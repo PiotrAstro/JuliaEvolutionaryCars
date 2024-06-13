@@ -1,0 +1,4 @@
+name = "JuliaEvolutionaryCars"
+uuid = "67cd5754-9a54-4d01-b0ba-1d2faa06a4f4"
+authors = ["Piotr Zatwarnicki <piotr.l.zatwarnicki@gmail.com>"]
+version = "0.1.0"
