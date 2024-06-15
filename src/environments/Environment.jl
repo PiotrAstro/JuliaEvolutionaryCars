@@ -1,13 +1,14 @@
+
 module Environment
-    include("../neural_network/NeuralNetwork.jl")
-    import .NeuralNetwork
-    export AbstractEnvironment, get_safe_data, load_safe_data!, reset!, react!, get_state, is_alive, get_trajectory_data!, get_trajectory_rewards!
+    import ..NeuralNetwork
+
+    export AbstractEnvironment, get_safe_data, load_safe_data!, reset!, react!, get_state, get_state_size, get_action_size, is_alive, get_trajectory_data!, get_trajectory_rewards!, get_environment, prepare_environments_kwargs, visualize!
     abstract type AbstractEnvironment end
 
-    struct Trajectory
-        states::Array{Float32}
-        actions::Array{Float32}
-        rewards::Array{Float64}
+    struct Trajectory{N1 <: AbstractFloat, N2 <: AbstractFloat}
+        states::Array{Float32, N1}
+        actions::Array{Float32, N2}
+        rewards::Vector{Float64}
         rewards_sum::Float64
     end
 
@@ -19,8 +20,8 @@ module Environment
     # ------------------------------------------------------------------------------------------------
     # Interface functions
 
-    "resets the environment before, doesnt reset after, concrete implementation will have some kwargs"
-    function visulize!(env::AbstractEnvironment, model::NeuralNetwork.AbstractNeuralNetwork;)
+    "Doesnt reset environment afterwards, real implementation will have some kwargs"
+    function visualize!(env::AbstractEnvironment, model::NeuralNetwork.AbstractNeuralNetwork, reset::Bool = true;)
         throw("unimplemented")
     end
 
@@ -63,7 +64,7 @@ module Environment
     "Get the rewards of the trajectory of the environments using the neural network. Returns sum of rewards for each environment. Modifies state of environments - resets them before and leaves them used"
     function get_trajectory_rewards!(envs::Vector{<:AbstractEnvironment}, neural_network::NeuralNetwork.AbstractNeuralNetwork; reset::Bool = true) :: Vector{Float64}
         rewards = zeros(Float64, length(envs))
-        envs_alive = Vector((env, i) for (i, env) in enumerate(envs))
+        envs_alive = Vector([(env, i) for (i, env) in enumerate(envs)])
 
         if reset
             for env in envs
@@ -72,15 +73,15 @@ module Environment
         end
 
         while length(envs_alive) > 0
-            states = Array([get_state(env) for (env, _) in envs_alive])
+            states = Array(hcat([get_state(env) for (env, _) in envs_alive]...))
             actions = NeuralNetwork.predict(neural_network, states)
             i = 1
             while i <= length(envs_alive)
                 (env, j) = envs_alive[i]
-                rewards[j] += react!(env, actions[i])
+                rewards[j] += react!(env, actions[:, i])
                 if !is_alive(env)
                     deleteat!(envs_alive, i)
-                    deleteat!(actions, i)
+                    actions = hcat(actions[:, 1:i-1], actions[:, i+1:end])
                     i -= 1
                 end
                 i += 1
@@ -116,8 +117,8 @@ module Environment
 
                 if !is_alive(env)
                     deleteat!(envs_alive, i)
-                    deleteat!(actions, i)
-                    deleteat!(states, i)
+                    states = vcat(states[1:i-1], states[i+1:end])
+                    actions = vcat(actions[1:i-1], actions[i+1:end])
                     i -= 1
                 end
                 i += 1
@@ -127,4 +128,29 @@ module Environment
         return [Trajectory(states, actions, rewards) for (rewards, states, actions) in trajectory_data]
     end
 
+
+
+    # includes
+    include("_CarEnvironment.jl")
+    using .CarEnvironment
+
+
+    function get_environment(name::Symbol) :: Type
+        if name == :BasicCarEnvironment
+            return BasicCarEnvironment
+        else
+            throw("Environment not found")
+        end
+    end
+
+    function prepare_environments_kwargs(dict_universal::Dict{Symbol, Any}, dict_changeable::Vector{Dict{Symbol, Any}}) :: Vector{Dict{Symbol, Any}}
+        dicts_copy = [deepcopy(dict_universal) for _ in 1:length(dict_changeable)]
+        for i in 1:length(dict_changeable)
+            for (key, value) in dict_changeable[i]
+                dicts_copy[i][key] = value
+            end
+        end
+
+        return dicts_copy
+    end
 end # module

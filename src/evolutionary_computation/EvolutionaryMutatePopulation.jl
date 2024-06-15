@@ -1,21 +1,15 @@
 module EvolutionaryMutatePopulaiton
-    include("../neural_network/NeuralNetwork.jl")
-    include("../neural_network/NeuralNetworkFunctions.jl")
-    include("../environments/EnvironmentFunctions.jl")
-    include("../environments/Environment.jl")
-
-    using Statistics
-    using .NeuralNetwork
-    using .NeuralNetworkFunctions
-    using .EnvironmentFunctions
-    using .Environment
+    import ..NeuralNetwork
+    import ..Environment
+    import Statistics as St
+    import Printf as Pf
 
     export EvolutionaryMutatePopulationAlgorithm, run!
 
     #--------------------------------------------------------------------------------------------------------
     # protected
 
-    mutable struct Individual{T <: Environment.AbstractEnvironment, N <: NeuralNetwork.AbstractNeuralNetwork}
+    mutable struct Individual{T<:Environment.AbstractEnvironment, N<:NeuralNetwork.AbstractNeuralNetwork}
         const neural_network_type::Type{N}
         const neural_network::N
         const neural_network_kwargs::Dict{Symbol, Any}
@@ -27,14 +21,14 @@ module EvolutionaryMutatePopulaiton
     end
 
     function Individual(
-            neural_network_type::Type{T},
+            neural_network_type::Type{N},
             neural_network_kwargs::Dict{Symbol, Any},
-            environments_kwargs::Dict{Symbol, Any},
-            environment_type::Type{N}
-        ) #where T <: Environment.AbstractEnvironment where N <: NeuralNetwork.AbstractNeuralNetwork
+            environments_kwargs::Vector{Dict{Symbol, Any}},
+            environment_type::Type{T}
+        ) where {T<:Environment.AbstractEnvironment, N<:NeuralNetwork.AbstractNeuralNetwork}
         return Individual{environment_type, neural_network_type}(
             neural_network_type,
-            (neural_network_type)(neural_network_kwargs...),
+            (neural_network_type)(;neural_network_kwargs...),
             neural_network_kwargs,
             0.0,
             false,
@@ -46,7 +40,7 @@ module EvolutionaryMutatePopulaiton
 
     function get_fitness(ind::Individual)::Float64
         if !ind._is_fitness_calculated
-            ind._fitness = sum(get_trajectory_rewards!(ind.environments, ind.neural_network; reset=true))
+            ind._fitness = sum(Environment.get_trajectory_rewards!(ind.environments, ind.neural_network; reset=true))
             ind._is_fitness_calculated = true
         end
         return ind._fitness
@@ -56,13 +50,26 @@ module EvolutionaryMutatePopulaiton
     function mutate(ind::Individual, mutation_rate::Float64) :: Individual
         get_fitness(ind)
         new_individual = copy(ind)
-        params = get_parameters(new_individual.neural_network)
+        params = NeuralNetwork.get_parameters(new_individual.neural_network)
         
         for param in params
-            param .+= randn() * mutation_rate
+            param .+= randn(Float32, size(param)) .* mutation_rate
         end
 
-        set_parameters!(new_individual.neural_network, params)
+        NeuralNetwork.set_parameters!(new_individual.neural_network, params)
+        new_individual._is_fitness_calculated = false
+        get_fitness(new_individual)
+        return new_individual
+    end
+
+    function crossover(ind1::Individual, ind2::Individual) :: Individual
+        get_fitness(ind1)
+        get_fitness(ind2)
+        new_individual = copy(ind1)
+        params1 = NeuralNetwork.get_parameters(ind1.neural_network)
+        params2 = NeuralNetwork.get_parameters(ind2.neural_network)
+        new_params = [rand() < 0.5 ? param1 : param2 for (param1, param2) in zip(params1, params2)]
+        NeuralNetwork.set_parameters!(new_individual.neural_network, new_params)
         new_individual._is_fitness_calculated = false
         get_fitness(new_individual)
         return new_individual
@@ -75,7 +82,7 @@ module EvolutionaryMutatePopulaiton
             ind.environments_kwargs,
             ind.environment_type
         )
-        set_parameters!(new_individual.neural_network, get_parameters(ind.neural_network))
+        NeuralNetwork.set_parameters!(new_individual.neural_network, NeuralNetwork.get_parameters(ind.neural_network))
         new_individual._fitness = ind._fitness
         new_individual._is_fitness_calculated = ind._is_fitness_calculated
         return new_individual
@@ -86,11 +93,9 @@ module EvolutionaryMutatePopulaiton
     # public
 
     mutable struct EvolutionaryMutatePopulationAlgorithm
-        population::Vector{Individual}
+        population::Vector{Individual{T, N}} where {T<:Environment.AbstractEnvironment, N<:NeuralNetwork.AbstractNeuralNetwork}
         population_size::Int
         mutation_rate::Float64
-        const max_generations::Int
-        const max_evaluations::Int
         const visualization_kwargs::Dict{Symbol, Any}
         const visualization_environment::Environment.AbstractEnvironment
         best_individual::Individual
@@ -100,8 +105,6 @@ module EvolutionaryMutatePopulaiton
     function EvolutionaryMutatePopulationAlgorithm(;
         population_size::Int,
         mutation_rate::Float64,
-        max_generations::Int,
-        max_evaluations::Int,
         n_threads::Int,
         environment_kwargs::Vector{Dict{Symbol, Any}},
         visualization_kwargs::Dict{Symbol, Any},
@@ -109,28 +112,18 @@ module EvolutionaryMutatePopulaiton
         environment::Symbol,
         neural_network_data::Dict{Symbol, Any}
     ) :: EvolutionaryMutatePopulationAlgorithm
-        nn_type = get_neural_network(neural_network_data[:name])
-        env_type = get_environment(environment)
+        nn_type = NeuralNetwork.get_neural_network(neural_network_data[:name])
+        env_type = Environment.get_environment(environment)
+        
         visualization_environment = (env_type)(;environment_visualization_kwargs...)
 
-        println((nn_type, env_type), (typeof(nn_type), typeof(env_type)))
-
-        ind = Individual(
-            AbstractNeuralNetwork,
-            neural_network_data[:kwargs],
-            environment_kwargs,
-            AbstractEnvironment
-        )
-
-        println("Hello world")
-
-        population = [
+        population = Vector([
             Individual(
                 nn_type,
                 neural_network_data[:kwargs],
                 environment_kwargs,
                 env_type
-        ) for _ in 1:population_size]
+        ) for _ in 1:population_size])
 
         visualization_environment = (env_type)(;environment_visualization_kwargs...)
 
@@ -138,8 +131,6 @@ module EvolutionaryMutatePopulaiton
             population,
             population_size,
             mutation_rate,
-            max_generations,
-            max_evaluations,
             visualization_kwargs,
             visualization_environment,
             population[1],
@@ -147,30 +138,46 @@ module EvolutionaryMutatePopulaiton
         )
     end
 
-    function run!(algo::EvolutionaryMutatePopulationAlgorithm)
-        for generation in 1:algo.max_generations
-            for individual in algo.population
-                if generation * algo.population_size >= algo.max_evaluations
-                    break
-                end
+    function run!(algo::EvolutionaryMutatePopulationAlgorithm; max_generations::Int, max_evaluations::Int, log::Bool=true, visualize_each_n_epochs::Int=0)
+        for generation in 1:max_generations
+            if generation * algo.population_size >= max_evaluations
+                break
+            end
 
-                # new_individuals = Threads.foreach((fit_individual) -> mutate(fit_individual, algo.mutation_rate), algo.population; ntasks=Threads.threadpoolsize())
-                time_start = time() 
-                new_individuals = Threads.@threads for i in 1:length(algo.population)
-                    mutate(algo.population[i], algo.mutation_rate)
-                end
-                time_end = time()
-                println("Generation: $generation, time: $(time_end - time_start)")
-                
-                append!(algo.population, new_individuals)
-                sorted = sort(algo.population, by=get_fitness, rev=true)
-                algo.population = sorted[1:algo.population_size]
+            # new_individuals = Threads.foreach((fit_individual) -> mutate(fit_individual, algo.mutation_rate), algo.population; ntasks=Threads.threadpoolsize())
+            time_start = time()
+            # new_individuals = Threads.foreach((fit_individual) -> mutate(fit_individual, algo.mutation_rate), algo.population; ntasks=Threads.threadpoolsize())
+            new_individuals = Vector(algo.population)
 
-                if get_fitness(algo.population[1]) > get_fitness(algo.best_individual)
-                    algo.best_individual = copy(algo.population[1])
-                end
+            Threads.@threads for i in eachindex(new_individuals)
+            # for i in eachindex(new_individuals)
+                new_individuals[i] = mutate(new_individuals[i], algo.mutation_rate)
+            end
+            time_end = time()
 
-                println("best: $(get_fitness(algo.best_individual))    mean: $(mean(get_fitness.(algo.population)))\n\n\n")
+
+            
+            append!(algo.population, new_individuals)
+            sorted = sort(algo.population, by=get_fitness, rev=true)
+            algo.population = sorted[1:algo.population_size]
+
+            if get_fitness(algo.population[1]) > get_fitness(algo.best_individual)
+                algo.best_individual = algo.population[1]
+            end
+
+            if log
+                quantiles = [0.25, 0.5, 0.75, 0.95]
+                quantiles_values = St.quantile(get_fitness.(algo.population), quantiles)
+                elapsed_time = time_end - time_start
+                one_mutation_ratio = Threads.nthreads() * elapsed_time / length(new_individuals)
+                Pf.@printf "Generation: %i, time: %.3f, threads: %i, calculated: %i, time*threads/calc: %.3f\n" generation elapsed_time Threads.nthreads() length(new_individuals) one_mutation_ratio
+                Pf.@printf "best: %.2f\tmean: %.2f\n" get_fitness(algo.best_individual) St.mean(get_fitness.(algo.population))
+                println("quantiles:\t$(join([(Pf.@sprintf "%.2f: %.2f" quantile fitness) for (quantile, fitness) in zip(quantiles, quantiles_values)], "\t"))")
+                print("\n\n\n")
+            end
+
+            if visualize_each_n_epochs > 0 && generation % visualize_each_n_epochs == 0
+                Environment.visualize!(algo.visualization_environment, algo.best_individual.neural_network; algo.visualization_kwargs...)
             end
         end
     end

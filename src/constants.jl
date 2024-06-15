@@ -6,19 +6,26 @@ car_image_path = raw"data\car.png"
 map_image_path_2 = raw"data\map.png"
 
 img = Gray.(load(map_image_path))
-map_view = Matrix{Bool}(Array(img) .> 0.5)
+map = Matrix{Bool}(Array(img) .> 0.5)
 
 img2 = Gray.(load(map_image_path_2))
-map_view_2 = Matrix{Bool}(Array(img2) .> 0.5)
+map_2 = Matrix{Bool}(Array(img2) .> 0.5)
 
 MAX_STEPS = 2000
 
 CONSTANTS_DICT = Dict(
+    :run_config => Dict(
+        :max_generations => 1000,
+        :max_evaluations => 100000,
+        :log => true,
+        :visualize_each_n_epochs => 50,
+    ),
     :environment => Dict(
         :name => :BasicCarEnvironment,
         :visualization => Dict(
             :car_image_path => car_image_path,
-            :map_image_path => map_image_path
+            :map_image_path => map_image_path,
+            :fps => 60,
         ),
         :universal_kwargs => Dict(
             :angle_max_change => 1.15,  # 1.15
@@ -34,37 +41,37 @@ CONSTANTS_DICT = Dict(
         ),
         :changeable_training_kwargs_list => [
             Dict(
-                :map_view => map_view,
+                :map => map,
                 :start_position => (504.0, 744.0),
                 :start_angle => 0.0,
                 :max_steps => MAX_STEPS
             ),
             Dict(
-                :map_view => map_view,
+                :map => map,
                 :start_position => (504.0, 744.0),
                 :start_angle => 180.0,
                 :max_steps => MAX_STEPS
             ),
             Dict(
-                :map_view => map_view,
+                :map => map,
                 :start_position => (425.0, 337.0),
                 :start_angle => 170.0,
                 :max_steps => MAX_STEPS
             ),
             Dict(
-                :map_view => map_view,
+                :map => map,
                 :start_position => (283.0, 536.0),
                 :start_angle => 200.0,
                 :max_steps => MAX_STEPS
             ),
             Dict(
-                :map_view => map_view,
+                :map => map,
                 :start_position => (665.0, 400.0),
                 :start_angle => 270.0,
                 :max_steps => MAX_STEPS
             ),
             Dict(
-                :map_view => map_view,
+                :map => map,
                 :start_position => (366.0, 173.0),
                 :start_angle => 315.0,
                 :max_steps => MAX_STEPS
@@ -72,7 +79,7 @@ CONSTANTS_DICT = Dict(
         ],
         :changeable_validation_kwargs_list => [
             Dict(
-                :map_view => map_view,
+                :map => map,
                 :start_position => (504.0, 744.0),
                 :start_angle => 0.0,
                 :max_steps => 5000
@@ -92,7 +99,7 @@ CONSTANTS_DICT = Dict(
         )
     ),
     :Genetic_Algorithm => Dict(
-        :population => 500,
+        :population => 100,
         :max_evaluations => 100000,
         :epochs => 10000,
         :mutation_factor => 0.1,
@@ -113,8 +120,8 @@ CONSTANTS_DICT = Dict(
     ),
     :Evolutionary_Mutate_Population => Dict(
         :population_size => 100,
-        :max_evaluations => 100000,
-        :max_generations => 1000,
+        # :max_evaluations => 100000,
+        # :max_generations => 1000,
         :mutation_rate => 0.1,
         # :mutation_controller => Dict(
         #     :name => :Mut_One,

@@ -1,13 +1,13 @@
 module MLP
-    include("NeuralNetwork.jl")
-    using .NeuralNetwork
-    using Flux
-    using Memoization
+    import Flux as Fx
+    import Memoization as Mm
 
-    export MLP_NN, predict, learn!, get_parameters, set_parameters!
+    import ..NeuralNetwork: AbstractNeuralNetwork, predict, learn!, get_parameters, set_parameters!
 
-    struct MLP_NN <: NeuralNetwork.AbstractNeuralNetwork
-        layers::Chain
+    export MLP_NN
+
+    struct MLP_NN <: AbstractNeuralNetwork
+        layers::Fx.Chain
     end
 
     """
@@ -28,7 +28,6 @@ module MLP
                     hidden_neurons::Int=64,
                     dropout::Float64=0.0,
                     activation_function::Symbol=:relu,
-                    #last_activation_function::Union{Symbol, Vector{Tuple{Symbol, Int}}}=:none)
                     last_activation_function::Union{Symbol, Vector{Tuple{Symbol, Int}}, Function}=:none)
         layers = []
         activation = _get_activation_function(activation_function)[1]
@@ -36,48 +35,48 @@ module MLP
         # Hidden layers
         for i in 1:hidden_layers
             if i == 1
-                push!(layers, Dense(input_size, hidden_neurons, activation))
+                push!(layers, Fx.Dense(input_size, hidden_neurons, activation))
             else
-                push!(layers, Dense(hidden_neurons, hidden_neurons, activation))
+                push!(layers, Fx.Dense(hidden_neurons, hidden_neurons, activation))
             end
 
             if dropout > 0.0
-                push!(layers, Dropout(dropout))
+                push!(layers, Fx.Dropout(dropout))
             end
         end
         if typeof(last_activation_function) <: Symbol
             activation_last_tmp = _get_activation_function(last_activation_function)
             if activation_last_tmp[2]
-                push!(layers, Dense(hidden_neurons, output_size, activation_last_tmp[1]))
+                push!(layers, Fx.Dense(hidden_neurons, output_size, activation_last_tmp[1]))
             else
-                push!(layers, Dense(hidden_neurons, output_size))
+                push!(layers, Fx.Dense(hidden_neurons, output_size))
                 push!(layers, activation_last_tmp[1])
             end
         elseif typeof(last_activation_function) <: Vector
-            push!(layers, Dense(hidden_neurons, output_size))
+            push!(layers, Fx.Dense(hidden_neurons, output_size))
 
             @assert output_size == sum([num for (_, num) in last_activation_function])
             final_activation = _generate_activation_function(last_activation_function)
             push!(layers, final_activation)
         elseif typeof(last_activation_function) <: Function
-            push!(layers, Dense(hidden_neurons, output_size))
+            push!(layers, Fx.Dense(hidden_neurons, output_size))
             push!(layers, last_activation_function)
         end
         
-        return MLP_NN(Chain(layers))
+        return MLP_NN(Fx.Chain(layers))
 
     end
 
-    function get_parameters(nn::AbstractNeuralNetwork) :: Flux.Params
-        return Flux.params(nn.layers)
+    function get_parameters(nn::AbstractNeuralNetwork) :: Fx.Params
+        return Fx.params(nn.layers)
     end
 
-    function set_parameters!(nn::AbstractNeuralNetwork, parameters::Flux.Params)
-        Flux.loadparams!(nn.layers, parameters)
+    function set_parameters!(nn::AbstractNeuralNetwork, parameters::Fx.Params)
+        Fx.loadparams!(nn.layers, parameters)
     end
 
     function predict(nn::MLP_NN, X::Array{Float32}) :: Array{Float32}
-        return testmode!(nn.layers(X))
+        return Fx.testmode!(nn.layers(X))
     end
 
     function learn!(nn::MLP_NN,
@@ -90,9 +89,9 @@ module MLP
                     )
         data = [(X, Y)]
         opt = ADAM(learning_rate)
-        ps = Flux.params(nn.layers)
+        ps = Fx.params(nn.layers)
         for epoch in 1:epochs
-            Flux.train!(Losses, ps, data, opt)
+            Fx.train!(Losses, ps, data, opt)
         end
     end
 
@@ -127,7 +126,7 @@ module MLP
         return code
     end
 
-    @memoize Dict function _generate_activation_function(activations::Vector{Tuple{Symbol, Int}}) :: Function  # I might remove Dict - it will be a bit faster, but will be based on === not on ==
+    Mm.@memoize Dict function _generate_activation_function(activations::Vector{Tuple{Symbol, Int}}) :: Function  # I might remove Dict - it will be a bit faster, but will be based on === not on ==
         f = eval(_generate_activation_function_code(activations))
         final_activation = (x) -> Base.invokelatest(f, x)
         return final_activation
@@ -140,13 +139,13 @@ module MLP
     """
     function _get_activation_function(name::Symbol)::Tuple{Function, Bool}
         if name == :relu
-            return (Flux.relu, true)
+            return (Fx.relu, true)
         elseif name == :sigmoid
-            return (Flux.sigmoid, true)
+            return (Fx.sigmoid, true)
         elseif name == :tanh
-            return (Flux.tanh, true)
+            return (Fx.tanh, true)
         elseif name == :softmax
-            return (Flux.softmax, false)
+            return (Fx.softmax, false)
         elseif name == :none
             return (identity, false)
         else

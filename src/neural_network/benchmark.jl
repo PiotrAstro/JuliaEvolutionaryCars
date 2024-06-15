@@ -4,7 +4,7 @@ using BenchmarkTools
 using Random
 using LinearAlgebra
 
-include("MLP.jl")
+include("_MLP.jl")
 using .MLP
 
 # Set the number of BLAS threads to 1
