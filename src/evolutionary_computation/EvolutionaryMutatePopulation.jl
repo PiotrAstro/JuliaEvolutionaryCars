@@ -4,6 +4,8 @@ module EvolutionaryMutatePopulaiton
     import Statistics as St
     import Printf as Pf
 
+    import Plots
+
     export EvolutionaryMutatePopulationAlgorithm, run!
 
     #--------------------------------------------------------------------------------------------------------
@@ -151,6 +153,7 @@ module EvolutionaryMutatePopulaiton
 
             Threads.@threads for i in eachindex(new_individuals)
             # for i in eachindex(new_individuals)
+                # new_individuals[i] = @time mutate(new_individuals[i], algo.mutation_rate)
                 new_individuals[i] = mutate(new_individuals[i], algo.mutation_rate)
             end
             time_end = time()
@@ -163,13 +166,25 @@ module EvolutionaryMutatePopulaiton
 
             if get_fitness(algo.population[1]) > get_fitness(algo.best_individual)
                 algo.best_individual = algo.population[1]
+
+                if get_fitness(algo.best_individual) > 400.0
+                    trajectories = Environment.get_trajectory_data!(algo.best_individual.environments, algo.best_individual.neural_network)
+                    trajectory = trajectories[1]
+                    states = [trajectory.states[:, i] for i in 1:size(trajectory.states)[2]]
+                    states_cosine_similarity = [_cosine_similarity(states[1], state) for state in states]
+
+                    
+                    Plots.plot(states_cosine_similarity, label="cosine similarity")
+                    Plots.savefig("../log/cosine_similarity.png")
+                    println("best fitness: $(get_fitness(algo.best_individual))")
+                end
             end
 
             if log
                 quantiles = [0.25, 0.5, 0.75, 0.95]
                 quantiles_values = St.quantile(get_fitness.(algo.population), quantiles)
                 elapsed_time = time_end - time_start
-                one_mutation_ratio = Threads.nthreads() * elapsed_time / length(new_individuals)
+                one_mutation_ratio = Threads.nthreads() * elapsed_time / length(algo.population)
                 Pf.@printf "Generation: %i, time: %.3f, threads: %i, calculated: %i, time*threads/calc: %.3f\n" generation elapsed_time Threads.nthreads() length(new_individuals) one_mutation_ratio
                 Pf.@printf "best: %.2f\tmean: %.2f\n" get_fitness(algo.best_individual) St.mean(get_fitness.(algo.population))
                 println("quantiles:\t$(join([(Pf.@sprintf "%.2f: %.2f" quantile fitness) for (quantile, fitness) in zip(quantiles, quantiles_values)], "\t"))")
@@ -181,4 +196,18 @@ module EvolutionaryMutatePopulaiton
             end
         end
     end
+
+    function _cosine_similarity(v1::Vector{Float32}, v2::Vector{Float32}) :: Float64
+        value = 0.0
+        length_1 = 0.0
+        length_2 = 0.0
+
+        for (x, y) in zip(v1, v2)
+            value += x * y
+            length_1 += x^2
+            length_2 += y^2
+        end
+
+        return value / (sqrt(length_1) * sqrt(length_2))
+    end 
 end

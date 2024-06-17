@@ -5,9 +5,9 @@ module Environment
     export AbstractEnvironment, get_safe_data, load_safe_data!, reset!, react!, get_state, get_state_size, get_action_size, is_alive, get_trajectory_data!, get_trajectory_rewards!, get_environment, prepare_environments_kwargs, visualize!
     abstract type AbstractEnvironment end
 
-    struct Trajectory{N1 <: AbstractFloat, N2 <: AbstractFloat}
-        states::Array{Float32, N1}
-        actions::Array{Float32, N2}
+    struct Trajectory{A1 <: Array{Float32}, A2 <: Array{Float32}}
+        states::A1
+        actions::A2
         rewards::Vector{Float64}
         rewards_sum::Float64
     end
@@ -64,7 +64,7 @@ module Environment
     "Get the rewards of the trajectory of the environments using the neural network. Returns sum of rewards for each environment. Modifies state of environments - resets them before and leaves them used"
     function get_trajectory_rewards!(envs::Vector{<:AbstractEnvironment}, neural_network::NeuralNetwork.AbstractNeuralNetwork; reset::Bool = true) :: Vector{Float64}
         rewards = zeros(Float64, length(envs))
-        envs_alive = Vector([(env, i) for (i, env) in enumerate(envs)])
+        envs_alive = [(env, i) for (i, env) in enumerate(envs)]
 
         if reset
             for env in envs
@@ -93,39 +93,40 @@ module Environment
 
     "Get the rewards, states and actions of the trajectory of the environments using the neural network. Returns sum of rewards for each environment. Modifies state of environments - resets them before and leaves them used"
     function get_trajectory_data!(envs::Vector{<:AbstractEnvironment}, neural_network::NeuralNetwork.AbstractNeuralNetwork, reset::Bool = true) :: Vector{Trajectory}
-        envs_alive = Vector((env, i) for (i, env) in enumerate(envs))
-        trajectory_data = Vector{Tuple{Vector{AbstractFloat}, Array{AbstractFloat}, Array{AbstractFloat}}}()
+        envs_alive = [(env, i) for (i, env) in enumerate(envs)]
+        trajectory_data = Vector{Tuple{Vector{Float64}, Vector{Array{Float32}}, Vector{Array{Float32}}}}()
 
         for env in envs
             if reset
                 reset!(env)
             end
 
-            push!(trajectory_data, (Vector{Float64}, Array{Float32}(), Array{Float32}()))
+            push!(trajectory_data, (Vector{Float64}(), Vector{Array{Float32}}(), Vector{Array{Float32}}()))
         end
 
         while length(envs_alive) > 0
-            states = Array([get_state(env) for (env, _) in envs_alive])
+            states = reduce(hcat, [get_state(env) for (env, _) in envs_alive])
             actions = NeuralNetwork.predict(neural_network, states)
             i = 1
             while i <= length(envs_alive)
                 (env, j) = envs_alive[i]
-                reward = react!(env, actions[i])
+                current_action = actions[:, i]
+                reward = react!(env, current_action)
                 push!(trajectory_data[j][1], reward)
-                push!(trajectory_data[j][2], states[i])
-                push!(trajectory_data[j][3], actions[i])
+                push!(trajectory_data[j][2], states[:, i])
+                push!(trajectory_data[j][3], current_action)
 
                 if !is_alive(env)
                     deleteat!(envs_alive, i)
-                    states = vcat(states[1:i-1], states[i+1:end])
-                    actions = vcat(actions[1:i-1], actions[i+1:end])
+                    states = hcat(states[:, 1:i-1], states[:, i+1:end])
+                    actions = hcat(actions[:, 1:i-1], actions[:, i+1:end])
                     i -= 1
                 end
                 i += 1
             end
         end
 
-        return [Trajectory(states, actions, rewards) for (rewards, states, actions) in trajectory_data]
+        return [Trajectory(reduce(hcat, states), reduce(hcat, actions), rewards) for (rewards, states, actions) in trajectory_data]
     end
 
 

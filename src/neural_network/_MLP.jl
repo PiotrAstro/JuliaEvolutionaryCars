@@ -1,13 +1,18 @@
+
+__precompile__(false)
 module MLP
-    import Flux as Fx
+    import Flux
+    import Random
+    import IterTools
+    import Optimisers as Opt
     import Memoization as Mm
 
     import ..NeuralNetwork: AbstractNeuralNetwork, predict, learn!, get_parameters, set_parameters!
 
     export MLP_NN
 
-    struct MLP_NN <: AbstractNeuralNetwork
-        layers::Fx.Chain
+    mutable struct MLP_NN <: AbstractNeuralNetwork
+        layers::Flux.Chain
     end
 
     """
@@ -35,63 +40,76 @@ module MLP
         # Hidden layers
         for i in 1:hidden_layers
             if i == 1
-                push!(layers, Fx.Dense(input_size, hidden_neurons, activation))
+                push!(layers, Flux.Dense(input_size, hidden_neurons, activation))
             else
-                push!(layers, Fx.Dense(hidden_neurons, hidden_neurons, activation))
+                push!(layers, Flux.Dense(hidden_neurons, hidden_neurons, activation))
             end
 
             if dropout > 0.0
-                push!(layers, Fx.Dropout(dropout))
+                push!(layers, Flux.Dropout(dropout))
             end
         end
         if typeof(last_activation_function) <: Symbol
             activation_last_tmp = _get_activation_function(last_activation_function)
             if activation_last_tmp[2]
-                push!(layers, Fx.Dense(hidden_neurons, output_size, activation_last_tmp[1]))
+                push!(layers, Flux.Dense(hidden_neurons, output_size, activation_last_tmp[1]))
             else
-                push!(layers, Fx.Dense(hidden_neurons, output_size))
+                push!(layers, Flux.Dense(hidden_neurons, output_size))
                 push!(layers, activation_last_tmp[1])
             end
         elseif typeof(last_activation_function) <: Vector
-            push!(layers, Fx.Dense(hidden_neurons, output_size))
+            push!(layers, Flux.Dense(hidden_neurons, output_size))
 
             @assert output_size == sum([num for (_, num) in last_activation_function])
             final_activation = _generate_activation_function(last_activation_function)
             push!(layers, final_activation)
         elseif typeof(last_activation_function) <: Function
-            push!(layers, Fx.Dense(hidden_neurons, output_size))
+            push!(layers, Flux.Dense(hidden_neurons, output_size))
             push!(layers, last_activation_function)
         end
         
-        return MLP_NN(Fx.Chain(layers))
+        return MLP_NN(Flux.Chain(layers))
 
     end
 
-    function get_parameters(nn::AbstractNeuralNetwork) :: Fx.Params
-        return Fx.params(nn.layers)
+    function get_parameters(nn::AbstractNeuralNetwork) :: Flux.Params
+        return Flux.params(nn.layers)
     end
 
-    function set_parameters!(nn::AbstractNeuralNetwork, parameters::Fx.Params)
-        Fx.loadparams!(nn.layers, parameters)
+    function set_parameters!(nn::AbstractNeuralNetwork, parameters::Flux.Params)
+        Flux.loadparams!(nn.layers, parameters)
     end
 
     function predict(nn::MLP_NN, X::Array{Float32}) :: Array{Float32}
-        return Fx.testmode!(nn.layers(X))
+        return Flux.testmode!(nn.layers(X))
     end
 
     function learn!(nn::MLP_NN,
                     X::Array{Float32},
                     Y::Array{Float32},
-                    Loss::Function;
+                    loss::Function;
                     epochs::Int = 1,
                     batch_size::Int = 1,
                     learning_rate::AbstractFloat = 0.01
                     )
-        data = [(X, Y)]
-        opt = ADAM(learning_rate)
-        ps = Fx.params(nn.layers)
+        opt_settings = Opt.AdamW(learning_rate)
+        opt_state = Flux.setup(opt_settings, nn.layers)
+        custom_loss = (m, x, y) -> loss(m(x), y)
+
+        # shuffle x and y the same way
+        perm = Random.randperm(size(X, 2))
+        X = X[:, perm]
+        Y = Y[:, perm]
+
+        x_batches = IterTools.partition(1:size(X, 2), batch_size)
+        y_batches = IterTools.partition(1:size(Y, 2), batch_size)
+
         for epoch in 1:epochs
-            Fx.train!(Losses, ps, data, opt)
+            for data in zip(x_batches, y_batches)
+                # gs = Flux.gradient(x -> Loss(nn.layers(x), y_batch), Flux.params(nn.layers))
+                # opt_state, nn.layers = Opt.update!(opt_state, nn.layers, gs)
+                Flux.train!(custom_loss, nn.layers, data, opt_state)
+            end
         end
     end
 
@@ -139,13 +157,13 @@ module MLP
     """
     function _get_activation_function(name::Symbol)::Tuple{Function, Bool}
         if name == :relu
-            return (Fx.relu, true)
+            return (Flux.relu, true)
         elseif name == :sigmoid
-            return (Fx.sigmoid, true)
+            return (Flux.sigmoid, true)
         elseif name == :tanh
-            return (Fx.tanh, true)
+            return (Flux.tanh, true)
         elseif name == :softmax
-            return (Fx.softmax, false)
+            return (Flux.softmax, false)
         elseif name == :none
             return (identity, false)
         else

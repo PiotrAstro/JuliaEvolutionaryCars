@@ -18,7 +18,7 @@ CONSTANTS_DICT = Dict(
         :max_generations => 1000,
         :max_evaluations => 100000,
         :log => true,
-        :visualize_each_n_epochs => 50,
+        :visualize_each_n_epochs => 20,
     ),
     :environment => Dict(
         :name => :BasicCarEnvironment,
