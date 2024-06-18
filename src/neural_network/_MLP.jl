@@ -1,5 +1,4 @@
 
-__precompile__(false)
 module MLP
     import Flux
     import Random
@@ -81,35 +80,38 @@ module MLP
     end
 
     function predict(nn::MLP_NN, X::Array{Float32}) :: Array{Float32}
-        return Flux.testmode!(nn.layers(X))
+        # return Flux.testmode!(nn.layers(X))
+        return nn.layers(X)
     end
 
     function learn!(nn::MLP_NN,
                     X::Array{Float32},
                     Y::Array{Float32},
                     loss::Function;
-                    epochs::Int = 1,
+                    epochs::Int = 64,
                     batch_size::Int = 1,
                     learning_rate::AbstractFloat = 0.01
                     )
         opt_settings = Opt.AdamW(learning_rate)
         opt_state = Flux.setup(opt_settings, nn.layers)
-        custom_loss = (m, x, y) -> loss(m(x), y)
+        custom_loss = (m, x, y) -> (loss)(m(x), y)
 
         # shuffle x and y the same way
         perm = Random.randperm(size(X, 2))
         X = X[:, perm]
         Y = Y[:, perm]
 
-        x_batches = IterTools.partition(1:size(X, 2), batch_size)
-        y_batches = IterTools.partition(1:size(Y, 2), batch_size)
+        batches = [(
+                X[:, i: (i+batch_size-1 <= size(X, 2) ? i+batch_size-1 : end)],
+                Y[:, i: (i+batch_size-1 <= size(Y, 2) ? i+batch_size-1 : end)]
+            ) for i in 1:batch_size:size(X, 2)]
 
         for epoch in 1:epochs
-            for data in zip(x_batches, y_batches)
-                # gs = Flux.gradient(x -> Loss(nn.layers(x), y_batch), Flux.params(nn.layers))
-                # opt_state, nn.layers = Opt.update!(opt_state, nn.layers, gs)
-                Flux.train!(custom_loss, nn.layers, data, opt_state)
-            end
+            # for data in batches
+            #     gs = Flux.gradient(x -> Loss(nn.layers(x), y_batch), Flux.params(nn.layers))
+            #     opt_state, nn.layers = Opt.update!(opt_state, nn.layers, gs)
+            # end
+            Flux.train!(custom_loss, nn.layers, batches, opt_state)
         end
     end
 
@@ -134,7 +136,8 @@ module MLP
     
         # Construct the final expressions
         final_expressions = [
-            dot ? :($(activation).(x[$(starts[i]):$(ends[i]), :])) : :($(activation)(x[$(starts[i]):$(ends[i]), :]))
+            dot ? :($(activation).(view(x, $(starts[i]):$(ends[i]), :))) : :($(activation)(view(x, $(starts[i]):$(ends[i]), :)))
+            # dot ? :($(activation).(x[$(starts[i]):$(ends[i]), :])) : :($(activation)(x[$(starts[i]):$(ends[i]), :]))
             for (i, (activation, dot)) in enumerate(activations_info)
         ]
     
@@ -146,8 +149,12 @@ module MLP
 
     Mm.@memoize Dict function _generate_activation_function(activations::Vector{Tuple{Symbol, Int}}) :: Function  # I might remove Dict - it will be a bit faster, but will be based on === not on ==
         f = eval(_generate_activation_function_code(activations))
-        final_activation = (x) -> Base.invokelatest(f, x)
-        return final_activation
+        return f
+
+        # IMPORTANT: lines below should be uncommented for world age problem, but they also make zygote not work
+        
+        # final_activation = (x) -> Base.invokelatest(f, x)
+        # return final_activation
     end
 
     """

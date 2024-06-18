@@ -4,6 +4,9 @@ module EvolutionaryMutatePopulaiton
     import Statistics as St
     import Printf as Pf
 
+    # tmp
+    import Flux
+
     import Plots
 
     export EvolutionaryMutatePopulationAlgorithm, run!
@@ -61,6 +64,43 @@ module EvolutionaryMutatePopulaiton
         NeuralNetwork.set_parameters!(new_individual.neural_network, params)
         new_individual._is_fitness_calculated = false
         get_fitness(new_individual)
+        return new_individual
+    end
+
+    function local_search(ind::Individual) :: Individual
+        TRIES = 20
+        CHANGES = 5
+        
+        previous_fitness = get_fitness(ind)
+        new_individual = copy(ind)
+        trajectories = Environment.get_trajectory_data!(new_individual.environments, new_individual.neural_network)
+        
+        for _ in 1:TRIES
+            states = reduce(hcat, [trajectory.states for trajectory in trajectories])
+            actions = reduce(hcat, [trajectory.actions for trajectory in trajectories])
+
+            random_index = rand(1:size(states)[2], CHANGES)
+            random_states = states[:, random_index]
+            random_actions = actions[:, random_index]
+
+            random_actions .+= randn(Float32, size(random_actions)) .* 0.1
+            random_actions = vcat(Flux.softmax(random_actions[1:3, :]), Flux.softmax(random_actions[4:6, :])) #(random_actions .- minimum(random_actions, dims=1)) ./ (maximum(random_actions, dims=1) .- minimum(random_actions, dims=1))
+            
+            previous_params = NeuralNetwork.get_parameters(new_individual.neural_network)
+            NeuralNetwork.learn!(new_individual.neural_network, random_states, random_actions, Flux.kldivergence; epochs=10, learning_rate=0.001)
+            
+            trajectories_new = Environment.get_trajectory_data!(new_individual.environments, new_individual.neural_network)
+            new_fitness = sum([trajectory.rewards_sum for trajectory in trajectories_new])
+            if new_fitness > previous_fitness
+                previous_fitness = new_fitness
+                trajectories = trajectories_new
+            else
+                NeuralNetwork.set_parameters!(new_individual.neural_network, previous_params)
+            end
+        end
+
+        new_individual._fitness = previous_fitness
+        new_individual._is_fitness_calculated = true
         return new_individual
     end
 
@@ -165,19 +205,26 @@ module EvolutionaryMutatePopulaiton
             algo.population = sorted[1:algo.population_size]
 
             if get_fitness(algo.population[1]) > get_fitness(algo.best_individual)
+                locally_new = local_search(algo.best_individual)
+
+                if log
+                    println("\n\n\n\n$(generation) - new best fitness:")
+                    Pf.@printf "previous: %.2f \t new: %.2f \t new ls: %.2f \n\n\n\n" get_fitness(algo.best_individual) get_fitness(algo.population[1]) get_fitness(locally_new)
+                end
+                algo.population[1] = locally_new
                 algo.best_individual = algo.population[1]
 
-                if get_fitness(algo.best_individual) > 400.0
-                    trajectories = Environment.get_trajectory_data!(algo.best_individual.environments, algo.best_individual.neural_network)
-                    trajectory = trajectories[1]
-                    states = [trajectory.states[:, i] for i in 1:size(trajectory.states)[2]]
-                    states_cosine_similarity = [_cosine_similarity(states[1], state) for state in states]
+                # if get_fitness(algo.best_individual) > 400.0
+                #     trajectories = Environment.get_trajectory_data!(algo.best_individual.environments, algo.best_individual.neural_network)
+                #     trajectory = trajectories[1]
+                #     states = [trajectory.states[:, i] for i in 1:size(trajectory.states)[2]]
+                #     states_cosine_similarity = [_cosine_similarity(states[1], state) for state in states]
 
                     
-                    Plots.plot(states_cosine_similarity, label="cosine similarity")
-                    Plots.savefig("../log/cosine_similarity.png")
-                    println("best fitness: $(get_fitness(algo.best_individual))")
-                end
+                #     Plots.plot(states_cosine_similarity, label="cosine similarity")
+                #     Plots.savefig("log/cosine_similarity.png")
+                #     println("best fitness: $(get_fitness(algo.best_individual))")
+                # end
             end
 
             if log
