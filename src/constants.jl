@@ -1,5 +1,6 @@
 using Images
 using FileIO
+import Flux
 
 map_image_path = raw"data\map2.png"
 car_image_path = raw"data\car.png"
@@ -95,9 +96,57 @@ CONSTANTS_DICT = Dict(
             :hidden_neurons => 256,  # 64
             :dropout => 0.0,
             :activation_function => :relu,  # :relu
-            :last_activation_function => [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
+            :last_activation_function => (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
         )
     ),
+
+
+
+    :StatesGroupingGA => Dict(
+        :nn_encoder => Dict(
+            :name => :MLP_NN,
+            :kwargs => Dict(
+                :input_size => 10,
+                :output_size => 64,
+                :hidden_layers => 1,
+                :hidden_neurons => 64,  # 64
+                :dropout => 0.5,
+                :activation_function => :relu,  # :relu
+                :last_activation_function => :none
+            )
+        ),
+        :nn_autodecoder => Dict(
+            :name => :MLP_NN,
+            :kwargs => Dict(
+                :input_size => 64,
+                :output_size => 10,
+                :hidden_layers => 1,
+                :hidden_neurons => 64,  # 64
+                :dropout => 0.5,
+                :activation_function => :relu,  # :relu
+                :input_activation_function => :relu,
+                :last_activation_function => :none
+            )
+        ),
+        :nn_game_decoder => Dict(
+            :name => :MLP_NN,
+            :kwargs => Dict(
+                :input_size => 64,
+                :output_size => 6,
+                :hidden_layers => 1,
+                :hidden_neurons => 64,  # 64
+                :dropout => 0.5,
+                :activation_function => :relu,  # :relu
+                :input_activation_function => :relu,
+                :last_activation_function => (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
+            )
+        ),
+        :space_explorers_n => 10,
+    ),
+
+
+
+
     :Genetic_Algorithm => Dict(
         :population => 100,
         :max_evaluations => 100000,

@@ -3,10 +3,10 @@ module EvolutionaryMutatePopulaiton
     import ..Environment
     import Statistics as St
     import Printf as Pf
+    import JLD
 
     # tmp
     import Flux
-
     import Plots
 
     export EvolutionaryMutatePopulationAlgorithm, run!
@@ -77,10 +77,13 @@ module EvolutionaryMutatePopulaiton
         
         for _ in 1:TRIES
             states = reduce(hcat, [trajectory.states for trajectory in trajectories])
+            JLD.save("log/states.jld", "states", states)
             actions = reduce(hcat, [trajectory.actions for trajectory in trajectories])
 
             random_index = rand(1:size(states)[2], CHANGES)
             random_states = states[:, random_index]
+            
+
             random_actions = actions[:, random_index]
 
             random_actions .+= randn(Float32, size(random_actions)) .* 0.1
@@ -214,17 +217,17 @@ module EvolutionaryMutatePopulaiton
                 algo.population[1] = locally_new
                 algo.best_individual = algo.population[1]
 
-                # if get_fitness(algo.best_individual) > 400.0
-                #     trajectories = Environment.get_trajectory_data!(algo.best_individual.environments, algo.best_individual.neural_network)
-                #     trajectory = trajectories[1]
-                #     states = [trajectory.states[:, i] for i in 1:size(trajectory.states)[2]]
-                #     states_cosine_similarity = [_cosine_similarity(states[1], state) for state in states]
+                if get_fitness(algo.best_individual) > 400.0
+                    trajectories = Environment.get_trajectory_data!(algo.best_individual.environments, algo.best_individual.neural_network)
+                    trajectory = trajectories[1]
+                    states = [trajectory.states[:, i] for i in 1:size(trajectory.states)[2]]
+                    states_cosine_similarity = [_cosine_similarity(states[1], state) for state in states]
 
                     
-                #     Plots.plot(states_cosine_similarity, label="cosine similarity")
-                #     Plots.savefig("log/cosine_similarity.png")
-                #     println("best fitness: $(get_fitness(algo.best_individual))")
-                # end
+                    Plots.plot(states_cosine_similarity, label="cosine similarity")
+                    Plots.savefig("log/cosine_similarity.png")
+                    println("best fitness: $(get_fitness(algo.best_individual))")
+                end
             end
 
             if log
