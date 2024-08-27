@@ -15,6 +15,8 @@ map_2 = Matrix{Bool}(Array(img2) .> 0.5)
 MAX_STEPS = 2000
 
 CONSTANTS_DICT = Dict(
+    # ------------------------------------------------------------------------------------
+    # Universal staff
     :run_config => Dict(
         :max_generations => 1000,
         :max_evaluations => 100000,
@@ -101,15 +103,18 @@ CONSTANTS_DICT = Dict(
     ),
 
 
+    # ------------------------------------------------------------------------------------
+    # method specific staff
+
 
     :StatesGroupingGA => Dict(
         :nn_encoder => Dict(
             :name => :MLP_NN,
             :kwargs => Dict(
                 :input_size => 10,
-                :output_size => 64,
+                :output_size => 32,
                 :hidden_layers => 1,
-                :hidden_neurons => 64,  # 64
+                :hidden_neurons => 32,  # 64
                 :dropout => 0.5,
                 :activation_function => :relu,  # :relu
                 :last_activation_function => :none
@@ -118,30 +123,33 @@ CONSTANTS_DICT = Dict(
         :nn_autodecoder => Dict(
             :name => :MLP_NN,
             :kwargs => Dict(
-                :input_size => 64,
+                :input_size => 32,
                 :output_size => 10,
                 :hidden_layers => 1,
-                :hidden_neurons => 64,  # 64
+                :hidden_neurons => 32,  # 64
                 :dropout => 0.5,
                 :activation_function => :relu,  # :relu
                 :input_activation_function => :relu,
-                :last_activation_function => :none
+                :last_activation_function => :none,
+                :loss => Flux.mse
             )
         ),
         :nn_game_decoder => Dict(
             :name => :MLP_NN,
             :kwargs => Dict(
-                :input_size => 64,
-                :output_size => 6,
-                :hidden_layers => 1,
-                :hidden_neurons => 64,  # 64
-                :dropout => 0.5,
+                :input_size => 32,
+                :output_size => 9,
+                :hidden_layers => 2,
+                :hidden_neurons => 32,  # 64
+                :dropout => 0.0,  # 0.5,
                 :activation_function => :relu,  # :relu
-                :input_activation_function => :relu,
-                :last_activation_function => (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
+                :input_activation_function => :none,  # :relu,
+                :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
+                :loss => Flux.crossentropy
             )
         ),
-        :space_explorers_n => 10,
+        :space_explorers_n => 50,
+        :max_states_considered => 10_000,
     ),
 
 

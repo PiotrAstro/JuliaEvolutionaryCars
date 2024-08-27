@@ -1,19 +1,27 @@
-import MKL
+using MKL
+
+using LinearAlgebra
+println("BLAS kernel: $(BLAS.get_config())")
+println("Number of BLAS threads: $(BLAS.get_num_threads())")
+println("Number of Julia threads: $(Threads.nthreads())")
 
 module JuliaEvolutionaryCars
 
     export run_EvMutPop
 
-    include("neural_network/NeuralNetwork.jl")
+    include("ClusteringHML/ClusteringHML.jl")
+    import .ClusteringHML
+
+    include("NeuralNetwork/NeuralNetwork.jl")
     import .NeuralNetwork
 
-    include("environments/Environment.jl")
+    include("Environments/Environment.jl")
     import .Environment
 
-    include("evolutionary_computation/EvolutionaryMutatePopulation.jl")
+    include("EvolutionaryComputation/EvolutionaryMutatePopulation.jl")
     import .EvolutionaryMutatePopulaiton
 
-    include("evolutionary_computation/states_grouping_GA/StatesGroupingGA.jl")
+    include("EvolutionaryComputation/StatesGroupingGA/StatesGroupingGA.jl")
     import .StatesGroupingGA
 
     function run_EvMutPop(CONSTANTS_DICT::Dict{Symbol})

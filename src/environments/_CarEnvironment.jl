@@ -38,21 +38,21 @@ All angles are in degrees, later they are converted to radians for calculations.
 Car dimmensions should be full width and full height. They are converted to half width and half height in the constructor.
 """
 function BasicCarEnvironment(;
-                            map::Matrix{Bool},
-                            start_position::Tuple{Float64, Float64},
-                            start_angle::Float64,
-                            max_steps::Int,
-                            angle_max_change::Float64,
-                            car_dimensions::Tuple{Float64, Float64},
-                            initial_speed::Float64,
-                            min_speed::Float64,
-                            max_speed::Float64,
-                            speed_change::Float64,
-                            rays::Vector{Float64},
-                            rays_distances_scale_factor::Float64,
-                            ray_input_clip::Float64,
-                            collision_reward::Float64
-                            ) :: BasicCarEnvironment
+    map::Matrix{Bool},
+    start_position::Tuple{Float64, Float64},
+    start_angle::Float64,
+    max_steps::Int,
+    angle_max_change::Float64,
+    car_dimensions::Tuple{Float64, Float64},
+    initial_speed::Float64,
+    min_speed::Float64,
+    max_speed::Float64,
+    speed_change::Float64,
+    rays::Vector{Float64},
+    rays_distances_scale_factor::Float64,
+    ray_input_clip::Float64,
+    collision_reward::Float64
+) :: BasicCarEnvironment
     angle_max_change = deg2rad(angle_max_change)
     start_angle = deg2rad(start_angle)
     rays_rad = deg2rad.(rays)
@@ -96,8 +96,14 @@ end
 function react!(env::BasicCarEnvironment, action::Vector{Float32}) :: Float64
     env.current_step += 1
     
-    steering_action = argmax(action[1:3])
-    speed_action = argmax(action[4:6])
+    # for action space with 2 x 3 softmax outputs
+    # steering_action = argmax(action[1:3])
+    # speed_action = argmax(action[4:6])
+
+    # for action space with 9 outputs, all possible combinations
+    max_action = argmax(action)
+    steering_action = (max_action - 1) % 3 + 1
+    speed_action = (max_action - 1) ÷ 3 + 1
 
     if steering_action == 2
         env.angle += env.angle_max_change
@@ -131,7 +137,7 @@ function get_state_size(env::BasicCarEnvironment) :: Vector{Int}
 end
 
 function get_action_size(env::BasicCarEnvironment) :: Int
-    return 6
+    return 9  # 6
 end
 
 function get_state(env::BasicCarEnvironment) :: Array{Float32}

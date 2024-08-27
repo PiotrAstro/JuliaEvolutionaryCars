@@ -75,47 +75,25 @@ function MLP_NN(;
 
 end
 
-function get_parameters(nn::AbstractNeuralNetwork) :: Flux.Params
+function get_parameters(nn::MLP_NN) :: Flux.Params
     return Flux.params(nn.layers)
 end
 
-function set_parameters!(nn::AbstractNeuralNetwork, parameters::Flux.Params)
+function set_parameters!(nn::MLP_NN, parameters::Flux.Params)
     Flux.loadparams!(nn.layers, parameters)
+end
+
+function get_loss(nn::MLP_NN) :: Function
+    return nn.loss
+end
+
+function get_Flux_representation(nn::MLP_NN)
+    return nn.layers
 end
 
 function predict(nn::MLP_NN, X::Array{Float32}) :: Array{Float32}
     # return Flux.testmode!(nn.layers(X))
     return nn.layers(X)
-end
-
-function learn!(nn::MLP_NN,
-                X::Array{Float32},
-                Y::Array{Float32};
-                epochs::Int = 64,
-                batch_size::Int = 1,
-                learning_rate::AbstractFloat = 0.01
-                )
-    opt_settings = Optimisers.AdamW(learning_rate)
-    opt_state = Flux.setup(opt_settings, nn.layers)
-    custom_loss = (m, x, y) -> (nn.loss)(m(x), y)
-
-    # shuffle x and y the same way
-    perm = Random.randperm(size(X, 2))
-    X = X[:, perm]
-    Y = Y[:, perm]
-
-    batches = [(
-            X[:, i: (i+batch_size-1 <= size(X, 2) ? i+batch_size-1 : end)],
-            Y[:, i: (i+batch_size-1 <= size(Y, 2) ? i+batch_size-1 : end)]
-        ) for i in 1:batch_size:size(X, 2)]
-
-    for epoch in 1:epochs
-        # for data in batches
-        #     gs = Flux.gradient(x -> Loss(nn.layers(x), y_batch), Flux.params(nn.layers))
-        #     opt_state, nn.layers = Opt.update!(opt_state, nn.layers, gs)
-        # end
-        Flux.train!(custom_loss, nn.layers, batches, opt_state)
-    end
 end
 
 # --------------------------------------------------------------------------------

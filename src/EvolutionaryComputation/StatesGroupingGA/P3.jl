@@ -40,7 +40,7 @@ function Population_Pyramid(env_wrapper::EnvironmentWrapper.EnvironmentWrapperSt
     return Population_Pyramid([[first_individual]], first_individual, env_wrapper)
 end
 
-function get_fitness!(individual::Individual) where E
+function get_fitness!(individual::Individual) :: Float64
     if !individual._fitness_actual
         individual._fitness = EnvironmentWrapper.get_fitness(individual.env_wrapper, individual.genes)
         individual._fitness_actual = true
@@ -69,11 +69,13 @@ end
 # end
 
 function FIHC!(individual::Individual)
+    print("\npre FIHC fitness: ", get_fitness!(individual))
+
     random_order = Random.randperm(length(individual.genes))
     actions_number = EnvironmentWrapper.get_action_size(individual.env_wrapper)
     for gene_index in random_order
         previous_fitness = get_fitness!(individual)
-        previous_gene = individual.genes[i]
+        previous_gene = individual.genes[gene_index]
         random_loci_order = [i for i in Random.randperm(actions_number) if i != previous_gene]
         for loci in random_loci_order
             individual.genes[gene_index] = loci
@@ -87,6 +89,8 @@ function FIHC!(individual::Individual)
             end
         end
     end
+
+    print("\tpost FIHC fitness: $(get_fitness!(individual))\n")
 end
 
 "RUns new individual, does FIHC, optimal mixing, climbing through levels and returns final individual"
