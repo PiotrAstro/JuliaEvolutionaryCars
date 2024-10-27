@@ -19,9 +19,9 @@ CONSTANTS_DICT = Dict(
     # Universal staff
     :run_config => Dict(
         :max_generations => 1000,
-        :max_evaluations => 100000,
+        :max_evaluations => 1_000_000,
         :log => true,
-        :visualize_each_n_epochs => 20,
+        :visualize_each_n_epochs => 10_000,
     ),
     :environment => Dict(
         :name => :BasicCarEnvironment,
@@ -93,12 +93,13 @@ CONSTANTS_DICT = Dict(
         :name => :MLP_NN,
         :kwargs => Dict(
             :input_size => 10,
-            :output_size => 6,
+            :output_size => 9,  # 6,
             :hidden_layers => 2,
-            :hidden_neurons => 256,  # 64
+            :hidden_neurons => 64,  # 64
             :dropout => 0.0,
             :activation_function => :relu,  # :relu
-            :last_activation_function => (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
+            :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
+            :loss => Flux.kldivergence
         )
     ),
 
@@ -112,10 +113,10 @@ CONSTANTS_DICT = Dict(
             :name => :MLP_NN,
             :kwargs => Dict(
                 :input_size => 10,
-                :output_size => 32,
-                :hidden_layers => 1,
-                :hidden_neurons => 32,  # 64
-                :dropout => 0.5,
+                :output_size => 8,
+                :hidden_layers => 2,
+                :hidden_neurons => 32,  # 32
+                :dropout => 0.0,  # 0.5
                 :activation_function => :relu,  # :relu
                 :last_activation_function => :none
             )
@@ -123,21 +124,21 @@ CONSTANTS_DICT = Dict(
         :nn_autodecoder => Dict(
             :name => :MLP_NN,
             :kwargs => Dict(
-                :input_size => 32,
-                :output_size => 10,
-                :hidden_layers => 1,
+                :input_size => 8,
+                :output_size => 10,  # it should be 10, 9 is for normal learning
+                :hidden_layers => 2,  # was 1
                 :hidden_neurons => 32,  # 64
-                :dropout => 0.5,
+                :dropout => 0.0,  # 0.5
                 :activation_function => :relu,  # :relu
                 :input_activation_function => :relu,
-                :last_activation_function => :none,
-                :loss => Flux.mse
+                :last_activation_function => :none, # was :none
+                :loss => Flux.mse  # was Flux.mse
             )
-        ),
+        ), 
         :nn_game_decoder => Dict(
             :name => :MLP_NN,
             :kwargs => Dict(
-                :input_size => 32,
+                :input_size => 8,  # 32
                 :output_size => 9,
                 :hidden_layers => 2,
                 :hidden_neurons => 32,  # 64
@@ -176,7 +177,7 @@ CONSTANTS_DICT = Dict(
         :logs_path => raw"C:\Piotr\AIProjects\Evolutionary_Cars\logs"
     ),
     :Evolutionary_Mutate_Population => Dict(
-        :population_size => 100,
+        :population_size => 100, # 400
         # :max_evaluations => 100000,
         # :max_generations => 1000,
         :mutation_rate => 0.1,

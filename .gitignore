@@ -1,3 +1,4 @@
 
 *.jl.*
 Manifest.toml
+log

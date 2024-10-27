@@ -30,3 +30,7 @@ end
 function predict(nn::Combined_NN, X::Array{Float32}) :: Array{Float32}
     return nn.layers(X)
 end
+
+function copy(nn::Combined_NN) :: Combined_NN
+    return Combined_NN([copy(layer) for layer in nn.layers], nn.loss)
+end

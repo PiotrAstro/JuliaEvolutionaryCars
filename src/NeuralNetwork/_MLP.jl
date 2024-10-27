@@ -8,6 +8,7 @@ end
 function MLP_NN(layers::Vector{MLP_NN}) :: MLP_NN
     layers_new = Flux.Chain([layer.layers for layer in layers])
     loss = layers[end].loss
+
     return MLP_NN(layers_new, loss)
 end
 
@@ -94,6 +95,10 @@ end
 function predict(nn::MLP_NN, X::Array{Float32}) :: Array{Float32}
     # return Flux.testmode!(nn.layers(X))
     return nn.layers(X)
+end
+
+function copy(nn::MLP_NN) :: MLP_NN
+    return MLP_NN(deepcopy(nn.layers), nn.loss)
 end
 
 # --------------------------------------------------------------------------------

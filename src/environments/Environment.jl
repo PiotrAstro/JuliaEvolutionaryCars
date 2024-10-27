@@ -3,7 +3,7 @@ module Environment
 
 import ..NeuralNetwork
 
-export AbstractEnvironment, get_safe_data, load_safe_data!, reset!, react!, get_state, get_state_size, get_action_size, is_alive, get_trajectory_data!, get_trajectory_rewards!, get_environment, prepare_environments_kwargs, visualize!
+export AbstractEnvironment, get_safe_data, load_safe_data!, copy, reset!, react!, get_state, get_state_size, get_action_size, is_alive, get_trajectory_data!, get_trajectory_rewards!, get_environment, prepare_environments_kwargs, visualize!
 abstract type AbstractEnvironment end
 
 struct Trajectory{A1 <: Array{Float32}, A2 <: Array{Float32}}
@@ -55,6 +55,10 @@ function get_state(env::AbstractEnvironment) :: Vector{Float32}
 end
 
 function is_alive(env::AbstractEnvironment)::Bool
+    throw("unimplemented")
+end
+
+function copy(env::AbstractEnvironment)
     throw("unimplemented")
 end
 

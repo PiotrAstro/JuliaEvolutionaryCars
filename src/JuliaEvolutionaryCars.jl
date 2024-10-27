@@ -29,7 +29,6 @@ module JuliaEvolutionaryCars
         final_dict = Dict{Symbol, Any}(
             CONSTANTS_DICT[:Evolutionary_Mutate_Population]...,
 
-            :neural_network_data => CONSTANTS_DICT[:neural_network],
             :environment_kwargs => Environment.prepare_environments_kwargs(
                 CONSTANTS_DICT[:environment][:universal_kwargs],
                 CONSTANTS_DICT[:environment][:changeable_training_kwargs_list]
@@ -39,7 +38,8 @@ module JuliaEvolutionaryCars
                 CONSTANTS_DICT[:environment][:universal_kwargs],
                 CONSTANTS_DICT[:environment][:changeable_validation_kwargs_list]
             )[1],
-            :environment => CONSTANTS_DICT[:environment][:name]
+            :environment => CONSTANTS_DICT[:environment][:name],
+            :neural_network_data => CONSTANTS_DICT[:neural_network]
         )
 
         
@@ -76,14 +76,37 @@ module JuliaEvolutionaryCars
 end # module EvolutionaryCarsJulia
 
 
+# Ogólny problem:
+# Jak zrownoleglić obliczeni FIHCA?
 
-# Ścignąć o tym maila
-# O klasteryzacji spytać Jakuba Nalepę
-# Zacząć od K-średnich
+# Ogólne pytanie:
+# Gdzie się robi zrównoleglenie w P3?
 
+# Pomysł!
+# Bierzemy sobie P3, normalne FIHCowanie, potem jeśli przechodzimy do kolejnego poziomu
+# to aktualizujemy nasz problem, więc FIHCujemy też go.
+# dzięki temu mamy stałe fitnessy poza jednym individualem, który jest i tak FIHCowany, czyli powinien wskoczyć na dobry poziom.
+
+# Pomysł do Evolutionary Mutate Population!
+# FIHC - bierzemy jakiegoś individuala, encodujemy stany używając którejś jego warstwy (np. przed ostatniej), grupujemy i FIHCujemy tak jak dotychczas wymyśliłem.
+# albo bierzemy te warstwy z 2 individualów, możemy je konkatenować, grupować po tym i robić optimal mixing
+# wtedy do obliczenia fitnessu można spróbować uczyć z przeuczać tą sieć
+# Pytanie: czy nie będzie problemem optymalizacja losowymi wartościami i gradientowa używana naprzemian?
+
+
+# przyspieszanie FIHC'abstract
+# coś z odległościami między stanami
+# jakaś rozmyta funkcja przynależności
+
+
+# Komar wszystkie ciągłe prace - napisać mail 
+
+
+# pomysł z zupełnie innej beczki - p3 evolutionary mutate, najpierw jakiś fihc, potem pokolei na jakiejś podstawie genieclust robimy optimalmixing z innymi individualami
+# może ten sam mechanizm klasteryzacji itd, ale za
 
 
 include("constants.jl")
 # Run the algorithm
-# JuliaEvolutionaryCars.run_EvMutPop(CONSTANTS_DICT)
-JuliaEvolutionaryCars.run_StGroupGA(CONSTANTS_DICT)
+JuliaEvolutionaryCars.run_EvMutPop(CONSTANTS_DICT)
+# JuliaEvolutionaryCars.run_StGroupGA(CONSTANTS_DICT)

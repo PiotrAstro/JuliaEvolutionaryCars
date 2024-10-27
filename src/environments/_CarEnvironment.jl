@@ -5,7 +5,8 @@ mutable struct BasicCarEnvironment <: AbstractEnvironment
     const map::Matrix{Bool}
     const start_position::Tuple{Float64, Float64}
     const start_angle::Float64
-    const max_steps::Int
+    #const max_steps::Int
+    max_steps::Int
     const angle_max_change::Float64
     const car_dimensions::Tuple{Float64, Float64}
     const initial_speed::Float64
@@ -65,6 +66,26 @@ end
 #--------------------------------------------------------------------------
 # Interface functions
 
+function copy(env::BasicCarEnvironment) :: BasicCarEnvironment
+    # it should use named kwargs
+    return BasicCarEnvironment(;
+        map = env.map,
+        start_position = env.start_position,
+        start_angle = rad2deg(env.start_angle),
+        max_steps = env.max_steps,
+        angle_max_change = rad2deg(env.angle_max_change),
+        car_dimensions = (env.car_dimensions[1] * 2, env.car_dimensions[2] * 2),
+        initial_speed = env.initial_speed,
+        min_speed = env.min_speed,
+        max_speed = env.max_speed,
+        speed_change = env.speed_change,
+        rays = rad2deg.(env.rays),
+        rays_distances_scale_factor = env.rays_distances_scale_factor,
+        ray_input_clip = env.ray_input_clip,
+        collision_reward = env.collision_reward
+    )
+end
+
 function get_safe_data(env::BasicCarEnvironment)::Dict{Symbol}
     return Dict(
         :x => env.x,
@@ -103,7 +124,7 @@ function react!(env::BasicCarEnvironment, action::Vector{Float32}) :: Float64
     # for action space with 9 outputs, all possible combinations
     max_action = argmax(action)
     steering_action = (max_action - 1) % 3 + 1
-    speed_action = (max_action - 1) ÷ 3 + 1
+    speed_action = 3  # 3 # (max_action - 1) ÷ 3 + 1
 
     if steering_action == 2
         env.angle += env.angle_max_change
@@ -137,7 +158,7 @@ function get_state_size(env::BasicCarEnvironment) :: Vector{Int}
 end
 
 function get_action_size(env::BasicCarEnvironment) :: Int
-    return 9  # 6
+    return 3  # 9 # 3 # 6
 end
 
 function get_state(env::BasicCarEnvironment) :: Array{Float32}

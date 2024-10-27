@@ -1,4 +1,7 @@
-module P3
+
+# it has different state of environment on each level (next levels are more actualised)
+# therefore in general I do not have to actualise fitnesses of individuals - only the one that moves from one level to another, so I can FIHC it
+module P3Levels
 
 import ..NeuralNetwork
 import ..Environment
@@ -19,11 +22,15 @@ mutable struct Individual
     _fitness_actual::Bool
 end
 
+struct Level 
+    individuals::Vector{Individual}
+    env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct
+end
+
 mutable struct Population_Pyramid
-    _population::Vector{Vector{Individual}}
+    population::Vector{Level}
     # _dependencies_matrices::Vector{Array{Int, 4}}
     best_individual::Individual
-    env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct
 end
 
 # --------------------------------------------------------------------------------------------------
@@ -38,7 +45,8 @@ end
 
 function Population_Pyramid(env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct)
     first_individual = Individual(env_wrapper)
-    return Population_Pyramid([[first_individual]], first_individual, env_wrapper)
+    @time FIHC!(first_individual)
+    return Population_Pyramid([Level([first_individual], env_wrapper)], first_individual)
 end
 
 function get_fitness!(individual::Individual) :: Float64
@@ -123,23 +131,49 @@ function optimal_mixing!(individual::Individual, other_individuals::Vector{Indiv
     print("\tpost optimal mixing fitness: $(get_fitness!(individual))\n")
 end
 
-function FIHC!(individual::Individual)
+function FIHC!_off(individual::Individual)
+    # flat version
     print("\npre FIHC fitness: ", get_fitness!(individual))
+    random_perm = Random.randperm(length(individual.genes))
+    actions_number = EnvironmentWrapper.get_action_size(individual.env_wrapper)
+
+    for gene_index in random_perm
+        previous_fitness = get_fitness!(individual)
+        previous_gene = individual.genes[gene_index]
+        random_loci_order = [i for i in Random.randperm(actions_number) if i != previous_gene]
+        for loci in random_loci_order
+            individual.genes[gene_index] = loci
+            individual._fitness_actual = false
+            new_fitness = get_fitness!(individual)
+            if new_fitness > previous_fitness
+                print("improvement from $previous_fitness to $new_fitness\tgene index $gene_index\n")
+            else
+                individual.genes[gene_index] = previous_gene
+                individual._fitness = previous_fitness
+            end
+        end
+    end
+    print("\tpost FIHC fitness: $(get_fitness!(individual))\n")
+end
+
+function FIHC!(individual::Individual)
+    println("\npre FIHC fitness: $(get_fitness!(individual))\n")
     root = individual.env_wrapper._similarity_tree
     tree_levels = [[root.left, root.right]]
     actions_number = EnvironmentWrapper.get_action_size(individual.env_wrapper)
-    # individual.genes .= Random.rand(1:actions_number)
-    # individual._fitness_actual = false
-    # println(" FIHC initial fitness: ", get_fitness!(individual))
+    individual.genes .= Random.rand(1:actions_number)
+    individual._fitness_actual = false
+    println(" FIHC initial fitness: ", get_fitness!(individual))
+    overall_fitness_ckecks = 0
 
     # this one is test only!!!
     i = 1
-    while i <= length(tree_levels) && i <= 7
+    while i <= length(tree_levels) && i <= 9
         current_level = tree_levels[i]
         random_perm = Random.randperm(length(current_level))
 
         for node in current_level[random_perm]
-            random_perm_actions = Random.randperm(actions_number)            
+            random_perm_actions = Random.randperm(actions_number)
             old_elements = individual.genes[node.elements]
             old_fitness = get_fitness!(individual)
             
@@ -147,6 +181,7 @@ function FIHC!(individual::Individual)
             #     individual.genes[node.elements] .= chosen_action
             #     individual._fitness_actual = false
             #     new_fitness = get_fitness!(individual)
+            #     overall_fitness_ckecks += 1
 
             #     if old_fitness >= new_fitness
             #         individual.genes[node.elements] = old_elements
@@ -169,6 +204,8 @@ function FIHC!(individual::Individual)
                 get_fitness!(individual)
             end
 
+            overall_fitness_ckecks += actions_number
+
             max_copy = argmax(get_fitness!, individuals_copies)
             if get_fitness!(max_copy) > old_fitness
                 individual.genes[node.elements] = max_copy.genes[node.elements]
@@ -189,6 +226,8 @@ function FIHC!(individual::Individual)
         i += 1
     end
 
+    print("overall_fitness_ckecks: $overall_fitness_ckecks")
+
     print("\tpost FIHC fitness: $(get_fitness!(individual))\n")
 end
 
@@ -207,45 +246,48 @@ function save_decision_plot(individual::Individual)
 end
 
 "RUns new individual, does FIHC, optimal mixing, climbing through levels and returns final individual"
-function run_new_individual!(p3::Population_Pyramid) :: Vector{Int}
-    new_individual = Individual(p3.env_wrapper)
-    FIHC!(new_individual)
-    save_decision_plot(new_individual)
-    push!(p3._population[1], new_individual)
+function run_new_individual!(p3::Population_Pyramid)
+    new_individual = Individual(p3.population[1].env_wrapper)
+    @time FIHC!(new_individual)
+    # save_decision_plot(new_individual)
+    add_to_next_level = true
 
     i = 1
-    while i <= length(p3._population)
+    while i <= length(p3.population)
+        new_individual = copy_individual(new_individual)
+        if i > 1
+            new_env_wrapper = p3.population[i].env_wrapper
+            new_individual.genes = EnvironmentWrapper.translate_solutions(new_individual.env_wrapper, new_env_wrapper, [new_individual.genes])[1]
+            new_individual.env_wrapper = new_env_wrapper
+            old_fitness = get_fitness!(new_individual)
+            new_individual._fitness_actual = false
+            println("fitness changed from $old_fitness to $(get_fitness!(new_individual))")
+            @time FIHC!(new_individual)
+        end
+
+        if add_to_next_level
+            push!(p3.population[i].individuals, new_individual)
+        end
+
         old_fitness = get_fitness!(new_individual)
-        optimal_mixing!(new_individual, p3._population[i])
+        optimal_mixing!(new_individual, p3.population[i].individuals)
         new_fitness = get_fitness!(new_individual)
 
         if new_fitness > old_fitness
-            if i == length(p3._population) 
-                push!(p3._population, [new_individual])
-            else
-                push!(p3._population[i+1], new_individual)
+            add_to_next_level = true
+
+            if i == length(p3.population)
+                new_env_wrapper = EnvironmentWrapper.copy(p3.population[i].env_wrapper)
+                # actually I do not want to actualise any genes, i just want to create new empty level
+                genes = [individual.genes for individual in p3.population[i].individuals]
+                EnvironmentWrapper.actualize!(new_env_wrapper, genes, genes)
+                push!(p3.population, Level(Vector{Individual}(undef, 0), new_env_wrapper))
             end
+        else
+            add_to_next_level = false
         end
 
         i += 1
-    end
-    return new_individual.genes
-end
-
-function get_all_genes(p3::Population_Pyramid) :: Vector{Vector{Int}}
-    return reduce(vcat, [
-        [individual.genes for individual in level] for level in p3._population
-    ])
-end
-
-function actualize_population!(p3::Population_Pyramid, changed_solutions::Vector{Vector{Int}})
-    start = 1
-    for level in p3._population
-        stop = start - 1 + length(level)
-        for (individual, changed_solution) in zip(level, changed_solutions[start:stop])
-            actualize_genes!(individual, changed_solution)
-        end
-        start = stop + 1
     end
 end
 

@@ -7,8 +7,10 @@ import Random
 import IterTools
 import Optimisers
 import Memoization
+import Distances
+import LinearAlgebra
 
-export AbstractNeuralNetwork, predict, learn!, get_parameters, set_parameters!, get_neural_network, get_Flux_representation
+export AbstractNeuralNetwork, predict, learn!, get_parameters, set_parameters!, copy, get_neural_network, get_Flux_representation
 abstract type AbstractNeuralNetwork end
 
 # Dummy Neural Network, used for manual testing in visual environments
@@ -40,9 +42,10 @@ function learn!(
     nn::AbstractNeuralNetwork,
     X::Array{Float32},
     Y::Array{Float32};
-    epochs::Int = 50,
-    batch_size::Int = 64,
-    learning_rate::AbstractFloat = 0.001
+    epochs::Int = 10,
+    batch_size::Int = 256,
+    learning_rate::AbstractFloat = 0.003,
+    verbose::Bool = true
 )
     nn_internal = get_Flux_representation(nn)
     nn_loss = get_loss(nn)
@@ -71,10 +74,12 @@ function learn!(
         Flux.train!(custom_loss, nn_internal, batches, opt_state)
 
         # print loss
-        println("Epoch: $epoch, Loss: $(Statistics.mean(custom_loss(nn_internal, X, Y)))")
+        if verbose
+            println("Epoch: $epoch, Loss: $(Statistics.mean(custom_loss(nn_internal, X, Y)))")
+        end
 
         # # print accuracy
-        # # check if one hot encoding
+        # check if one hot encoding
         # predictions = predict(nn, X)
         # accuracy = sum([argmax(predictions[:, i]) == argmax(Y[:, i]) for i in 1:size(Y, 2)]) / size(Y, 2)
         # println("Epoch: $epoch, Accuracy: $accuracy")
@@ -91,7 +96,7 @@ end
 # import concrete implementations
 include("_MLP.jl")
 include("_Combined.jl")
-include("_DistanceBasedClassificator")
+include("_DistanceBasedClassificator.jl")
 
 # -------------------------------------------------------
 # module functions:

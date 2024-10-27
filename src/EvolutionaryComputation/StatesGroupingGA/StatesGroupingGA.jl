@@ -10,12 +10,16 @@ import .EnvironmentWrapper
 include("P3.jl")
 import .P3
 
+include("P3Levels.jl")
+import .P3Levels
+
 include("NormalGA.jl")
 import .NormalGA
 
 mutable struct StatesGroupingGA_Algorithm
-    #p3::P3.Population_Pyramid
-    ga::NormalGA.GA_Struct
+    # p3::P3.Population_Pyramid
+    p3Levels::P3Levels.Population_Pyramid
+    # ga::NormalGA.GA_Struct
     env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct
     visualization_env::Environment.AbstractEnvironment
     visualization_kwargs::Dict{Symbol, Any}
@@ -47,11 +51,13 @@ function StatesGroupingGA_Algorithm(;
     )
 
     # p3 = P3.Population_Pyramid(env_wrapper)
-    ga = NormalGA.GA_Struct(env_wrapper)
+    p3Levels = P3Levels.Population_Pyramid(env_wrapper)
+    # ga = NormalGA.GA_Struct(env_wrapper)
 
     return StatesGroupingGA_Algorithm(
         # p3,
-        ga,
+        p3Levels,
+        # ga,
         env_wrapper,
         visualization_env,
         visualization_kwargs,
@@ -63,23 +69,29 @@ function run!(algorithm::StatesGroupingGA_Algorithm; max_generations::Int, max_e
     # Preprocessing data
 
     for generation in 1:max_generations
+        P3Levels.run_new_individual!(algorithm.p3Levels)
+
+
         # collect trajectories
         # new_genes_vector = Vector{Vector{<:Int}}()
         # for _ in 1:algorithm.space_explorers_n
         #     new_genes = P3.run_new_individual!(algorithm.p3)
         #     push!(new_genes_vector, new_genes)
         # end
-        NormalGA.generation!(algorithm.ga)
-        # nn = EnvironmentWrapper.get_full_NN(algorithm.env_wrapper, NormalGA.get_best_genes(algorithm.ga))
-        # Environment.visualize!(algorithm.visualization_env, nn; algorithm.visualization_kwargs...)
+        # P3.run_new_individual!(algorithm.p3)
 
-        if generation % 20 == 0
-            best_n_genes = NormalGA.get_best_n_genes(algorithm.ga, algorithm.space_explorers_n)
-            all_solutions = NormalGA.get_all_genes(algorithm.ga)
 
-            translated_solutions = EnvironmentWrapper.actualize!(algorithm.env_wrapper, best_n_genes, all_solutions)
-            NormalGA.actualize_population!(algorithm.ga, translated_solutions)
-        end
+        # @time NormalGA.generation!(algorithm.ga)
+        # # nn = EnvironmentWrapper.get_full_NN(algorithm.env_wrapper, NormalGA.get_best_genes(algorithm.ga))
+        # # Environment.visualize!(algorithm.visualization_env, nn; algorithm.visualization_kwargs...)
+
+        # if generation % 1 == 0
+        #     best_n_genes = NormalGA.get_best_n_genes(algorithm.ga, algorithm.space_explorers_n)
+        #     all_solutions = NormalGA.get_all_genes(algorithm.ga)
+
+        #     translated_solutions = EnvironmentWrapper.actualize!(algorithm.env_wrapper, best_n_genes, all_solutions)
+        #     NormalGA.actualize_population!(algorithm.ga, translated_solutions)
+        # end
     end
 end
 
