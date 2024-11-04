@@ -136,14 +136,38 @@ function crossover(ind1::Individual, ind2::Individual) :: Individual
     actions_to_learn = actions_ind1 + actions_ind2
     actions_to_learn = actions_to_learn .- minimum(actions_to_learn, dims=1)
     actions_to_learn = actions_to_learn ./ sum(actions_to_learn, dims=1)
-    @time NeuralNetwork.learn!(new_individual.neural_network, states, actions_to_learn; epochs=3, learning_rate=0.001, verbose=false)
+    NeuralNetwork.learn!(new_individual.neural_network, states, actions_to_learn; epochs=3, learning_rate=0.001, verbose=false)
 
     new_individual._is_fitness_calculated = false
-    @time get_fitness(new_individual)
+    get_fitness(new_individual)
 
-    println("fitness 1: $(get_fitness(ind1)), fitness 2: $(get_fitness(ind2)), new fitness: $(get_fitness(new_individual))")
+    # println("fitness 1: $(get_fitness(ind1)), fitness 2: $(get_fitness(ind2)), new fitness: $(get_fitness(new_individual))")
 
     return new_individual
+end
+
+function differential_evolution_one_run(base_ind::Individual, ind_a::Individual, ind_b::Individual)::Individual
+    new_ind = copy(base_ind)
+    states = reduce(hcat, [trajectory.states for trajectory in get_trajectories(new_ind)])
+    actions_new_ind = reduce(hcat, [trajectory.actions for trajectory in get_trajectories(new_ind)])
+
+    actions_a = NeuralNetwork.predict(ind_a.neural_network, states)
+    actions_b = NeuralNetwork.predict(ind_b.neural_network, states)
+
+    a_b_normalized = actions_a - actions_b
+    # a_b_normalized .-= minimum(a_b_normalized, dims=1)
+    # a_b_normalized ./= sum(a_b_normalized, dims=1)
+
+    actions_new_ind += a_b_normalized
+    actions_new_ind .-= minimum(actions_new_ind, dims=1)
+    actions_new_ind ./= sum(actions_new_ind, dims=1)
+
+    NeuralNetwork.learn!(new_ind.neural_network, states, actions_new_ind; epochs=3, learning_rate=0.001, verbose=false)
+
+    new_ind._is_fitness_calculated = false
+    get_fitness(new_ind)
+
+    return new_ind
 end
 
 function copy(ind::Individual) :: Individual
@@ -206,7 +230,7 @@ function EvolutionaryMutatePopulationAlgorithm(;
         mutation_rate,
         visualization_kwargs,
         visualization_environment,
-        population[1],
+        copy(population[1]),
         n_threads > 0 ? n_threads : Threads.nthreads()
     )
 end
@@ -225,18 +249,29 @@ function run!(algo::EvolutionaryMutatePopulationAlgorithm; max_generations::Int,
             # new_individuals[i] = @time mutate(new_individuals[i], algo.mutation_rate)
             new_individuals[i] = mutate(new_individuals[i], algo.mutation_rate)
         end
-        # append!(algo.population, new_individuals)
+        append!(algo.population, new_individuals)
 
         # rand_permutation = Random.randperm(length(algo.population))
-        Threads.@threads for i in  2:5 # 1:2:length(algo.population)
-            parent1 = algo.best_individual # algo.population[rand_permutation[i]]
-            parent2 = algo.population[i] # algo.population[rand_permutation[i]]
-            new_individual = crossover(parent1, parent2)
-            index_to_replace = i # get_fitness(parent1) < get_fitness(parent2) ? i : i + 1
-            algo.population[index_to_replace] = new_individual
-        end
+        # Threads.@threads for i in 1:2:99 # 2:10  # Threads.@threads
+        #     parent1 = algo.population[rand_permutation[i]]
+        #     parent2 = algo.population[rand_permutation[i+1]]
+        #     new_individual = crossover(parent1, parent2)
+        #     index_to_replace = get_fitness(parent1) < get_fitness(parent2) ? i : i + 1
+        #     algo.population[rand_permutation[index_to_replace]] = new_individual
+        # end
 
         append!(algo.population, new_individuals)
+
+        # differential evolution test
+        rand_permutation = Random.randperm(length(algo.population))
+        Threads.@threads for i in 1:2:99 # 2:10  # Threads.@threads
+            parent1 = algo.population[rand_permutation[i]]
+            parent2 = algo.population[rand_permutation[i+1]]
+            new_individual = differential_evolution_one_run(algo.best_individual, parent1, parent2)
+            if get_fitness(new_individual) > get_fitness(parent1)
+                algo.population[rand_permutation[i]] = new_individual
+            end
+        end
 
         sorted = sort(algo.population, by=get_fitness, rev=true)
         algo.population = sorted[1:algo.population_size]
@@ -250,7 +285,7 @@ function run!(algo::EvolutionaryMutatePopulationAlgorithm; max_generations::Int,
             #     Pf.@printf "previous: %.2f \t new: %.2f \t new ls: %.2f \n\n\n\n" get_fitness(algo.best_individual) get_fitness(algo.population[1]) get_fitness(locally_new)
             # end
             # algo.population[1] = locally_new
-            algo.best_individual = algo.population[1]
+            algo.best_individual = copy(algo.population[1])
 
             if get_fitness(algo.best_individual) > 400.0
                 # _save_previous_responses(algo)

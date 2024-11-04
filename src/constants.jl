@@ -93,7 +93,7 @@ CONSTANTS_DICT = Dict(
         :name => :MLP_NN,
         :kwargs => Dict(
             :input_size => 10,
-            :output_size => 9,  # 6,
+            :output_size => 9,  # 6 # 3 # 9
             :hidden_layers => 2,
             :hidden_neurons => 64,  # 64
             :dropout => 0.0,
@@ -108,12 +108,30 @@ CONSTANTS_DICT = Dict(
     # method specific staff
 
 
+    :ContinuousStatesGrouping => Dict(
+        # :population_size => 100, # 400
+        # :max_evaluations => 100000,
+        # :max_generations => 1000,
+        # :mutation_rate => 0.1,
+        # :mutation_controller => Dict(
+        #     :name => :Mut_One,
+        #     :kwargs => Dict(
+        #         :mutation_factor => 0.1,
+        #         :use_children => false
+        #     )
+        # ),
+        :n_threads => 8,
+        # :save_logs_every_n_epochs => 50,
+        # :logs_path => raw"logs"
+    ),
+
+
     :StatesGroupingGA => Dict(
         :nn_encoder => Dict(
             :name => :MLP_NN,
             :kwargs => Dict(
                 :input_size => 10,
-                :output_size => 8,
+                :output_size => 16,
                 :hidden_layers => 2,
                 :hidden_neurons => 32,  # 32
                 :dropout => 0.0,  # 0.5
@@ -124,7 +142,7 @@ CONSTANTS_DICT = Dict(
         :nn_autodecoder => Dict(
             :name => :MLP_NN,
             :kwargs => Dict(
-                :input_size => 8,
+                :input_size => 16,
                 :output_size => 10,  # it should be 10, 9 is for normal learning
                 :hidden_layers => 2,  # was 1
                 :hidden_neurons => 32,  # 64
@@ -138,7 +156,7 @@ CONSTANTS_DICT = Dict(
         :nn_game_decoder => Dict(
             :name => :MLP_NN,
             :kwargs => Dict(
-                :input_size => 8,  # 32
+                :input_size => 16,  # 32
                 :output_size => 9,
                 :hidden_layers => 2,
                 :hidden_neurons => 32,  # 64

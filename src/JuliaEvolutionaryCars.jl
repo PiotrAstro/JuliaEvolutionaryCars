@@ -24,6 +24,9 @@ module JuliaEvolutionaryCars
     include("EvolutionaryComputation/StatesGroupingGA/StatesGroupingGA.jl")
     import .StatesGroupingGA
 
+    include("EvolutionaryComputation/ContinuousStatesGrouping/ContinuousStatesGrouping.jl")
+    import .ContinuousStatesGrouping
+
     function run_EvMutPop(CONSTANTS_DICT::Dict{Symbol})
         # Preprocessing data
         final_dict = Dict{Symbol, Any}(
@@ -73,6 +76,31 @@ module JuliaEvolutionaryCars
         StatesGroupingGA.run!(evolutionary_algorithm; CONSTANTS_DICT[:run_config]...)
     end
 
+    function run_ConStGroup(CONSTANTS_DICT::Dict{Symbol})
+        # Preprocessing data
+        final_dict = Dict{Symbol, Any}(
+            CONSTANTS_DICT[:ContinuousStatesGrouping]...,
+
+            :environment_kwargs => Environment.prepare_environments_kwargs(
+                CONSTANTS_DICT[:environment][:universal_kwargs],
+                CONSTANTS_DICT[:environment][:changeable_training_kwargs_list]
+            ),
+            :visualization_kwargs => Dict{Symbol, Any}(CONSTANTS_DICT[:environment][:visualization]),
+            :environment_visualization_kwargs => Environment.prepare_environments_kwargs(
+                CONSTANTS_DICT[:environment][:universal_kwargs],
+                CONSTANTS_DICT[:environment][:changeable_validation_kwargs_list]
+            )[1],
+            :environment => CONSTANTS_DICT[:environment][:name],
+            :neural_network_data => CONSTANTS_DICT[:neural_network]
+        )
+
+        
+
+        # Running the algorithm
+        evolutionary_algorithm = ContinuousStatesGrouping.ContinuousStatesGroupingAlgorithm(;final_dict...)
+        ContinuousStatesGrouping.run!(evolutionary_algorithm; CONSTANTS_DICT[:run_config]...)
+    end
+
 end # module EvolutionaryCarsJulia
 
 
@@ -108,5 +136,6 @@ end # module EvolutionaryCarsJulia
 
 include("constants.jl")
 # Run the algorithm
-JuliaEvolutionaryCars.run_EvMutPop(CONSTANTS_DICT)
-# JuliaEvolutionaryCars.run_StGroupGA(CONSTANTS_DICT)
+# JuliaEvolutionaryCars.run_EvMutPop(CONSTANTS_DICT)
+JuliaEvolutionaryCars.run_StGroupGA(CONSTANTS_DICT)
+# JuliaEvolutionaryCars.run_ConStGroup(CONSTANTS_DICT)

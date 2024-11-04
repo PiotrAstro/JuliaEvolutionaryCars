@@ -9,8 +9,9 @@ import Optimisers
 import Memoization
 import Distances
 import LinearAlgebra
+# import SimilaritySearch
 
-export AbstractNeuralNetwork, predict, learn!, get_parameters, set_parameters!, copy, get_neural_network, get_Flux_representation
+export AbstractNeuralNetwork, predict, learn!, get_parameters, set_parameters!, copy, get_neural_network, get_Flux_representation, get_loss, get_input_representant_nn
 abstract type AbstractNeuralNetwork end
 
 # Dummy Neural Network, used for manual testing in visual environments
@@ -34,6 +35,14 @@ function get_Flux_representation(nn::AbstractNeuralNetwork)
 end
 
 function get_loss(nn::AbstractNeuralNetwork) :: Function
+    throw("not implemented")
+end
+
+function copy(nn::AbstractNeuralNetwork) :: AbstractNeuralNetwork
+    throw("not implemented")
+end
+
+function get_input_representant_nn(nn::AbstractNeuralNetwork)
     throw("not implemented")
 end
 

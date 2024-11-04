@@ -295,7 +295,7 @@ function get_full_NN(env_wrap::EnvironmentWrapperStruct, genes::Vector{Int}) :: 
     # new way to do it
     return NeuralNetwork.DistanceBasedClassificator(
         env_wrap._encoder,
-        env_wrap._encoded_exemplars_normalised,
+        env_wrap._encoded_exemplars_normalised,  # env_wrap._encoded_exemplars, # env_wrap._encoded_exemplars_normalised,
         genes,
         get_action_size(env_wrap)
     )
@@ -323,8 +323,8 @@ function _collect_trajectories_states(envs::Vector{<:Environment.AbstractEnviron
 end
 
 function _normalize_exemplars(exemplars::Matrix{Float32}) :: Matrix{Float32}
-    sums = sum(exemplars, dims=1)
-    exemplars_normalised = exemplars ./ sums
+    sums = sum(exemplars .^ 2, dims=1)
+    exemplars_normalised = exemplars ./ sqrt.(sums)
     exemplars_normalised_transposed = exemplars_normalised'
     return exemplars_normalised_transposed
 end

@@ -101,6 +101,13 @@ function copy(nn::MLP_NN) :: MLP_NN
     return MLP_NN(deepcopy(nn.layers), nn.loss)
 end
 
+function get_input_representant_nn(nn::MLP_NN) :: MLP_NN
+    return MLP_NN(
+        Flux.Chain(nn.layers[1:(length(nn.layers)-1)]),
+        nn.loss
+    )
+end
+
 # --------------------------------------------------------------------------------
 # protected functions
 

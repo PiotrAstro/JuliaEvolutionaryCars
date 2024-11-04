@@ -101,7 +101,7 @@ function _get_exemplars(encoded_states::Matrix{Float32}, encoder::NeuralNetwork.
     # change encoded states to pyobject
     encoded_states_py = PyCall.PyObject(encoded_states')
     # get genie clustering
-    n_clusters = 3000  # 40 - works well, can get optimal solution  # size(encoded_states, 2)  # 100
+    n_clusters = 200  # 200 - works well, can get optimal solution  # size(encoded_states, 2)  # 100
     genie = genieclust.Genie(n_clusters=n_clusters, compute_full_tree=true, verbose=true, gini_threshold=0.05, affinity="cosine")
     @time genie.fit(encoded_states_py)
 

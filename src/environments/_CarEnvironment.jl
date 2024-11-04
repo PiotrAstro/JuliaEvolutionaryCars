@@ -124,7 +124,7 @@ function react!(env::BasicCarEnvironment, action::Vector{Float32}) :: Float64
     # for action space with 9 outputs, all possible combinations
     max_action = argmax(action)
     steering_action = (max_action - 1) % 3 + 1
-    speed_action = 3  # 3 # (max_action - 1) ÷ 3 + 1
+    speed_action = (max_action - 1) ÷ 3 + 1  # 3 # (max_action - 1) ÷ 3 + 1
 
     if steering_action == 2
         env.angle += env.angle_max_change
@@ -158,7 +158,7 @@ function get_state_size(env::BasicCarEnvironment) :: Vector{Int}
 end
 
 function get_action_size(env::BasicCarEnvironment) :: Int
-    return 3  # 9 # 3 # 6
+    return 9  # 9 # 3 # 6
 end
 
 function get_state(env::BasicCarEnvironment) :: Array{Float32}
