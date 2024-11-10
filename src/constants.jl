@@ -169,6 +169,7 @@ CONSTANTS_DICT = Dict(
         ),
         :space_explorers_n => 50,
         :max_states_considered => 10_000,
+        :n_clusters => 200,  # 200 works very well
     ),
 
 

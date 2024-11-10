@@ -28,6 +28,7 @@ end
 
 mutable struct EnvironmentWrapperStruct
     _envs::Vector{<:Environment.AbstractEnvironment}
+    _n_clusters::Int
     _encoder::NeuralNetwork.AbstractNeuralNetwork
     _decoder::NeuralNetwork.AbstractNeuralNetwork
     _autoencoder::NeuralNetwork.AbstractNeuralNetwork
@@ -37,6 +38,7 @@ mutable struct EnvironmentWrapperStruct
     _raw_all_states::Array{Float32}
     _raw_exemplars::Matrix{Float32}
     _similarity_tree::TreeNode
+    _time_distance_tree::TreeNode
     _time_tree::TreeNode
     _max_states_considered::Int
 end
@@ -50,7 +52,8 @@ function EnvironmentWrapperStruct(
     decoder_dict::Dict{Symbol, Any},
     game_decoder_dict::Dict{Symbol, Any},
     initial_space_explorers_n::Int,
-    max_states_considered::Int
+    max_states_considered::Int,
+    n_clusters::Int,
 ) :: EnvironmentWrapperStruct
 
     encoder = NeuralNetwork.get_neural_network(encoder_dict[:name])(;encoder_dict[:kwargs]...)
@@ -69,7 +72,7 @@ function EnvironmentWrapperStruct(
         ]) for _ in 1:initial_space_explorers_n
     ]
     # states collection
-    states = _collect_trajectories_states(envs, NNs)
+    states, states_by_trajectories = _collect_trajectories_states(envs, NNs)
 
     if size(states, 2) > max_states_considered
         random_columns = rand(1:size(states, 2), max_states_considered)
@@ -108,13 +111,14 @@ function EnvironmentWrapperStruct(
     # NeuralNetwork.learn!(autoencoder, good_states_loaded, action_taken_one_hot)
     println("Autoencoder trained")
     # println("autoencoder result: $(Environment.get_trajectory_rewards!(envs, autoencoder))")
+    encoded_states_by_trajectory = [NeuralNetwork.predict(encoder, states_one_traj) for states_one_traj in states_by_trajectories]
     encoded_states = NeuralNetwork.predict(encoder, states)
 
     # encoded_states = NeuralNetwork.predict(encoder, good_states_loaded)
 
     println("Encoded states calculated")
 
-    exemplars_ids, similarity_tree = _get_exemplars(encoded_states, encoder)
+    exemplars_ids, similarity_tree = _get_exemplars(encoded_states, encoder, n_clusters)
     # TEST!!!
     # encoded_states = good_states_loaded
     println("exemplars number: $(length(exemplars_ids))")
@@ -124,11 +128,15 @@ function EnvironmentWrapperStruct(
     # savefig("scatter_plot.png")
     # println("should be scattered now")
 
-    println("\n\n\n\nfinished\n\n\n\n")
     encoded_exemplars = encoded_states[:, exemplars_ids]
+    time_distance_tree = _create_time_distance_tree(encoded_states_by_trajectory, encoded_exemplars)
+
+    println("\n\n\n\nfinished\n\n\n\n")
+    
 
     wrapper = EnvironmentWrapperStruct(
         envs,
+        n_clusters,
         encoder,
         decoder,
         autoencoder,
@@ -138,6 +146,7 @@ function EnvironmentWrapperStruct(
         states,
         states[:, exemplars_ids],
         similarity_tree,
+        time_distance_tree,
         TreeNode(nothing, nothing, 0.0, exemplars_ids),
         max_states_considered
     )
@@ -169,6 +178,7 @@ function copy(env_wrap::EnvironmentWrapperStruct) :: EnvironmentWrapperStruct
     autoencoder_copy = NeuralNetwork.Combined_NN([encoder_copy, decoder_copy])
     return EnvironmentWrapperStruct(
         envs_copy,
+        env_wrap._n_clusters,
         encoder_copy,
         decoder_copy,
         autoencoder_copy,
@@ -178,6 +188,7 @@ function copy(env_wrap::EnvironmentWrapperStruct) :: EnvironmentWrapperStruct
         env_wrap._raw_all_states,
         env_wrap._raw_exemplars,
         env_wrap._similarity_tree,
+        env_wrap._time_distance_tree,
         env_wrap._time_tree,
         env_wrap._max_states_considered
     )
@@ -221,7 +232,7 @@ function actualize!(env_wrap::EnvironmentWrapperStruct, genes_new_trajectories::
         NNs[i] = full_NN
     end
     
-    states = _collect_trajectories_states(env_wrap._envs, NNs)
+    states, states_by_trajectories = _collect_trajectories_states(env_wrap._envs, NNs)
     states = hcat(states, env_wrap._raw_all_states)
     if size(states, 2) > env_wrap._max_states_considered
         random_columns = rand(1:size(states, 2), env_wrap._max_states_considered)
@@ -233,21 +244,23 @@ function actualize!(env_wrap::EnvironmentWrapperStruct, genes_new_trajectories::
     new_states_old_encoding = NeuralNetwork.predict(env_wrap._encoder, states)
     NeuralNetwork.learn!(env_wrap._autoencoder, states, states)
     println("Autoencoder trained")
+    new_encoded_states_by_trajectory = [NeuralNetwork.predict(env_wrap._encoder, states_one_traj) for states_one_traj in states_by_trajectories]
     new_encoded_states = NeuralNetwork.predict(env_wrap._encoder, states)
 
     # # get new exemplars, states and newly encoded states
-    new_exemplars_ids, similarity_tree = _get_exemplars(new_encoded_states, env_wrap._encoder)
+    new_exemplars_ids, similarity_tree = _get_exemplars(new_encoded_states, env_wrap._encoder, env_wrap._n_clusters)
     println("exemplars number: $(length(new_exemplars_ids))")
     new_exemplars = new_encoded_states[:, new_exemplars_ids]
+    time_distance_tree = _create_time_distance_tree(new_encoded_states_by_trajectory, new_exemplars)
     new_exemplars_old_encoding = new_states_old_encoding[:, new_exemplars_ids]
 
     # just for testing!!!!!!
-    # new_states_old_encoding = NeuralNetwork.predict(env_wrap._encoder, states)
-    # old_states_old_encoding = NeuralNetwork.predict(env_wrap._encoder, env_wrap._raw_all_states)
-    # timestamp_string = Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS")
-    # Plots.scatter(new_states_old_encoding[1, :], new_states_old_encoding[2, :], legend=false, color=:blue)  # Creates the scatter plot
-    # Plots.scatter!(old_states_old_encoding[1, :], old_states_old_encoding[2, :], legend=false, color=:yellow)  # Adds the exemplars to the scatter plot
-    # Plots.savefig("log/actualization_$timestamp_string.png")
+    new_states_old_encoding = NeuralNetwork.predict(env_wrap._encoder, states)
+    old_states_old_encoding = NeuralNetwork.predict(env_wrap._encoder, env_wrap._raw_all_states)
+    timestamp_string = Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS")
+    Plots.scatter(new_states_old_encoding[1, :], new_states_old_encoding[2, :], legend=false, color=:blue)  # Creates the scatter plot
+    Plots.scatter!(old_states_old_encoding[1, :], old_states_old_encoding[2, :], legend=false, color=:yellow)  # Adds the exemplars to the scatter plot
+    Plots.savefig("log/actualization_$timestamp_string.png")
 
     # new_states_old_encoding = hcat(new_states_old_encoding, env_wrap._encoded_exemplars)
     # env_wrap._raw_all_states = hcat(env_wrap._raw_all_states, states)
@@ -266,6 +279,7 @@ function actualize!(env_wrap::EnvironmentWrapperStruct, genes_new_trajectories::
     env_wrap._encoded_exemplars_normalised = _normalize_exemplars(new_exemplars)
     env_wrap._raw_all_states = states
     env_wrap._similarity_tree = similarity_tree
+    env_wrap._time_distance_tree = time_distance_tree
 
     return new_solutions
 end
@@ -308,18 +322,20 @@ end
 # --------------------------------------------------------------------------------------------------
 # Private functions
 
-function _collect_trajectories_states(envs::Vector{<:Environment.AbstractEnvironment}, NNs::Vector{<:NeuralNetwork.AbstractNeuralNetwork})
+function _collect_trajectories_states(envs::Vector{<:Environment.AbstractEnvironment}, NNs::Vector{<:NeuralNetwork.AbstractNeuralNetwork}) :: Tuple{Array{Float32}, Vector{Array{Float32}}}
+    trajectories_states_separately = Vector{Vector{Array{Float32}}}(undef, length(NNs))
     trajectories_states = Vector{Array{Float32}}(undef, length(NNs))
 
     Threads.@threads for i in 1:length(NNs)
         envs_copy = [Environment.copy(env) for env in envs]
         nn = NNs[i]
         trajectories = Environment.get_trajectory_data!(envs_copy, nn)
-        trajectories_states[i] = reduce(hcat, [trajectory.states for trajectory in trajectories])
+        trajectories_states_separately[i] = [trajectory.states for trajectory in trajectories]
+        trajectories_states[i] = reduce(hcat, trajectories_states_separately[i])
     end
-
+    states_by_trajectory_flat = reduce(vcat, trajectories_states_separately)
     states = reduce(hcat, trajectories_states)
-    return states
+    return states, states_by_trajectory_flat
 end
 
 function _normalize_exemplars(exemplars::Matrix{Float32}) :: Matrix{Float32}
@@ -347,5 +363,6 @@ function _translate_solutions(old_exemplars::Matrix{Float32}, new_exemplars::Mat
 end
 
 include("_EnvironmentWrapperClustering.jl")
+include("_EnvironmentWrapperTimeClustering.jl")
 
 end

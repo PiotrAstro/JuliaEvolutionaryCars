@@ -77,8 +77,8 @@ function predict(nn::DistanceBasedClassificator, X::Array{Float32}) :: Array{Flo
     # --------------------------------------------------------------------------------------------
     # actual Function
 
-    # mean of 3 closest actions
-    n = 1
+    # mean of n closest actions
+    n = 3
     encoded_x = predict(nn.encoder, X)
     # normalize length - make it a unit vector
     encoded_x .*= inv.(sqrt.(sum(abs2, encoded_x; dims=1)))
