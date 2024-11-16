@@ -26,7 +26,7 @@ end
 
 
 function MutationOnlyStruct(env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct)
-    individuals = [Ind.Individual(env_wrapper) for _ in 1:100]
+    individuals = [Ind.Individual(env_wrapper) for _ in 1:200]
     return MutationOnlyStruct(individuals, env_wrapper, individuals[1])
 end
 
@@ -40,8 +40,10 @@ function generation!(mutation_struct::MutationOnlyStruct)
     new_individuals = Vector{Ind.Individual}(undef, length(mutation_struct.population))
     Threads.@threads for i in 1:length(mutation_struct.population)
         Ind.get_fitness!(mutation_struct.population[i])
+        
         new_individuals[i] = Ind.copy_individual(mutation_struct.population[i])
-        Ind.mutate_top_to_bottom!(new_individuals[i], 0.05)
+        # Ind.mutate_flat!(new_individuals[i], 0.1)
+        Ind.mutate_top_to_bottom!(new_individuals[i], 0.07)  # 0.1 gave once optimal result
         Ind.get_fitness!(new_individuals[i])
     end
 

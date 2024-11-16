@@ -53,7 +53,6 @@ function run_new_individual!(p3::Population_Pyramid)
     i = 1
     while i <= length(p3.population)
         new_individual = Ind.copy_individual(new_individual)
-        println(Ind.get_same_genes_percent(new_individual, p3.population[i].individuals))
         if i > 1
             # new_env_wrapper = p3.population[i].env_wrapper
             # new_individual.genes = EnvironmentWrapper.translate_solutions(new_individual.env_wrapper, new_env_wrapper, [new_individual.genes])[1]
@@ -65,7 +64,7 @@ function run_new_individual!(p3::Population_Pyramid)
 
             Ind.FIHC_top_to_bottom!(new_individual)
         end
-        println(Ind.get_same_genes_percent(new_individual, p3.population[i].individuals))
+        println("Genes pre mixing: ", Ind.get_same_genes_percent(new_individual, p3.population[i].individuals))
 
         if add_to_next_level
             push!(p3.population[i].individuals, new_individual)
@@ -74,7 +73,7 @@ function run_new_individual!(p3::Population_Pyramid)
 
         old_fitness = Ind.get_fitness!(new_individual)
         Ind.optimal_mixing_bottom_to_top!(new_individual, p3.population[i].individuals)
-        println(Ind.get_same_genes_percent(new_individual, p3.population[i].individuals))
+        println("Genes post mixing: ", Ind.get_same_genes_percent(new_individual, p3.population[i].individuals))
         new_fitness = Ind.get_fitness!(new_individual)
 
         if Ind.get_fitness!(p3.best_individual) < new_fitness
@@ -112,25 +111,29 @@ function run!(env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct, visualiz
     best_ever_fitness_environment_wrapper_version = 0
 
     current_env_wrapper_version = 0
+    generation_this_level = 0
     for generation in 1:100
+        generation_this_level += 1
         run_new_individual!(p3)
-        Ind.visualize(p3.best_individual, visualization_env, visualization_kwargs)
         if Ind.get_fitness!(p3.best_individual) > best_ever_fitness
             best_ever_fitness = Ind.get_fitness!(p3.best_individual)
             best_ever_fitness_environment_wrapper_version = current_env_wrapper_version
         end
 
+        Ind.visualize(p3.best_individual, visualization_env, visualization_kwargs)
+
         println("\n\n\n\n\n\n\n\n\n")
-        println("Generation: $generation   current_env_wrapper_version: $current_env_wrapper_version   current_best_fitness: $(Ind.get_fitness!(p3.best_individual))")
-        println("best_ever_fitness: $best_ever_fitness   best_ever_fitness_environment_wrapper_version: $best_ever_fitness_environment_wrapper_version")
+        println("Generation local: $generation_this_level   current_env_wrapper_version: $current_env_wrapper_version   current_best_fitness: $(Ind.get_fitness!(p3.best_individual))")
+        println("Generation global: $generation   best_ever_fitness: $best_ever_fitness   best_ever_fitness_environment_wrapper_version: $best_ever_fitness_environment_wrapper_version")
         println("\n\n\n\n\n\n\n\n\n")
 
-        if generation % (2 * 2^current_env_wrapper_version) == 0
+        if generation_this_level % (2 * 2^current_env_wrapper_version) == 0
             current_env_wrapper_version += 1
             env_wrap = EnvironmentWrapper.copy(p3.population[1].env_wrapper)
             best_individuals = get_n_best_individuals_genes(p3, space_explorers_n)
             EnvironmentWrapper.actualize!(env_wrap, best_individuals, best_individuals)
             p3 = P3Levels.Population_Pyramid(env_wrap)
+            generation_this_level = 0
         end
     end
 end

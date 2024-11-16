@@ -41,34 +41,11 @@ function predict(nn::DistanceBasedClassificator, X::Array{Float32}) :: Array{Flo
     # end
 
     # @time for _ in 1:100000
-    #     n = 3
-    #     encoded_x = predict(nn.encoder, X)
-    #     encoded_x .*= inv.(sqrt.(sum(abs2, encoded_x; dims=1)))  # normalize length - make it a unit vector
-    #     similarity = nn.encoded_exemplars * encoded_x
-    #     closest_exemplars = [_get_n_largest_indices(one_col, n) for one_col in eachcol(similarity)]
-    #     result_matrix = zeros(Float32, nn.actions_number, size(X, 2))
-    #     @inbounds for (result_col, (closest_exemplars_indicies, closest_exemplars_sim)) in zip(eachcol(result_matrix), closest_exemplars)
-    #         dist = max.(1.0 .- closest_exemplars_sim, 1e-6)
-    #         min_dist = minimum(dist)
-    #         for (i, row) in enumerate(nn.translation[closest_exemplars_indicies])
-    #             result_col[row] += min_dist / dist[i]
-    #         end
-    #         # actually, this sum is currently not needed, cause I take max anyway
-    #         result_col ./= sum(result_col)
-    #     end
+        
     # end
 
     # @time for _ in 1:100000
-    #     encoded_x = predict(nn.encoder, X)
-    #     encoded_x .*= inv.(sqrt.(sum(abs2, encoded_x; dims=1)))
         
-    #     similarity = nn.encoded_exemplars * encoded_x
-    #     result_matrix = zeros(Float32, nn.actions_number, size(X, 2))
-    #     closest_exemplars = [argmax(one_col) for one_col in eachcol(similarity)]
-    #     row_indices = nn.translation[closest_exemplars]
-    #     @inbounds for (i, row_index) in enumerate(row_indices)
-    #         result_matrix[row_index, i] = 1.0
-    #     end
     # end
 
     # println("")
@@ -78,7 +55,8 @@ function predict(nn::DistanceBasedClassificator, X::Array{Float32}) :: Array{Flo
     # actual Function
 
     # mean of n closest actions
-    n = 3
+    n = 5
+
     encoded_x = predict(nn.encoder, X)
     # normalize length - make it a unit vector
     encoded_x .*= inv.(sqrt.(sum(abs2, encoded_x; dims=1)))

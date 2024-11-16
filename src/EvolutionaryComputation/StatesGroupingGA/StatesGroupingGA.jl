@@ -64,8 +64,9 @@ function StatesGroupingGA_Algorithm(;
 end
 
 function run!(algorithm::StatesGroupingGA_Algorithm; max_generations::Int, max_evaluations::Int, log::Bool=true, visualize_each_n_epochs::Int=0)
-    # P3Levels.run!(algorithm.env_wrapper, algorithm.visualization_env, algorithm.visualization_kwargs, max_generations, algorithm.space_explorers_n)
-    MutationOnly.run!(algorithm.env_wrapper, algorithm.visualization_env, algorithm.visualization_kwargs, max_generations, algorithm.space_explorers_n)
+    P3Levels.run!(algorithm.env_wrapper, algorithm.visualization_env, algorithm.visualization_kwargs, max_generations, algorithm.space_explorers_n)
+    # MutationOnly.run!(algorithm.env_wrapper, algorithm.visualization_env, algorithm.visualization_kwargs, max_generations, algorithm.space_explorers_n)
+    # NormalGA.run!(algorithm.env_wrapper, algorithm.visualization_env, algorithm.visualization_kwargs, max_generations, algorithm.space_explorers_n)
 end
 
 end # module StatesGroupingGA

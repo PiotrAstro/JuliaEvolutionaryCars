@@ -96,6 +96,52 @@ function crossover(individual1::Individual, individual2::Individual) :: Tuple{In
     return (new_individual1, new_individual2)
 end
 
+function optimal_mixing_top_to_bottom_2_individuals(individual1::Individual, individual2) :: Individual
+    new_individual = copy_individual(individual1)
+    # print("\npre optimal mixing fitness: ", get_fitness!(new_individual))
+    # root = individual.env_wrapper._similarity_tree
+    root = new_individual.env_wrapper._time_distance_tree
+    tree_levels = [[root.left, root.right]]
+
+    # this one is test only!!!
+    i = 1
+    while i <= length(tree_levels)
+        current_level = tree_levels[i]
+        random_perm = Random.randperm(length(current_level))
+
+        for node in current_level[random_perm]         
+            old_elements = new_individual.genes[node.elements]
+            old_fitness = get_fitness!(new_individual)
+
+            if old_elements != individual1.genes[node.elements]
+                new_individual.genes[node.elements] = individual1.genes[node.elements]
+                new_individual._fitness_actual = false
+            elseif old_elements != individual2.genes[node.elements]
+                new_individual.genes[node.elements] = individual2.genes[node.elements]
+                new_individual._fitness_actual = false
+            end
+
+            if get_fitness!(new_individual) > old_fitness
+                # println("improvement from $old_fitness  to $(get_fitness!(new_individual))\ttree level $i")
+                # save_decision_plot(individual)
+            end
+
+            if !EnvironmentWrapper.is_leaf(node)
+                if i == length(tree_levels)
+                    push!(tree_levels, [node.left, node.right])
+                else
+                    push!(tree_levels[i+1], node.left, node.right)
+                end
+            end
+        end
+
+        i += 1
+    end
+
+    # print("\tpost optimal mixing fitness: $(get_fitness!(new_individual))\n")
+    return new_individual
+end
+
 function optimal_mixing_top_to_bottom!(individual::Individual, other_individuals::Vector{Individual})
     print("\npre optimal mixing fitness: ", get_fitness!(individual))
     # root = individual.env_wrapper._similarity_tree

@@ -24,7 +24,7 @@ function _create_time_distance_tree(encoded_states_trajectories::Vector{Matrix{F
         end
     end
 
-    clustering = Clustering.hclust(distances, linkage=:complete)
+    clustering = Clustering.hclust(distances, linkage=:single)
     tree = _create_tree_hclust(clustering.merges, exemplars_n)
     return tree
 end

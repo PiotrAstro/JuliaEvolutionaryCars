@@ -9,6 +9,7 @@ import Optimisers
 import Memoization
 import Distances
 import LinearAlgebra
+import SparseArrays
 # import SimilaritySearch
 
 export AbstractNeuralNetwork, predict, learn!, get_parameters, set_parameters!, copy, get_neural_network, get_Flux_representation, get_loss, get_input_representant_nn
