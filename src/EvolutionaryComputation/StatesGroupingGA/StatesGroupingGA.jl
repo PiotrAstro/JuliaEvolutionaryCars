@@ -3,7 +3,7 @@ module StatesGroupingGA
 import ..NeuralNetwork
 import ..Environment
 
-include("EnvironmentWrapper.jl")
+include("EnvironmentWrapper/EnvironmentWrapper.jl")
 import .EnvironmentWrapper
 
 include("IndividualModule.jl")
@@ -12,13 +12,13 @@ import .IndividualModule
 # --------------------------------------------------------------------------------------------------
 # Ga methods
 
-include("MutationOnly.jl")
+include("algorithms/MutationOnly.jl")
 import .MutationOnly
 
-include("P3Levels.jl")
+include("algorithms/P3Levels.jl")
 import .P3Levels
 
-include("NormalGA.jl")
+include("algorithms/NormalGA.jl")
 import .NormalGA
 
 mutable struct StatesGroupingGA_Algorithm

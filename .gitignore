@@ -1,4 +1,6 @@
 
 *.jl.*
 Manifest.toml
-log
+log/*
+*.code-workspace
+! log/.gitignore
