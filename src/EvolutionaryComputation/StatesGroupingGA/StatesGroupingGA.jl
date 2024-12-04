@@ -2,7 +2,6 @@ module StatesGroupingGA
 
 import ..NeuralNetwork
 import ..Environment
-import ..ClusteringHML
 
 include("EnvironmentWrapper.jl")
 import .EnvironmentWrapper
@@ -39,7 +38,8 @@ function StatesGroupingGA_Algorithm(;
     environment::Symbol,
     space_explorers_n::Int,
     max_states_considered::Int,
-    n_clusters::Int
+    n_clusters::Int,
+    fuzzy_logic_of_n_closest::Int
 )
     environment_type = Environment.get_environment(environment)
     environments = [(environment_type)(;environment_kwarg...) for environment_kwarg in environment_kwargs]
@@ -52,7 +52,8 @@ function StatesGroupingGA_Algorithm(;
         nn_game_decoder,
         space_explorers_n,
         max_states_considered,
-        n_clusters
+        n_clusters,
+        fuzzy_logic_of_n_closest
     )
 
     return StatesGroupingGA_Algorithm(

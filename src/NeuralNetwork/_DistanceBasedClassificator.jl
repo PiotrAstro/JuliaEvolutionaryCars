@@ -7,9 +7,10 @@ translation is a vector of size number of exemplars
 """
 struct DistanceBasedClassificator{N <: AbstractNeuralNetwork} <: AbstractNeuralNetwork
     encoder::N
-    encoded_exemplars::Matrix{Float32}
+    encoded_exemplars::Matrix{Float32}  # encoded exemplars are normalized (unit vectors) and transposed for better performance, so it should be clusters_n x features
     translation::Vector{Int}
     actions_number::Int
+    fuzzy_logic_of_n_closest::Int
 end
 
 # function DistanceBasedClassificator(encoder::AbstractNeuralNetwork, encoded_exemplars::Matrix{Float32}, translation::Vector{Int}, actions_number::Int) :: DistanceBasedClassificator 
@@ -55,13 +56,13 @@ function predict(nn::DistanceBasedClassificator, X::Array{Float32}) :: Array{Flo
     # actual Function
 
     # mean of n closest actions
-    n = 5
 
     encoded_x = predict(nn.encoder, X)
+
     # normalize length - make it a unit vector
     encoded_x .*= inv.(sqrt.(sum(abs2, encoded_x; dims=1)))
     similarity = nn.encoded_exemplars * encoded_x
-    closest_exemplars = [_get_n_largest_indices(one_col, n) for one_col in eachcol(similarity)]
+    closest_exemplars = [_get_n_largest_indices(one_col, nn.fuzzy_logic_of_n_closest) for one_col in eachcol(similarity)]
     result_matrix = zeros(Float32, nn.actions_number, size(X, 2))
     @inbounds for (result_col, (closest_exemplars_indicies, closest_exemplars_sim)) in zip(eachcol(result_matrix), closest_exemplars)
         # change similarity to distance and clamp from bottom to avoid division by zero

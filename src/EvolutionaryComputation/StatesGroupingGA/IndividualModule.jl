@@ -154,11 +154,10 @@ function optimal_mixing_top_to_bottom!(individual::Individual, other_individuals
         current_level = tree_levels[i]
         random_perm = Random.randperm(length(current_level))
 
-        for node in current_level[random_perm]         
-            old_elements = individual.genes[node.elements]
-            old_fitness = get_fitness!(individual)
-            
+        for node in current_level[random_perm]
             # get one random individual
+            # old_elements = individual.genes[node.elements]
+            # old_fitness = get_fitness!(individual)
             # random_individual = other_individuals[Random.rand(1:length(other_individuals))]
             # if individual.genes[node.elements] != random_individual.genes[node.elements]
             #     individual.genes[node.elements] = random_individual.genes[node.elements]
@@ -185,7 +184,7 @@ function optimal_mixing_top_to_bottom!(individual::Individual, other_individuals
             end
 
             max_copy = argmax(get_fitness!, individuals_copies)
-            if get_fitness!(max_copy) > old_fitness
+            if get_fitness!(max_copy) > get_fitness!(individual)
                 individual.genes[node.elements] = max_copy.genes[node.elements]
                 individual._fitness = max_copy._fitness
                 println("improvement from $old_fitness  to $(get_fitness!(max_copy))\ttree level $i")

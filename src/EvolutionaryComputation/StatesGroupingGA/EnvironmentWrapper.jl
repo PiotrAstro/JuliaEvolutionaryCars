@@ -2,7 +2,6 @@ module EnvironmentWrapper
 
 import ..NeuralNetwork
 import ..Environment
-import ..ClusteringHML
 
 import PyCall
 println(PyCall.python)
@@ -39,8 +38,8 @@ mutable struct EnvironmentWrapperStruct
     _raw_exemplars::Matrix{Float32}
     _similarity_tree::TreeNode
     _time_distance_tree::TreeNode
-    _time_tree::TreeNode
     _max_states_considered::Int
+    _fuzzy_logic_of_n_closest::Int
 end
 
 # --------------------------------------------------------------------------------------------------
@@ -54,6 +53,7 @@ function EnvironmentWrapperStruct(
     initial_space_explorers_n::Int,
     max_states_considered::Int,
     n_clusters::Int,
+    fuzzy_logic_of_n_closest::Int
 ) :: EnvironmentWrapperStruct
 
     encoder = NeuralNetwork.get_neural_network(encoder_dict[:name])(;encoder_dict[:kwargs]...)
@@ -147,8 +147,8 @@ function EnvironmentWrapperStruct(
         states[:, exemplars_ids],
         similarity_tree,
         time_distance_tree,
-        TreeNode(nothing, nothing, 0.0, exemplars_ids),
-        max_states_considered
+        max_states_considered,
+        fuzzy_logic_of_n_closest
     )
 
     # perfect_solution = action_taken[exemplars_ids]
@@ -189,8 +189,8 @@ function copy(env_wrap::EnvironmentWrapperStruct) :: EnvironmentWrapperStruct
         env_wrap._raw_exemplars,
         env_wrap._similarity_tree,
         env_wrap._time_distance_tree,
-        env_wrap._time_tree,
-        env_wrap._max_states_considered
+        env_wrap._max_states_considered,
+        env_wrap._fuzzy_logic_of_n_closest
     )
 end
 
@@ -311,7 +311,8 @@ function get_full_NN(env_wrap::EnvironmentWrapperStruct, genes::Vector{Int}) :: 
         env_wrap._encoder,
         env_wrap._encoded_exemplars_normalised,  # env_wrap._encoded_exemplars, # env_wrap._encoded_exemplars_normalised,
         genes,
-        get_action_size(env_wrap)
+        get_action_size(env_wrap),
+        env_wrap._fuzzy_logic_of_n_closest
     )
 end
 

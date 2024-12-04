@@ -102,8 +102,10 @@ function _get_exemplars(encoded_states::Matrix{Float32}, encoder::NeuralNetwork.
     encoded_states_py = PyCall.PyObject(encoded_states')
     # get genie clustering
     # n_clusters -> 200 - works well, can get optimal solution  # size(encoded_states, 2)  # 100
-    genie = genieclust.Genie(n_clusters=n_clusters, compute_full_tree=true, verbose=true, gini_threshold=0.05, affinity="cosine")
-    @time genie.fit(encoded_states_py)
+    genie = genieclust.Genie(n_clusters=n_clusters, compute_full_tree=true, verbose=false, gini_threshold=0.05, affinity="cosine")
+    
+    # @time genie.fit(encoded_states_py)
+    genie.fit(encoded_states_py)
 
     children = collect(Array(genie.children_)')
     distances_clusters = Array(genie.distances_)
@@ -115,37 +117,40 @@ function _get_exemplars(encoded_states::Matrix{Float32}, encoder::NeuralNetwork.
     exemplars = tree.elements
     tree.elements = collect(1:length(tree.elements))
     _tree_elements_to_indicies!(tree)
-    
-    # n_clusters = trunc(Int, sqrt(size(encoded_states, 2)))
-    # n_clusters = 30
-    # tree = _create_exemplar_tree_number(children, encoded_states, distances_clusters, size(encoded_states, 2), n_clusters)
 
-    # Plots.scatter(encoded_states[1, :], encoded_states[2, :], legend=false, marker=:x, size=(3000, 3000))  # Creates the scatter plot
-    Plots.scatter(encoded_states[1, 1:2], encoded_states[2, 1:2], legend=false, marker=:x, size=(3000, 3000))
-    # Plots.scatter!(encoded_states[1, exemplars], encoded_states[2, exemplars], legend=false, color=:red)  # Adds the exemplars to the scatter plot
-    # load arrays of states from log/states_(number).jld and encode them and plot, form states 1 to 9
-    for i in 1:9
-        states = JLD.load("log/states_$i.jld")["states"]
-        encoded_states_loaded = NeuralNetwork.predict(encoder, states)
-        Plots.scatter!(encoded_states_loaded[1, :], encoded_states_loaded[2, :], legend=false, markerstrokewidth=0)
+    begin
+        
+        # n_clusters = trunc(Int, sqrt(size(encoded_states, 2)))
+        # n_clusters = 30
+        # tree = _create_exemplar_tree_number(children, encoded_states, distances_clusters, size(encoded_states, 2), n_clusters)
+
+        # # Plots.scatter(encoded_states[1, :], encoded_states[2, :], legend=false, marker=:x, size=(3000, 3000))  # Creates the scatter plot
+        # Plots.scatter(encoded_states[1, 1:2], encoded_states[2, 1:2], legend=false, marker=:x, size=(3000, 3000))
+        # # Plots.scatter!(encoded_states[1, exemplars], encoded_states[2, exemplars], legend=false, color=:red)  # Adds the exemplars to the scatter plot
+        # # load arrays of states from log/states_(number).jld and encode them and plot, form states 1 to 9
+        # for i in 1:9
+        #     states = JLD.load("log/states_$i.jld")["states"]
+        #     encoded_states_loaded = NeuralNetwork.predict(encoder, states)
+        #     Plots.scatter!(encoded_states_loaded[1, :], encoded_states_loaded[2, :], legend=false, markerstrokewidth=0)
+        # end
+        
+        # timestamp_string = Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS")
+        # Plots.savefig("log/scatter_plot_$timestamp_string.png")
+
+        # labels = Array(genie.labels_)
+        # labels_ids = [Vector{Int}() for _ in 1:n_clusters]
+        # for i in 1:length(labels)
+        #    push!(labels_ids[labels[i] + 1], i) 
+        # end
+
+        # # display(labels_ids)
+        # # display(labels_ids[1])
+
+        # for cluster in labels_ids
+        #     Plots.scatter!(encoded_states[1, cluster], encoded_states[2, cluster], legend=false, marker=:utriangle, markerstrokewidth=0, alpha=0.6)
+        # end
+        # Plots.savefig("log/scatter_plot_clusters_$timestamp_string.png")
     end
-    
-    timestamp_string = Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS")
-    Plots.savefig("log/scatter_plot_$timestamp_string.png")
-
-    labels = Array(genie.labels_)
-    labels_ids = [Vector{Int}() for _ in 1:n_clusters]
-    for i in 1:length(labels)
-       push!(labels_ids[labels[i] + 1], i) 
-    end
-
-    # display(labels_ids)
-    # display(labels_ids[1])
-
-    for cluster in labels_ids
-        Plots.scatter!(encoded_states[1, cluster], encoded_states[2, cluster], legend=false, marker=:utriangle, markerstrokewidth=0, alpha=0.6)
-    end
-    Plots.savefig("log/scatter_plot_clusters_$timestamp_string.png")
 
     return (exemplars, tree)
 end
