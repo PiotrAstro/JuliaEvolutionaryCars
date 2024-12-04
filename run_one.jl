@@ -8,7 +8,6 @@ println("Number of Julia threads: $(Threads.nthreads())")
 
 include("constants.jl")
 include("src/JuliaEvolutionaryCars.jl")
-
 import .JuliaEvolutionaryCars
 
 # Run the algorithm

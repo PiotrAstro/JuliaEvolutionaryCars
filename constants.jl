@@ -170,7 +170,7 @@ CONSTANTS_DICT = Dict(
         :space_explorers_n => 50,
         :max_states_considered => 10_000,
         :fuzzy_logic_of_n_closest => 5,
-        :n_clusters => 200,  # 200 works very well
+        :n_clusters => 30,  # 40 and 200 works very well
     ),
 
 
