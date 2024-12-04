@@ -54,14 +54,6 @@ function run_new_individual!(p3::Population_Pyramid)
     while i <= length(p3.population)
         new_individual = Ind.copy_individual(new_individual)
         if i > 1
-            # new_env_wrapper = p3.population[i].env_wrapper
-            # new_individual.genes = EnvironmentWrapper.translate_solutions(new_individual.env_wrapper, new_env_wrapper, [new_individual.genes])[1]
-            # new_individual.env_wrapper = new_env_wrapper
-            # old_fitness = get_fitness!(new_individual)
-            # new_individual._fitness_actual = false
-            # println("fitness changed from $old_fitness to $(get_fitness!(new_individual))")
-            # @time FIHC_flat!(new_individual)
-
             Ind.FIHC_top_to_bottom!(new_individual)
         end
         println("Genes pre mixing: ", Ind.get_same_genes_percent(new_individual, p3.population[i].individuals))

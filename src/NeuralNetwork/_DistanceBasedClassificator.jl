@@ -13,10 +13,6 @@ struct DistanceBasedClassificator{N <: AbstractNeuralNetwork} <: AbstractNeuralN
     fuzzy_logic_of_n_closest::Int
 end
 
-# function DistanceBasedClassificator(encoder::AbstractNeuralNetwork, encoded_exemplars::Matrix{Float32}, translation::Vector{Int}, actions_number::Int) :: DistanceBasedClassificator 
-#     return DistanceBasedClassificator(encoder, encoded_exemplars, translation, actions_number)
-# end
-
 function get_parameters(nn::DistanceBasedClassificator) :: Flux.Params
     return get_parameters(nn.encoder)
 end
