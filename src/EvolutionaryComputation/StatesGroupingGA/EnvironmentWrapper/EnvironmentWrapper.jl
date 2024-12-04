@@ -79,54 +79,14 @@ function EnvironmentWrapperStruct(
         states = states[:, random_columns]
     end
 
-    
-
-    # load states from log/states_ 1 to 9 and encode them
-    # good_states_splitted = [JLD.load("log/states_$i.jld", "states") for i in 1:9]
-    # println("splitted states")
-    # for state in good_states_splitted
-    #     display(state)
-    # end
-    # action_taken = zeros(Int, sum([size(states, 2) for states in good_states_splitted]))
-    # current_start = 1
-    # for i in 1:9
-    #     action_taken[current_start:current_start+size(good_states_splitted[i], 2)-1] .= i
-    #     current_start += size(good_states_splitted[i], 2)
-    # end
-    # good_states_loaded = hcat(good_states_splitted...)
-
-    # println("good_states_loaded:")
-    # display(good_states_loaded)
-    # println("action_taken:")
-    # display(action_taken)
-
-    println("States number: $(size(states, 2))")
-    # preparing working autoencoder
     NeuralNetwork.learn!(autoencoder, states, states)
-    # NeuralNetwork.learn!(autoencoder, good_states_loaded, good_states_loaded)
-    # action_taken_one_hot = zeros(Float32, 9, size(good_states_loaded, 2))
-    # for i in 1:size(good_states_loaded, 2)
-    #     action_taken_one_hot[action_taken[i], i] = 1.0
-    # end
-    # NeuralNetwork.learn!(autoencoder, good_states_loaded, action_taken_one_hot)
     println("Autoencoder trained")
-    # println("autoencoder result: $(Environment.get_trajectory_rewards!(envs, autoencoder))")
     encoded_states_by_trajectory = [NeuralNetwork.predict(encoder, states_one_traj) for states_one_traj in states_by_trajectories]
     encoded_states = NeuralNetwork.predict(encoder, states)
-
-    # encoded_states = NeuralNetwork.predict(encoder, good_states_loaded)
 
     println("Encoded states calculated")
 
     exemplars_ids, similarity_tree = _get_exemplars(encoded_states, encoder, n_clusters)
-    # TEST!!!
-    # encoded_states = good_states_loaded
-    println("exemplars number: $(length(exemplars_ids))")
-    # scatter!(encoded_states[1, exemplars_ids], encoded_states[2, exemplars_ids], legend=false, color=:red)  # Adds the exemplars to the scatter plot
-
-    # # Saving the plot to a file, e.g., PNG format
-    # savefig("scatter_plot.png")
-    # println("should be scattered now")
 
     encoded_exemplars = encoded_states[:, exemplars_ids]
     time_distance_tree = _create_time_distance_tree(encoded_states_by_trajectory, encoded_exemplars)
@@ -150,23 +110,6 @@ function EnvironmentWrapperStruct(
         max_states_considered,
         fuzzy_logic_of_n_closest
     )
-
-    # perfect_solution = action_taken[exemplars_ids]
-
-    # println("exemplars ids:")
-    # display(exemplars_ids)
-    # println("perfect solution:")
-    # display(perfect_solution)
-    # println("perfect solution result: $(get_fitness(wrapper, perfect_solution))")
-    
-    # println("Press 'q' to exit...")
-    # while true
-    #     input = readline(stdin, keep=true)
-    #     if input == "q"
-    #         println("Exiting...")
-    #         exit()
-    #     end
-    # end
 
     return wrapper
 end
@@ -210,15 +153,6 @@ function get_fitness(env_wrap::EnvironmentWrapperStruct, genes::Vector{Int}) :: 
     full_NN = get_full_NN(env_wrap, genes)
     envs_copies = [Environment.copy(env) for env in env_wrap._envs]
     results = Environment.get_trajectory_rewards!(envs_copies, full_NN)
-    
-    # previous_max_steps = env_wrap._envs[1].max_steps
-    # env_wrap._envs[1].max_steps = 5_000
-    # Environment.visualize!(env_wrap._envs[1], full_NN;
-    #     car_image_path = raw"data\car.png",
-    #     map_image_path = raw"data\map2.png",
-    #     fps = 60
-    # )
-    # env_wrap._envs[1].max_steps = previous_max_steps
     return sum(results)
 end
 
@@ -238,7 +172,6 @@ function actualize!(env_wrap::EnvironmentWrapperStruct, genes_new_trajectories::
         random_columns = rand(1:size(states, 2), env_wrap._max_states_considered)
         states = states[:, random_columns]
     end
-    println("States number: $(size(states, 2))")
 
     # We have to retrain autoencoder to cluster new states
     new_states_old_encoding = NeuralNetwork.predict(env_wrap._encoder, states)
@@ -249,30 +182,9 @@ function actualize!(env_wrap::EnvironmentWrapperStruct, genes_new_trajectories::
 
     # # get new exemplars, states and newly encoded states
     new_exemplars_ids, similarity_tree = _get_exemplars(new_encoded_states, env_wrap._encoder, env_wrap._n_clusters)
-    println("exemplars number: $(length(new_exemplars_ids))")
     new_exemplars = new_encoded_states[:, new_exemplars_ids]
     time_distance_tree = _create_time_distance_tree(new_encoded_states_by_trajectory, new_exemplars)
     new_exemplars_old_encoding = new_states_old_encoding[:, new_exemplars_ids]
-
-    # just for testing!!!!!!
-    new_states_old_encoding = NeuralNetwork.predict(env_wrap._encoder, states)
-    old_states_old_encoding = NeuralNetwork.predict(env_wrap._encoder, env_wrap._raw_all_states)
-    timestamp_string = Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS")
-    Plots.scatter(new_states_old_encoding[1, :], new_states_old_encoding[2, :], legend=false, color=:blue)  # Creates the scatter plot
-    Plots.scatter!(old_states_old_encoding[1, :], old_states_old_encoding[2, :], legend=false, color=:yellow)  # Adds the exemplars to the scatter plot
-    Plots.savefig("log/actualization_$timestamp_string.png")
-
-    # new_states_old_encoding = hcat(new_states_old_encoding, env_wrap._encoded_exemplars)
-    # env_wrap._raw_all_states = hcat(env_wrap._raw_all_states, states)
-
-    # new_exemplars_ids, similarity_tree = _get_exemplars(new_states_old_encoding, env_wrap._encoder)
-    # println("exemplars number: $(length(new_exemplars_ids))")
-    # new_exemplars_old_encoding = new_states_old_encoding[:, new_exemplars_ids]
-    # new_exemplars_old_encoding = hcat(new_exemplars_old_encoding, env_wrap._encoded_exemplars)
-    # new_exemplars = new_exemplars_old_encoding
-    # end just for testing
-
-    # run through old encoder to get new exemplars encoded in old way, so that I can compare them with old exemplars
 
     new_solutions = _translate_solutions(env_wrap._encoded_exemplars, new_exemplars_old_encoding, all_solutions)
     env_wrap._encoded_exemplars = new_exemplars
@@ -285,28 +197,6 @@ function actualize!(env_wrap::EnvironmentWrapperStruct, genes_new_trajectories::
 end
 
 function get_full_NN(env_wrap::EnvironmentWrapperStruct, genes::Vector{Int}) :: NeuralNetwork.AbstractNeuralNetwork
-    # traditional way to do it
-    # new_game_decoder = env_wrap._game_decoder_data[1](;env_wrap._game_decoder_data[2]...)
-
-    # # creating one hot encoding
-    # actions_n = get_action_size(env_wrap)
-    # one_hot = zeros(Float32, actions_n, size(env_wrap._encoded_exemplars, 2))
-    # @inbounds for i in 1:size(env_wrap._encoded_exemplars, 2)
-    #     one_hot[genes[i], i] = 1.0
-    # end
-
-    # NeuralNetwork.learn!(new_game_decoder, env_wrap._encoded_exemplars, one_hot)
-    # full_NN = NeuralNetwork.Combined_NN(
-    #     [
-    #         env_wrap._encoder,
-    #         new_game_decoder
-    #     ]
-    # )
-
-    # return full_NN
-
-    # ---------------------
-    # new way to do it
     return NeuralNetwork.DistanceBasedClassificator(
         env_wrap._encoder,
         env_wrap._encoded_exemplars_normalised,  # env_wrap._encoded_exemplars, # env_wrap._encoded_exemplars_normalised,
@@ -348,7 +238,6 @@ end
 
 function _translate_solutions(old_exemplars::Matrix{Float32}, new_exemplars::Matrix{Float32}, all_solutions::Vector{Vector{Int}}) :: Vector{Vector{Int}}
     # calculate simmilarity matrix
-    # distances_matrix = [vec(sum((old_exemplars .- new_exemplar).^2, dims=1)) for new_exemplar in eachcol(new_exemplars)]
     distances_matrix = Distances.pairwise(Distances.CosineDist(), old_exemplars, new_exemplars)
     new_to_old = [argmin(one_col) for one_col in eachcol(distances_matrix)]
 
