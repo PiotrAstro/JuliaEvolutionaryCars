@@ -40,6 +40,7 @@ mutable struct EnvironmentWrapperStruct
     _time_distance_tree::TreeNode
     _max_states_considered::Int
     _fuzzy_logic_of_n_closest::Int
+    _result_memory::Dict{Vector{Int}, Float64}
 end
 
 # --------------------------------------------------------------------------------------------------
@@ -108,7 +109,8 @@ function EnvironmentWrapperStruct(
         similarity_tree,
         time_distance_tree,
         max_states_considered,
-        fuzzy_logic_of_n_closest
+        fuzzy_logic_of_n_closest,
+        Dict{Vector{Int}, Float64}()
     )
 
     return wrapper
@@ -133,7 +135,8 @@ function copy(env_wrap::EnvironmentWrapperStruct) :: EnvironmentWrapperStruct
         env_wrap._similarity_tree,
         env_wrap._time_distance_tree,
         env_wrap._max_states_considered,
-        env_wrap._fuzzy_logic_of_n_closest
+        env_wrap._fuzzy_logic_of_n_closest,
+        Base.copy(env_wrap._result_memory)
     )
 end
 
@@ -149,11 +152,17 @@ function get_groups_number(env_wrap::EnvironmentWrapperStruct) :: Int
     return size(env_wrap._encoded_exemplars, 2)
 end
 
+
 function get_fitness(env_wrap::EnvironmentWrapperStruct, genes::Vector{Int}) :: Float64
-    full_NN = get_full_NN(env_wrap, genes)
-    envs_copies = [Environment.copy(env) for env in env_wrap._envs]
-    results = Environment.get_trajectory_rewards!(envs_copies, full_NN)
-    return sum(results)
+    copied_genes = Base.copy(genes)
+
+    result = get!(env_wrap._result_memory, copied_genes) do
+        full_NN = get_full_NN(env_wrap, copied_genes)
+        envs_copies = [Environment.copy(env) for env in env_wrap._envs]
+        sum(Environment.get_trajectory_rewards!(envs_copies, full_NN))
+    end
+
+    return result
 end
 
 "Actualize exemplars and autoencoder based on trajectories generated with provided genes_new_t. Then translates all_solutions to new solutions and returns them."
@@ -192,6 +201,7 @@ function actualize!(env_wrap::EnvironmentWrapperStruct, genes_new_trajectories::
     env_wrap._raw_all_states = states
     env_wrap._similarity_tree = similarity_tree
     env_wrap._time_distance_tree = time_distance_tree
+    env_wrap._result_memory = Dict{Vector{Int}, Float64}()
 
     return new_solutions
 end
