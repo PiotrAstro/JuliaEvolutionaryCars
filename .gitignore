@@ -3,4 +3,5 @@
 Manifest.toml
 log/*
 *.code-workspace
+.vscode/
 !log/.gitignore
