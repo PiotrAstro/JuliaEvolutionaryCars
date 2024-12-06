@@ -11,6 +11,9 @@ include("src/JuliaEvolutionaryCars.jl")
 import .JuliaEvolutionaryCars
 
 # Run the algorithm
+# Test config dict - it will alter values in the constants.jl file to make some tests
+
+
 
 # JuliaEvolutionaryCars.run_EvMutPop(CONSTANTS_DICT)
 JuliaEvolutionaryCars.run_StGroupGA(CONSTANTS_DICT)

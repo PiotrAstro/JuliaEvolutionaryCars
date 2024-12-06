@@ -10,6 +10,7 @@ import Memoization
 import Distances
 import LinearAlgebra
 import SparseArrays
+import StatsBase
 # import SimilaritySearch
 
 export AbstractNeuralNetwork, predict, learn!, get_parameters, set_parameters!, copy, get_neural_network, get_Flux_representation, get_loss, get_input_representant_nn
@@ -107,6 +108,7 @@ end
 include("_MLP.jl")
 include("_Combined.jl")
 include("_DistanceBasedClassificator.jl")
+include("_Autoencoder.jl")
 
 # -------------------------------------------------------
 # module functions:
@@ -121,6 +123,8 @@ function get_neural_network(name::Symbol) :: Type
         return DistanceBasedClassificator
     elseif name == :DummyNN
         return DummyNN
+    elseif name == :Autoencoder
+        return Autoencoder
     else
         throw("Neural Network not found")
     end

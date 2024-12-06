@@ -13,7 +13,7 @@ import Plots
 import Dates
 import JLD
 
-export EnvironmentWrapperStruct, get_action_size, get_groups_number, get_fitness, actualize!, copy, translate_solutions
+export EnvironmentWrapperStruct, get_action_size, get_groups_number, get_fitness, actualize!, copy, translate_solutions, is_verbose, set_verbose!
 
 # --------------------------------------------------------------------------------------------------
 # Structs
@@ -41,6 +41,8 @@ mutable struct EnvironmentWrapperStruct
     _max_states_considered::Int
     _fuzzy_logic_of_n_closest::Int
     _result_memory::Dict{Vector{Int}, Float64}
+    _result_memory_mutex::ReentrantLock
+    _verbose::Bool
 end
 
 # --------------------------------------------------------------------------------------------------
@@ -50,16 +52,18 @@ function EnvironmentWrapperStruct(
     envs::Vector{<:Environment.AbstractEnvironment},
     encoder_dict::Dict{Symbol, Any},
     decoder_dict::Dict{Symbol, Any},
+    autoencoder_dict::Dict{Symbol, <:Any},
     game_decoder_dict::Dict{Symbol, Any},
     initial_space_explorers_n::Int,
     max_states_considered::Int,
     n_clusters::Int,
-    fuzzy_logic_of_n_closest::Int
+    fuzzy_logic_of_n_closest::Int,
+    verbose::Bool = false
 ) :: EnvironmentWrapperStruct
 
     encoder = NeuralNetwork.get_neural_network(encoder_dict[:name])(;encoder_dict[:kwargs]...)
     decoder = NeuralNetwork.get_neural_network(decoder_dict[:name])(;decoder_dict[:kwargs]...)
-    autoencoder = NeuralNetwork.Combined_NN([encoder, decoder])
+    autoencoder = NeuralNetwork.Autoencoder(encoder, decoder; autoencoder_dict...)
 
     game_decoder_struct = NeuralNetwork.get_neural_network(game_decoder_dict[:name])
     game_decoder_kwargs = game_decoder_dict[:kwargs]
@@ -80,19 +84,21 @@ function EnvironmentWrapperStruct(
         states = states[:, random_columns]
     end
 
-    NeuralNetwork.learn!(autoencoder, states, states)
-    println("Autoencoder trained")
+    NeuralNetwork.learn!(autoencoder, states, states; verbose=verbose)
+    if verbose
+        println("Autoencoder trained")
+    end
     encoded_states_by_trajectory = [NeuralNetwork.predict(encoder, states_one_traj) for states_one_traj in states_by_trajectories]
     encoded_states = NeuralNetwork.predict(encoder, states)
-
-    println("Encoded states calculated")
 
     exemplars_ids, similarity_tree = _get_exemplars(encoded_states, encoder, n_clusters)
 
     encoded_exemplars = encoded_states[:, exemplars_ids]
     time_distance_tree = _create_time_distance_tree(encoded_states_by_trajectory, encoded_exemplars)
 
-    println("\n\n\n\nfinished\n\n\n\n")
+    if verbose
+        println("Exemplars and time distance tree created")
+    end
     
 
     wrapper = EnvironmentWrapperStruct(
@@ -110,7 +116,9 @@ function EnvironmentWrapperStruct(
         time_distance_tree,
         max_states_considered,
         fuzzy_logic_of_n_closest,
-        Dict{Vector{Int}, Float64}()
+        Dict{Vector{Int}, Float64}(),
+        ReentrantLock(),
+        verbose
     )
 
     return wrapper
@@ -118,9 +126,14 @@ end
 
 function copy(env_wrap::EnvironmentWrapperStruct) :: EnvironmentWrapperStruct
     envs_copy = [Environment.copy(env) for env in env_wrap._envs]
-    encoder_copy = NeuralNetwork.copy(env_wrap._encoder)
-    decoder_copy = NeuralNetwork.copy(env_wrap._decoder)
-    autoencoder_copy = NeuralNetwork.Combined_NN([encoder_copy, decoder_copy])
+    autoencoder_copy = NeuralNetwork.copy(env_wrap._autoencoder)
+    encoder_copy = autoencoder_copy.encoder
+    decoder_copy = autoencoder_copy.decoder
+
+    lock(env_wrap._result_memory_mutex)
+    result_memory_copy = Base.copy(env_wrap._result_memory)
+    unlock(env_wrap._result_memory_mutex)
+
     return EnvironmentWrapperStruct(
         envs_copy,
         env_wrap._n_clusters,
@@ -136,7 +149,9 @@ function copy(env_wrap::EnvironmentWrapperStruct) :: EnvironmentWrapperStruct
         env_wrap._time_distance_tree,
         env_wrap._max_states_considered,
         env_wrap._fuzzy_logic_of_n_closest,
-        Base.copy(env_wrap._result_memory)
+        result_memory_copy,
+        ReentrantLock(),
+        env_wrap._verbose
     )
 end
 
@@ -156,10 +171,18 @@ end
 function get_fitness(env_wrap::EnvironmentWrapperStruct, genes::Vector{Int}) :: Float64
     copied_genes = Base.copy(genes)
 
-    result = get!(env_wrap._result_memory, copied_genes) do
+    lock(env_wrap._result_memory_mutex)
+    result = get(env_wrap._result_memory, copied_genes, nothing)
+    unlock(env_wrap._result_memory_mutex)
+
+    if isnothing(result)
         full_NN = get_full_NN(env_wrap, copied_genes)
         envs_copies = [Environment.copy(env) for env in env_wrap._envs]
-        sum(Environment.get_trajectory_rewards!(envs_copies, full_NN))
+        result = sum(Environment.get_trajectory_rewards!(envs_copies, full_NN))
+
+        lock(env_wrap._result_memory_mutex)
+        env_wrap._result_memory[copied_genes] = result
+        unlock(env_wrap._result_memory_mutex)
     end
 
     return result
@@ -185,7 +208,11 @@ function actualize!(env_wrap::EnvironmentWrapperStruct, genes_new_trajectories::
     # We have to retrain autoencoder to cluster new states
     new_states_old_encoding = NeuralNetwork.predict(env_wrap._encoder, states)
     NeuralNetwork.learn!(env_wrap._autoencoder, states, states)
-    println("Autoencoder trained")
+
+    if env_wrap._verbose
+        println("Autoencoder retrained")
+    end
+
     new_encoded_states_by_trajectory = [NeuralNetwork.predict(env_wrap._encoder, states_one_traj) for states_one_traj in states_by_trajectories]
     new_encoded_states = NeuralNetwork.predict(env_wrap._encoder, states)
 
@@ -202,6 +229,7 @@ function actualize!(env_wrap::EnvironmentWrapperStruct, genes_new_trajectories::
     env_wrap._similarity_tree = similarity_tree
     env_wrap._time_distance_tree = time_distance_tree
     env_wrap._result_memory = Dict{Vector{Int}, Float64}()
+    env_wrap._result_memory_mutex = ReentrantLock()
 
     return new_solutions
 end
@@ -218,6 +246,14 @@ end
 
 function translate_solutions(env_wrap_old::EnvironmentWrapperStruct, env_wrap_new::EnvironmentWrapperStruct, all_solutions::Vector{Vector{Int}}) :: Vector{Vector{Int}}
     return _translate_solutions(env_wrap_old._encoded_exemplars, NeuralNetwork.predict(env_wrap_old._encoder, env_wrap_old._raw_exemplars), all_solutions)
+end
+
+function is_verbose(env_wrap::EnvironmentWrapperStruct) :: Bool
+    return env_wrap._verbose
+end
+
+function set_verbose!(env_wrap::EnvironmentWrapperStruct, verbose::Bool)
+    env_wrap._verbose = verbose
 end
 
 # --------------------------------------------------------------------------------------------------

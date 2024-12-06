@@ -21,7 +21,7 @@ CONSTANTS_DICT = Dict(
         :max_generations => 1000,
         :max_evaluations => 1_000_000,
         :log => true,
-        :visualize_each_n_epochs => 10_000,
+        :visualize_each_n_epochs => 0,
     ),
     :environment => Dict(
         :name => :BasicCarEnvironment,
@@ -107,25 +107,6 @@ CONSTANTS_DICT = Dict(
     # ------------------------------------------------------------------------------------
     # method specific staff
 
-
-    :ContinuousStatesGrouping => Dict(
-        # :population_size => 100, # 400
-        # :max_evaluations => 100000,
-        # :max_generations => 1000,
-        # :mutation_rate => 0.1,
-        # :mutation_controller => Dict(
-        #     :name => :Mut_One,
-        #     :kwargs => Dict(
-        #         :mutation_factor => 0.1,
-        #         :use_children => false
-        #     )
-        # ),
-        :n_threads => 8,
-        # :save_logs_every_n_epochs => 50,
-        # :logs_path => raw"logs"
-    ),
-
-
     :StatesGroupingGA => Dict(
         :nn_encoder => Dict(
             :name => :MLP_NN,
@@ -139,7 +120,7 @@ CONSTANTS_DICT = Dict(
                 :last_activation_function => :none
             )
         ),
-        :nn_autodecoder => Dict(
+        :nn_decoder => Dict(
             :name => :MLP_NN,
             :kwargs => Dict(
                 :input_size => 16,
@@ -152,7 +133,11 @@ CONSTANTS_DICT = Dict(
                 :last_activation_function => :none, # was :none
                 :loss => Flux.mse  # was Flux.mse
             )
-        ), 
+        ),
+        :nn_autoencoder => Dict(
+            :mmd_weight => 0.1,
+            :learning_rate => 0.001
+        ),
         :nn_game_decoder => Dict(
             :name => :MLP_NN,
             :kwargs => Dict(
@@ -170,12 +155,36 @@ CONSTANTS_DICT = Dict(
         :space_explorers_n => 50,
         :max_states_considered => 10_000,
         :fuzzy_logic_of_n_closest => 5,
-        :n_clusters => 30,  # 40 and 200 works very well
+        :n_clusters => 40,  # 40 and 200 works very well
     ),
 
 
 
 
+
+
+
+
+
+
+
+
+    :ContinuousStatesGrouping => Dict(
+        # :population_size => 100, # 400
+        # :max_evaluations => 100000,
+        # :max_generations => 1000,
+        # :mutation_rate => 0.1,
+        # :mutation_controller => Dict(
+        #     :name => :Mut_One,
+        #     :kwargs => Dict(
+        #         :mutation_factor => 0.1,
+        #         :use_children => false
+        #     )
+        # ),
+        :n_threads => 8,
+        # :save_logs_every_n_epochs => 50,
+        # :logs_path => raw"logs"
+    ),
     :Genetic_Algorithm => Dict(
         :population => 100,
         :max_evaluations => 100000,

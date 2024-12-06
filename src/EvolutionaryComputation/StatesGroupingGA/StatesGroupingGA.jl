@@ -30,7 +30,8 @@ end
 
 function StatesGroupingGA_Algorithm(;
     nn_encoder::Dict{Symbol, Any},
-    nn_autodecoder::Dict{Symbol, Any},
+    nn_decoder::Dict{Symbol, Any},
+    nn_autoencoder::Dict{Symbol, <:Any},
     nn_game_decoder::Dict{Symbol, Any},
     environment_kwargs::Vector{Dict{Symbol, Any}},
     visualization_kwargs::Dict{Symbol, Any},
@@ -48,7 +49,8 @@ function StatesGroupingGA_Algorithm(;
     env_wrapper = EnvironmentWrapper.EnvironmentWrapperStruct(
         environments,
         nn_encoder,
-        nn_autodecoder,
+        nn_decoder,
+        nn_autoencoder,
         nn_game_decoder,
         space_explorers_n,
         max_states_considered,
@@ -64,8 +66,16 @@ function StatesGroupingGA_Algorithm(;
     )
 end
 
-function run!(algorithm::StatesGroupingGA_Algorithm; max_generations::Int, max_evaluations::Int, log::Bool=true, visualize_each_n_epochs::Int=0)
-    P3Levels.run!(algorithm.env_wrapper, algorithm.visualization_env, algorithm.visualization_kwargs, max_generations, algorithm.space_explorers_n)
+function run!(algorithm::StatesGroupingGA_Algorithm; max_generations::Int, max_evaluations::Int, log::Bool, visualize_each_n_epochs::Int=0)
+    P3Levels.run!(algorithm.env_wrapper;
+        visualization_env=algorithm.visualization_env,
+        visualization_kwargs=algorithm.visualization_kwargs,
+        max_generations=max_generations,
+        space_explorers_n=algorithm.space_explorers_n,
+        max_evaluations=max_evaluations,
+        log=log,
+        visualize_each_n_epochs=visualize_each_n_epochs
+    )
     # MutationOnly.run!(algorithm.env_wrapper, algorithm.visualization_env, algorithm.visualization_kwargs, max_generations, algorithm.space_explorers_n)
     # NormalGA.run!(algorithm.env_wrapper, algorithm.visualization_env, algorithm.visualization_kwargs, max_generations, algorithm.space_explorers_n)
 end

@@ -3,4 +3,4 @@
 Manifest.toml
 log/*
 *.code-workspace
-! log/.gitignore
+!log/.gitignore
