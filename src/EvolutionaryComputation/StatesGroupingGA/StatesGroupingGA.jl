@@ -1,7 +1,10 @@
 module StatesGroupingGA
 
+import DataFrames
+
 import ..NeuralNetwork
 import ..Environment
+import ..AbstractOptimizerModule: AbstractOptimizer, run!
 
 include("EnvironmentWrapper/EnvironmentWrapper.jl")
 import .EnvironmentWrapper
@@ -21,7 +24,7 @@ import .P3Levels
 include("algorithms/NormalGA.jl")
 import .NormalGA
 
-mutable struct StatesGroupingGA_Algorithm
+mutable struct StatesGroupingGA_Algorithm <: AbstractOptimizer
     env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct
     visualization_env::Environment.AbstractEnvironment
     visualization_kwargs::Dict{Symbol, Any}
@@ -66,8 +69,8 @@ function StatesGroupingGA_Algorithm(;
     )
 end
 
-function run!(algorithm::StatesGroupingGA_Algorithm; max_generations::Int, max_evaluations::Int, log::Bool, visualize_each_n_epochs::Int=0)
-    P3Levels.run!(algorithm.env_wrapper;
+function run!(algorithm::StatesGroupingGA_Algorithm; max_generations::Int, max_evaluations::Int, log::Bool, visualize_each_n_epochs::Int=0) :: DataFrames.DataFrame
+    return P3Levels.run!(algorithm.env_wrapper;
         visualization_env=algorithm.visualization_env,
         visualization_kwargs=algorithm.visualization_kwargs,
         max_generations=max_generations,

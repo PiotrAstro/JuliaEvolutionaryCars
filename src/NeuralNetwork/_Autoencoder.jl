@@ -75,7 +75,7 @@ function learn!(
         if verbose
             loss_combined_value = Statistics.mean(custom_loss(encoder, decoder, nn_loss, nn.mmd_weight, X, Y))
             loss_reconstruction_value = Statistics.mean(nn_loss(predict(nn, X), Y))
-            println("Epoch: $epoch, Loss combined: $loss_combined_value, Loss reconstruction: $loss_reconstruction_value")
+            Logging.@info "Epoch: $epoch, Loss combined: $loss_combined_value, Loss reconstruction: $loss_reconstruction_value"
         end
     end
 end
@@ -123,25 +123,3 @@ function gaussian_kernel(
         ) ./ ρ^2 ./ size(x, 1)
     )
 end # function
-
-# function compute_mmd(z, z_prior)
-#     # Implement MMD computation
-#     # For example, using a Gaussian kernel
-#     batch_size = size(z, 2)
-#     dimensions = Float32(size(z, 1))
-#     xx = sum(abs2, z; dims=1)
-#     yy = sum(abs2, z_prior; dims=1)
-#     xy = z' * z_prior
-#     # Compute distances
-#     dxx = xx .+ xx' .- 2 * (z' * z)
-#     dyy = yy .+ yy' .- 2 * (z_prior' * z_prior)
-#     dxy = xx .+ yy' .- 2 * xy
-#     # Gaussian kernel with bandwidth σ^2
-#     sigma2 = 1.0
-#     kxx = exp.(-dxx / (dimensions))
-#     kyy = exp.(-dyy / (dimensions))
-#     kxy = exp.(-dxy / (dimensions))
-#     mmd = Flux.mean(kxx) + Flux.mean(kyy) - 2 * Flux.mean(kxy)
-#     println("mmd: $mmd  kxx: $(Flux.mean(kxx))  kyy: $(Flux.mean(kyy))  kxy: $(Flux.mean(kxy))")
-#     return mmd
-# end

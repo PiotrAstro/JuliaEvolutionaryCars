@@ -6,6 +6,8 @@ import ..EnvironmentWrapper
 import Random
 import Plots
 import Dates
+import Logging
+import Printf
 
 export Individual, get_fitness!, copy_individual, actualize_genes!, optimal_mixing_top_to_bottom!, optimal_mixing_bottom_to_top!, FIHC_flat!, FIHC_top_to_bottom!, save_decision_plot
 
@@ -149,7 +151,7 @@ end
 
 function optimal_mixing_top_to_bottom!(individual::Individual, other_individuals::Vector{Individual})
     if individual._verbose
-        print("\npre optimal mixing fitness: ", get_fitness!(individual))
+        Logging.@info Printf.@sprintf("\npre optimal mixing fitness: %.2f\n", get_fitness!(individual))
     end
 
     # root = individual.env_wrapper._similarity_tree
@@ -181,7 +183,8 @@ function optimal_mixing_top_to_bottom!(individual::Individual, other_individuals
             #     end
             # end
             individuals_copies = Vector{Individual}(undef, length(other_individuals))
-            Threads.@threads for i in 1:length(other_individuals)
+            # Threads.@threads for i in 1:length(other_individuals)
+            for i in 1:length(other_individuals)
                 individual_tmp = copy_individual(individual)
                 individuals_copies[i] = individual_tmp
 
@@ -195,7 +198,7 @@ function optimal_mixing_top_to_bottom!(individual::Individual, other_individuals
                 individual.genes[node.elements] = max_copy.genes[node.elements]
                 individual._fitness = max_copy._fitness
                 if individual._verbose
-                    println("improvement from $old_fitness  to $(get_fitness!(max_copy))\ttree level $i")
+                    Logging.@info Printf.@sprintf("improvement from %.2f  to %.2f\ttree level %d\n", get_fitness!(individual), get_fitness!(max_copy), i)
                 end
                 # save_decision_plot(individual)
             end
@@ -213,7 +216,7 @@ function optimal_mixing_top_to_bottom!(individual::Individual, other_individuals
     end
 
     if individual._verbose
-        print("\tpost optimal mixing fitness: $(get_fitness!(individual))\n")
+        Logging.@info Printf.@sprintf("\tpost optimal mixing fitness: %.2f\n", get_fitness!(individual))
     end
 end
 
@@ -232,7 +235,7 @@ end
 
 function optimal_mixing_bottom_to_top!(individual::Individual, other_individuals::Vector{Individual})
     if individual._verbose
-        print("\npre optimal mixing fitness: ", get_fitness!(individual))
+        Logging.@info Printf.@sprintf("\npre optimal mixing fitness: %.2f\n", get_fitness!(individual))
     end
     # root = individual.env_wrapper._similarity_tree
     root = individual.env_wrapper._time_distance_tree
@@ -279,7 +282,8 @@ function optimal_mixing_bottom_to_top!(individual::Individual, other_individuals
             #     end
             # end
             individuals_copies = Vector{Individual}(undef, length(other_individuals))
-            Threads.@threads for i in 1:length(other_individuals)
+            # Threads.@threads for i in 1:length(other_individuals)
+            for i in 1:length(other_individuals)
                 individual_tmp = copy_individual(individual)
                 individuals_copies[i] = individual_tmp
 
@@ -293,7 +297,7 @@ function optimal_mixing_bottom_to_top!(individual::Individual, other_individuals
                 individual.genes[node.elements] = max_copy.genes[node.elements]
                 individual._fitness = max_copy._fitness
                 if individual._verbose
-                    println("improvement from $old_fitness  to $(get_fitness!(max_copy))\ttree level $i")
+                    Logging.@info Printf.@sprintf("improvement from %.2f  to %.2f\ttree level %d\n", old_fitness, get_fitness!(max_copy), i)
                 end
                 # save_decision_plot(individual)
             end
@@ -302,7 +306,7 @@ function optimal_mixing_bottom_to_top!(individual::Individual, other_individuals
     end
 
     if individual._verbose
-        print("\tpost optimal mixing fitness: $(get_fitness!(individual))\n")
+        Logging.@info Printf.@sprintf("\tpost optimal mixing fitness: %.2f\n", get_fitness!(individual))
     end
 end
 
@@ -311,7 +315,7 @@ end
 function FIHC_flat!(individual::Individual)
     # flat version
     if individual._verbose
-        print("\npre FIHC fitness: ", get_fitness!(individual))
+        Logging.@info Printf.@sprintf("\npre FIHC fitness: %.2f\n", get_fitness!(individual))
     end
     random_perm = Random.randperm(length(individual.genes))
     actions_number = EnvironmentWrapper.get_action_size(individual.env_wrapper)
@@ -322,7 +326,8 @@ function FIHC_flat!(individual::Individual)
         random_loci_order = [i for i in Random.randperm(actions_number) if i != previous_gene]
 
         individuals_copies = Vector{Individual}(undef, length(random_loci_order))
-        Threads.@threads for i in eachindex(random_loci_order)
+        # Threads.@threads for i in eachindex(random_loci_order)
+        for i in eachindex(random_loci_order)
             individual_tmp = copy_individual(individual)
             individuals_copies[i] = individual_tmp
             individual_tmp.genes[gene_index] = random_loci_order[i]
@@ -335,7 +340,7 @@ function FIHC_flat!(individual::Individual)
             individual.genes[gene_index] = max_copy.genes[gene_index]
             individual._fitness = max_copy._fitness
             if individual._verbose
-                println("improvement from $previous_fitness  to $(get_fitness!(max_copy))")
+                Logging.@info Printf.@sprintf("improvement from %.2f  to %.2f\n", previous_fitness, get_fitness!(max_copy))
             end
             # save_decision_plot(individual)
         end
@@ -354,13 +359,13 @@ function FIHC_flat!(individual::Individual)
     end
 
     if individual._verbose
-        print("\tpost FIHC fitness: ", get_fitness!(individual))
+        Logging.@info Printf.@sprintf("\npost FIHC fitness: %.2f\n", get_fitness!(individual))
     end
 end
 
 function FIHC_top_to_bottom!(individual::Individual)
     if individual._verbose
-        print("\npre FIHC fitness: ", get_fitness!(individual))
+        Logging.@info Printf.@sprintf("\npre FIHC fitness: %.2f\n", get_fitness!(individual))
     end
     root = individual.env_wrapper._similarity_tree
     tree_levels = [[root.left, root.right]]
@@ -392,7 +397,7 @@ function FIHC_top_to_bottom!(individual::Individual)
                     individual._fitness = old_fitness
                 else
                     if individual._verbose
-                        println("improvement from $old_fitness to $new_fitness\ttree level $i")
+                        Logging.@info Printf.@sprintf("improvement from %.2f  to %.2f\ttree level %d\n", old_fitness, new_fitness, i)
                     end
                     # save_decision_plot(individual)
                     old_fitness = new_fitness
@@ -433,8 +438,7 @@ function FIHC_top_to_bottom!(individual::Individual)
     end
 
     if individual._verbose
-        print("\toverall_fitness_ckecks: $overall_fitness_ckecks")
-        print("\tpost FIHC fitness: ", get_fitness!(individual))
+        Logging.@info Printf.@sprintf("\toverall_fitness_ckecks: %d", overall_fitness_ckecks) * Printf.@sprintf("\tpost FIHC fitness: %.2f", get_fitness!(individual))
     end
 end
 

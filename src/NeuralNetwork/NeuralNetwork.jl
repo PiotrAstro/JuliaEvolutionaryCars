@@ -11,14 +11,11 @@ import Distances
 import LinearAlgebra
 import SparseArrays
 import StatsBase
+import Logging
 # import SimilaritySearch
 
 export AbstractNeuralNetwork, predict, learn!, get_parameters, set_parameters!, copy, get_neural_network, get_Flux_representation, get_loss, get_input_representant_nn
 abstract type AbstractNeuralNetwork end
-
-# Dummy Neural Network, used for manual testing in visual environments
-export DummyNN
-struct DummyNN <: AbstractNeuralNetwork end
 
 function predict(nn::AbstractNeuralNetwork, X::Array{Float32}) :: Array{Float32}
     throw("not implemented")
@@ -47,6 +44,13 @@ end
 function get_input_representant_nn(nn::AbstractNeuralNetwork)
     throw("not implemented")
 end
+
+# -------------------------------------------------------
+# end interface
+
+# Dummy Neural Network, used for manual testing in visual environments
+export DummyNN
+struct DummyNN <: AbstractNeuralNetwork end
 
 # More or less universal function for learning
 function learn!(
@@ -86,7 +90,7 @@ function learn!(
 
         # print loss
         if verbose
-            println("Epoch: $epoch, Loss: $(Statistics.mean(custom_loss(nn_internal, X, Y)))")
+            Logging.@info "Epoch: $epoch, Loss: $(Statistics.mean(custom_loss(nn_internal, X, Y)))"
         end
 
         # # print accuracy

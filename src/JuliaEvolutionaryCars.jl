@@ -1,6 +1,11 @@
 module JuliaEvolutionaryCars
 
-export run_EvMutPop, run_StGroupGA, run_ConStGroup
+import DataFrames
+
+export run
+
+include("EvolutionaryComputation/AbstractOptimizer.jl")
+import .AbstractOptimizerModule
 
 include("NeuralNetwork/NeuralNetwork.jl")
 import .NeuralNetwork
@@ -17,35 +22,10 @@ import .StatesGroupingGA
 include("EvolutionaryComputation/ContinuousStatesGrouping/ContinuousStatesGrouping.jl")
 import .ContinuousStatesGrouping
 
-function run_EvMutPop(CONSTANTS_DICT::Dict{Symbol})
+function run(optimizer::Symbol, CONSTANTS_DICT::Dict{Symbol}) :: DataFrames.DataFrame
     # Preprocessing data
     final_dict = Dict{Symbol, Any}(
-        CONSTANTS_DICT[:Evolutionary_Mutate_Population]...,
-
-        :environment_kwargs => Environment.prepare_environments_kwargs(
-            CONSTANTS_DICT[:environment][:universal_kwargs],
-            CONSTANTS_DICT[:environment][:changeable_training_kwargs_list]
-        ),
-        :visualization_kwargs => Dict{Symbol, Any}(CONSTANTS_DICT[:environment][:visualization]),
-        :environment_visualization_kwargs => Environment.prepare_environments_kwargs(
-            CONSTANTS_DICT[:environment][:universal_kwargs],
-            CONSTANTS_DICT[:environment][:changeable_validation_kwargs_list]
-        )[1],
-        :environment => CONSTANTS_DICT[:environment][:name],
-        :neural_network_data => CONSTANTS_DICT[:neural_network]
-    )
-
-    
-
-    # Running the algorithm
-    evolutionary_algorithm = EvolutionaryMutatePopulaiton.EvolutionaryMutatePopulationAlgorithm(;final_dict...)
-    EvolutionaryMutatePopulaiton.run!(evolutionary_algorithm; CONSTANTS_DICT[:run_config]...)
-end
-
-function run_StGroupGA(CONSTANTS_DICT::Dict{Symbol})
-    # Preprocessing data
-    final_dict = Dict{Symbol, Any}(
-        CONSTANTS_DICT[:StatesGroupingGA]...,
+        CONSTANTS_DICT[optimizer]...,
 
         :environment_kwargs => Environment.prepare_environments_kwargs(
             CONSTANTS_DICT[:environment][:universal_kwargs],
@@ -59,36 +39,21 @@ function run_StGroupGA(CONSTANTS_DICT::Dict{Symbol})
         :environment => CONSTANTS_DICT[:environment][:name]
     )
 
-    
-
-    # Running the algorithm
-    evolutionary_algorithm = StatesGroupingGA.StatesGroupingGA_Algorithm(;final_dict...)
-    StatesGroupingGA.run!(evolutionary_algorithm; CONSTANTS_DICT[:run_config]...)
+    optimizer_instance = get_optimizer(optimizer)(;final_dict...)
+    data_frame = AbstractOptimizerModule.run!(optimizer_instance; CONSTANTS_DICT[:run_config]...)
+    return data_frame
 end
 
-function run_ConStGroup(CONSTANTS_DICT::Dict{Symbol})
-    # Preprocessing data
-    final_dict = Dict{Symbol, Any}(
-        CONSTANTS_DICT[:ContinuousStatesGrouping]...,
-
-        :environment_kwargs => Environment.prepare_environments_kwargs(
-            CONSTANTS_DICT[:environment][:universal_kwargs],
-            CONSTANTS_DICT[:environment][:changeable_training_kwargs_list]
-        ),
-        :visualization_kwargs => Dict{Symbol, Any}(CONSTANTS_DICT[:environment][:visualization]),
-        :environment_visualization_kwargs => Environment.prepare_environments_kwargs(
-            CONSTANTS_DICT[:environment][:universal_kwargs],
-            CONSTANTS_DICT[:environment][:changeable_validation_kwargs_list]
-        )[1],
-        :environment => CONSTANTS_DICT[:environment][:name],
-        :neural_network_data => CONSTANTS_DICT[:neural_network]
-    )
-
-    
-
-    # Running the algorithm
-    evolutionary_algorithm = ContinuousStatesGrouping.ContinuousStatesGroupingAlgorithm(;final_dict...)
-    ContinuousStatesGrouping.run!(evolutionary_algorithm; CONSTANTS_DICT[:run_config]...)
+function get_optimizer(optimizer::Symbol)
+    if optimizer == :StatesGroupingGA
+        return StatesGroupingGA.StatesGroupingGA_Algorithm
+    elseif optimizer == :EvolutionaryMutatePopulation
+        return EvolutionaryMutatePopulaiton.EvolutionaryMutatePopulationAlgorithm
+    elseif optimizer == :ContinuousStatesGrouping
+        return ContinuousStatesGrouping.ContinuousStatesGroupingAlgorithm
+    else
+        throw("Optimizer not found")
+    end
 end
 
 end # module EvolutionaryCarsJulia

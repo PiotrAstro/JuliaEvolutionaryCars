@@ -4,14 +4,16 @@ import ..NeuralNetwork
 import ..Environment
 
 import PyCall
-println(PyCall.python)
-genieclust = PyCall.pyimport("genieclust")
 import Statistics
 import Clustering
 import Distances
 import Plots
 import Dates
 import JLD
+import Logging
+
+Logging.@info PyCall.python
+genieclust = PyCall.pyimport("genieclust")
 
 export EnvironmentWrapperStruct, get_action_size, get_groups_number, get_fitness, actualize!, copy, translate_solutions, is_verbose, set_verbose!
 
@@ -86,7 +88,7 @@ function EnvironmentWrapperStruct(
 
     NeuralNetwork.learn!(autoencoder, states, states; verbose=verbose)
     if verbose
-        println("Autoencoder trained")
+        Logging.@info "Autoencoder trained"
     end
     encoded_states_by_trajectory = [NeuralNetwork.predict(encoder, states_one_traj) for states_one_traj in states_by_trajectories]
     encoded_states = NeuralNetwork.predict(encoder, states)
@@ -97,7 +99,7 @@ function EnvironmentWrapperStruct(
     time_distance_tree = _create_time_distance_tree(encoded_states_by_trajectory, encoded_exemplars)
 
     if verbose
-        println("Exemplars and time distance tree created")
+        Logging.@info "Exemplars and time distance tree created"
     end
     
 
@@ -192,7 +194,8 @@ end
 function actualize!(env_wrap::EnvironmentWrapperStruct, genes_new_trajectories::Vector{Vector{Int}}, all_solutions::Vector{Vector{Int}}) :: Vector{Vector{Int}}
     NNs = Vector{NeuralNetwork.AbstractNeuralNetwork}(undef, length(genes_new_trajectories))
 
-    Threads.@threads for i in 1:length(genes_new_trajectories)
+    # Threads.@threads for i in 1:length(genes_new_trajectories)
+    for i in 1:length(genes_new_trajectories)
         solution = genes_new_trajectories[i]
         full_NN = get_full_NN(env_wrap, solution)
         NNs[i] = full_NN
@@ -210,7 +213,7 @@ function actualize!(env_wrap::EnvironmentWrapperStruct, genes_new_trajectories::
     NeuralNetwork.learn!(env_wrap._autoencoder, states, states)
 
     if env_wrap._verbose
-        println("Autoencoder retrained")
+        Logging.@info "Autoencoder retrained"
     end
 
     new_encoded_states_by_trajectory = [NeuralNetwork.predict(env_wrap._encoder, states_one_traj) for states_one_traj in states_by_trajectories]
@@ -263,7 +266,8 @@ function _collect_trajectories_states(envs::Vector{<:Environment.AbstractEnviron
     trajectories_states_separately = Vector{Vector{Array{Float32}}}(undef, length(NNs))
     trajectories_states = Vector{Array{Float32}}(undef, length(NNs))
 
-    Threads.@threads for i in 1:length(NNs)
+    # Threads.@threads for i in 1:length(NNs)
+    for i in 1:length(NNs)
         envs_copy = [Environment.copy(env) for env in envs]
         nn = NNs[i]
         trajectories = Environment.get_trajectory_data!(envs_copy, nn)
@@ -289,7 +293,8 @@ function _translate_solutions(old_exemplars::Matrix{Float32}, new_exemplars::Mat
 
     # translate solutions
     new_solutions = Vector{Vector{Int}}(undef, length(all_solutions))
-    Threads.@threads for i in 1:length(all_solutions)
+    # Threads.@threads for i in 1:length(all_solutions)
+    for i in 1:length(all_solutions)
         solution = all_solutions[i]
         new_solution = [solution[old] for old in new_to_old]
         new_solutions[i] = new_solution

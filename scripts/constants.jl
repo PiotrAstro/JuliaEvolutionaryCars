@@ -89,19 +89,6 @@ CONSTANTS_DICT = Dict(
             )
         ]
     ),
-    :neural_network => Dict(
-        :name => :MLP_NN,
-        :kwargs => Dict(
-            :input_size => 10,
-            :output_size => 9,  # 6 # 3 # 9
-            :hidden_layers => 2,
-            :hidden_neurons => 64,  # 64
-            :dropout => 0.0,
-            :activation_function => :relu,  # :relu
-            :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
-            :loss => Flux.kldivergence
-        )
-    ),
 
 
     # ------------------------------------------------------------------------------------
@@ -184,6 +171,19 @@ CONSTANTS_DICT = Dict(
         :n_threads => 8,
         # :save_logs_every_n_epochs => 50,
         # :logs_path => raw"logs"
+        :neural_network => Dict(
+            :name => :MLP_NN,
+            :kwargs => Dict(
+                :input_size => 10,
+                :output_size => 9,  # 6 # 3 # 9
+                :hidden_layers => 2,
+                :hidden_neurons => 64,  # 64
+                :dropout => 0.0,
+                :activation_function => :relu,  # :relu
+                :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
+                :loss => Flux.kldivergence
+            )
+        ),
     ),
     :Genetic_Algorithm => Dict(
         :population => 100,
@@ -193,8 +193,22 @@ CONSTANTS_DICT = Dict(
         :crosses_per_epoch => 99,
         :save_logs_every_n_epochs => 10,
         :max_threads => 0,
-        :logs_path => raw"C:\Piotr\AIProjects\Evolutionary_Cars\logs"
+        :logs_path => raw"C:\Piotr\AIProjects\Evolutionary_Cars\logs",
+        :neural_network => Dict(
+            :name => :MLP_NN,
+            :kwargs => Dict(
+                :input_size => 10,
+                :output_size => 9,  # 6 # 3 # 9
+                :hidden_layers => 2,
+                :hidden_neurons => 64,  # 64
+                :dropout => 0.0,
+                :activation_function => :relu,  # :relu
+                :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
+                :loss => Flux.kldivergence,
+            )
+        ),
     ),
+
     :Differential_Evolution => Dict(
         :population => 2000,
         :max_evaluations => 100000,
@@ -203,8 +217,22 @@ CONSTANTS_DICT = Dict(
         :diff_weight => 0.8,
         :save_logs_every_n_epochs => 50,
         :max_threads => 0,
-        :logs_path => raw"C:\Piotr\AIProjects\Evolutionary_Cars\logs"
+        :logs_path => raw"C:\Piotr\AIProjects\Evolutionary_Cars\logs",
+        :neural_network => Dict(
+            :name => :MLP_NN,
+            :kwargs => Dict(
+                :input_size => 10,
+                :output_size => 9,  # 6 # 3 # 9
+                :hidden_layers => 2,
+                :hidden_neurons => 64,  # 64
+                :dropout => 0.0,
+                :activation_function => :relu,  # :relu
+                :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
+                :loss => Flux.kldivergence
+            )
+        ),
     ),
+
     :Evolutionary_Mutate_Population => Dict(
         :population_size => 100, # 400
         # :max_evaluations => 100000,
@@ -220,6 +248,19 @@ CONSTANTS_DICT = Dict(
         :n_threads => 8,
         # :save_logs_every_n_epochs => 50,
         # :logs_path => raw"logs"
+        :neural_network => Dict(
+            :name => :MLP_NN,
+            :kwargs => Dict(
+                :input_size => 10,
+                :output_size => 9,  # 6 # 3 # 9
+                :hidden_layers => 2,
+                :hidden_neurons => 64,  # 64
+                :dropout => 0.0,
+                :activation_function => :relu,  # :relu
+                :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
+                :loss => Flux.kldivergence
+            )
+        ),
     ),
     :Evolutionary_Mutate_Population_Original => Dict(
         :population => 5000,
@@ -235,7 +276,20 @@ CONSTANTS_DICT = Dict(
         ),
         :n_threads => 8,
         :save_logs_every_n_epochs => 50,
-        :logs_path => raw"C:\Piotr\AIProjects\Evolutionary_Cars\logs"
+        :logs_path => raw"C:\Piotr\AIProjects\Evolutionary_Cars\logs",
+        :neural_network => Dict(
+            :name => :MLP_NN,
+            :kwargs => Dict(
+                :input_size => 10,
+                :output_size => 9,  # 6 # 3 # 9
+                :hidden_layers => 2,
+                :hidden_neurons => 64,  # 64
+                :dropout => 0.0,
+                :activation_function => :relu,  # :relu
+                :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
+                :loss => Flux.kldivergence
+            )
+        ),
     ),
     :GESMR => Dict(
         :population => 100,
@@ -247,8 +301,22 @@ CONSTANTS_DICT = Dict(
         :mutation_ratio_mutate => 0.5,
         :max_threads => 8,
         :save_logs_every_n_epochs => 5,
-        :logs_path => raw"C:\Piotr\AIProjects\Evolutionary_Cars\logs"
+        :logs_path => raw"C:\Piotr\AIProjects\Evolutionary_Cars\logs",
+        :neural_network => Dict(
+            :name => :MLP_NN,
+            :kwargs => Dict(
+                :input_size => 10,
+                :output_size => 9,  # 6 # 3 # 9
+                :hidden_layers => 2,
+                :hidden_neurons => 64,  # 64
+                :dropout => 0.0,
+                :activation_function => :relu,  # :relu
+                :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
+                :loss => Flux.kldivergence
+            )
+        ),
     ),
+
     :Param_Les_Ev_Mut_Pop => Dict(
         :epochs => 10000,
         :mutation_controller => Dict(
@@ -262,8 +330,22 @@ CONSTANTS_DICT = Dict(
         ),
         :max_threads => 22,
         :save_logs_every_n_epochs => 300,
-        :logs_path => raw"C:\Piotr\AIProjects\Evolutionary_Cars\logs"
+        :logs_path => raw"C:\Piotr\AIProjects\Evolutionary_Cars\logs",
+        :neural_network => Dict(
+            :name => :MLP_NN,
+            :kwargs => Dict(
+                :input_size => 10,
+                :output_size => 9,  # 6 # 3 # 9
+                :hidden_layers => 2,
+                :hidden_neurons => 64,  # 64
+                :dropout => 0.0,
+                :activation_function => :relu,  # :relu
+                :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
+                :loss => Flux.kldivergence
+            )
+        ),
     ),
+    
     :Evolutionary_Strategy => Dict(
         :permutations => 1000,
         :max_evaluations => 100000,
@@ -272,6 +354,19 @@ CONSTANTS_DICT = Dict(
         :learning_rate => 0.1,
         :save_logs_every_n_epochs => 20,
         :max_threads => 0,
-        :logs_path => raw"C:\Piotr\AIProjects\Evolutionary_Cars\logs"
+        :logs_path => raw"C:\Piotr\AIProjects\Evolutionary_Cars\logs",
+        :neural_network => Dict(
+            :name => :MLP_NN,
+            :kwargs => Dict(
+                :input_size => 10,
+                :output_size => 9,  # 6 # 3 # 9
+                :hidden_layers => 2,
+                :hidden_neurons => 64,  # 64
+                :dropout => 0.0,
+                :activation_function => :relu,  # :relu
+                :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
+                :loss => Flux.kldivergence
+            )
+        ),
     ),
 )

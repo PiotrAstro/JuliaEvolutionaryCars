@@ -2,8 +2,8 @@ function _create_time_distance_tree(encoded_states_trajectories::Vector{Matrix{F
     exemplars_n = size(encoded_exemplars, 2)
 
     trajectories_time_distances_by_exemplar = [Vector{Matrix{Int}}() for _ in 1:length(encoded_states_trajectories)]
-    Threads.@threads for i in 1:length(encoded_states_trajectories)
-    # for i in 1:length(encoded_states_trajectories)
+    # Threads.@threads for i in 1:length(encoded_states_trajectories)
+    for i in 1:length(encoded_states_trajectories)
         trajectories_time_distances_by_exemplar[i] = _create_time_distance_matrix(encoded_states_trajectories[i], encoded_exemplars)
     end
 

@@ -11,6 +11,8 @@ import Random
 import Plots
 import Dates
 import Logging
+import Printf
+import DataFrames
 
 # --------------------------------------------------------------------------------------------------
 # Structs
@@ -32,7 +34,7 @@ end
 
 function Population_Pyramid(env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct, verbose::Bool = true) :: Population_Pyramid
     first_individual = Ind.Individual(env_wrapper, verbose)
-    @time Ind.FIHC_top_to_bottom!(first_individual)
+    Ind.FIHC_top_to_bottom!(first_individual)
 
     return Population_Pyramid([Level([first_individual], env_wrapper)], first_individual, verbose)
 end
@@ -47,7 +49,7 @@ end
 "Runs new individual, does FIHC, optimal mixing, climbing through levels and returns final individual"
 function run_new_individual!(p3::Population_Pyramid)
     if p3.verbose
-        println("best individual fitness: ", Ind.get_fitness!(p3.best_individual))
+        Logging.@info Printf.@sprintf("best individual fitness: %.2f\n", Ind.get_fitness!(p3.best_individual))
     end
     new_individual = Ind.Individual(p3.population[1].env_wrapper, p3.verbose)
     Ind.FIHC_top_to_bottom!(new_individual)
@@ -62,7 +64,7 @@ function run_new_individual!(p3::Population_Pyramid)
         end
 
         if p3.verbose
-            println("Genes pre mixing: ", Ind.get_same_genes_percent(new_individual, p3.population[i].individuals))
+            Logging.@info Printf.@sprintf("\nGenes pre mixing: %s\n", Ind.get_same_genes_percent(new_individual, p3.population[i].individuals))
         end
 
         if add_to_next_level
@@ -74,14 +76,14 @@ function run_new_individual!(p3::Population_Pyramid)
         Ind.optimal_mixing_bottom_to_top!(new_individual, p3.population[i].individuals)
 
         if p3.verbose
-            println("Genes post mixing: ", Ind.get_same_genes_percent(new_individual, p3.population[i].individuals))
+            Logging.@info Printf.@sprintf("\nGenes post mixing: %s\n", Ind.get_same_genes_percent(new_individual, p3.population[i].individuals))
         end
         new_fitness = Ind.get_fitness!(new_individual)
 
         if Ind.get_fitness!(p3.best_individual) < new_fitness
             p3.best_individual = Ind.copy_individual(new_individual)
             if p3.verbose
-                println("new best individual fitness: ", new_fitness)
+                Logging.@info Printf.@sprintf("\n\nnew best individual fitness: %.2f\n\n", Ind.get_fitness!(p3.best_individual))
             end
         end
 
@@ -125,6 +127,9 @@ function run!(
     best_ever_fitness = -Inf
     best_ever_fitness_environment_wrapper_version = 0
 
+    # (Generation, best_fitness, best_fitness_environment_wrapper_version)
+    list_with_results = Vector{Tuple{Int, Float64, Float64}}()
+
     current_env_wrapper_version = 0
     generation_this_level = 0
     for generation in 1:max_generations
@@ -140,10 +145,9 @@ function run!(
         end
 
         if log
-            println("\n\n\n\n\n\n\n\n\n")
-            println("Generation local: $generation_this_level   current_env_wrapper_version: $current_env_wrapper_version   current_best_fitness: $(Ind.get_fitness!(p3.best_individual))")
-            println("Generation global: $generation   best_ever_fitness: $best_ever_fitness   best_ever_fitness_environment_wrapper_version: $best_ever_fitness_environment_wrapper_version")
-            println("\n\n\n\n\n\n\n\n\n")
+            Logging.@info "\n\n\n\n\n\nGeneration $generation\n" *
+            Printf.@sprintf("Generation local: %d   current_env_wrapper_version: %d   current_best_fitness: %.2f\n", generation_this_level, current_env_wrapper_version, Ind.get_fitness!(p3.best_individual)) *
+            Printf.@sprintf("Generation global: %d   best_ever_fitness: %.2f   best_ever_fitness_environment_wrapper_version: %d\n\n\n\n\n\n", generation, best_ever_fitness, best_ever_fitness_environment_wrapper_version)
         end
 
         if generation_this_level % (2 * 2^current_env_wrapper_version) == 0
@@ -154,7 +158,15 @@ function run!(
             p3 = P3Levels.Population_Pyramid(env_wrap, p3.verbose)
             generation_this_level = 0
         end
+
+        push!(
+            list_with_results,
+            (generation, best_ever_fitness, Ind.get_fitness!(p3.best_individual))
+        )
     end
+
+    data_frame = DataFrames.DataFrame(list_with_results, [:Generation, :Best_ever_fitness, :Best_fitness])
+    return data_frame
 end
 
 
