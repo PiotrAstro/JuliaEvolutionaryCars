@@ -127,8 +127,8 @@ function run!(
     best_ever_fitness = -Inf
     best_ever_fitness_environment_wrapper_version = 0
 
-    # (Generation, best_fitness, best_fitness_environment_wrapper_version)
-    list_with_results = Vector{Tuple{Int, Float64, Float64}}()
+    # (generation_global, best_fitness_global, generation_local, best_fitness_local)
+    list_with_results = Vector{Tuple{Int, Float64, Int, Float64}}()
 
     current_env_wrapper_version = 0
     generation_this_level = 0
@@ -161,11 +161,14 @@ function run!(
 
         push!(
             list_with_results,
-            (generation, best_ever_fitness, Ind.get_fitness!(p3.best_individual))
+            (generation, best_ever_fitness, generation_this_level, Ind.get_fitness!(p3.best_individual))
         )
     end
 
-    data_frame = DataFrames.DataFrame(list_with_results, [:Generation, :Best_ever_fitness, :Best_fitness])
+    data_frame = DataFrames.DataFrame(
+        list_with_results,
+        [:generation_global, :best_fitness_global, :generation_local, :best_fitness_local]
+    )
     return data_frame
 end
 

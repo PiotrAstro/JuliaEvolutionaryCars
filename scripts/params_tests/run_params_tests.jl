@@ -86,7 +86,7 @@ How to set TESTED_VALUES:
     ]
 """
 
-CASES_PER_TEST = 10
+CASES_PER_TEST = 2
 LOGS_DIR = "log/parameters_tests_" * Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS") * "/"
 
 # we will change these values globally for all tests
@@ -118,8 +118,11 @@ TESTED_VALUES = [
 # Run the tests
 mkpath(LOGS_DIR)
 special_dicts = create_all_special_dicts(TESTED_VALUES)
+println("\n\n will run with the following settings:")
+display(special_dicts)
 special_dicts_with_cases = [(optimizer, special_dict, i) for (optimizer, special_dict) in special_dicts, i in 1:CASES_PER_TEST]
 
+println("\n\n\n\n Running tests")
 # Threads.@threads for i in 1:length(special_dicts_with_cases)
 for i in 1:length(special_dicts_with_cases)
     optimizer, special_dict, case = special_dicts_with_cases[i]
