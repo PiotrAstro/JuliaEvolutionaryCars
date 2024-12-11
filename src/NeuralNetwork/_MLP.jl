@@ -76,14 +76,6 @@ function MLP_NN(;
 
 end
 
-function get_parameters(nn::MLP_NN) :: Flux.Params
-    return Flux.params(nn.layers)
-end
-
-function set_parameters!(nn::MLP_NN, parameters::Flux.Params)
-    Flux.loadparams!(nn.layers, parameters)
-end
-
 function get_loss(nn::MLP_NN) :: Function
     return nn.loss
 end
@@ -99,13 +91,6 @@ end
 
 function copy(nn::MLP_NN) :: MLP_NN
     return MLP_NN(deepcopy(nn.layers), nn.loss)
-end
-
-function get_input_representant_nn(nn::MLP_NN) :: MLP_NN
-    return MLP_NN(
-        Flux.Chain(nn.layers[1:(length(nn.layers)-1)]),
-        nn.loss
-    )
 end
 
 # --------------------------------------------------------------------------------

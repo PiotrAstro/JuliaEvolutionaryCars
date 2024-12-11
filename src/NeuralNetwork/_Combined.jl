@@ -11,14 +11,6 @@ function Combined_NN(layers::Vector{<:AbstractNeuralNetwork}) :: Combined_NN
     return Combined_NN(layers_new, loss)
 end
 
-function get_parameters(nn::Combined_NN) :: Flux.Params
-    return Flux.params(nn.layers)
-end
-
-function set_parameters!(nn::Combined_NN, parameters::Flux.Params)
-    Flux.loadparams!(nn.layers, parameters)
-end
-
 function get_loss(nn::Combined_NN) :: Function
     return nn.loss
 end

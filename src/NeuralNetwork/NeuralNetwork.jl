@@ -21,14 +21,6 @@ function predict(nn::AbstractNeuralNetwork, X::Array{Float32}) :: Array{Float32}
     throw("not implemented")
 end
 
-function get_parameters(nn::AbstractNeuralNetwork) :: Flux.Params
-    throw("not implemented")
-end
-
-function set_parameters!(nn::AbstractNeuralNetwork, parameters::Flux.Params)
-    throw("not implemented")
-end
-
 function get_Flux_representation(nn::AbstractNeuralNetwork)
     throw("not implemented")
 end
@@ -38,10 +30,6 @@ function get_loss(nn::AbstractNeuralNetwork) :: Function
 end
 
 function copy(nn::AbstractNeuralNetwork) :: AbstractNeuralNetwork
-    throw("not implemented")
-end
-
-function get_input_representant_nn(nn::AbstractNeuralNetwork)
     throw("not implemented")
 end
 
@@ -82,29 +70,13 @@ function learn!(
     ]
 
     for epoch in 1:epochs
-        # for data in batches
-        #     gs = Flux.gradient(x -> Loss(nn.layers(x), y_batch), Flux.params(nn.layers))
-        #     opt_state, nn.layers = Opt.update!(opt_state, nn.layers, gs)
-        # end
         Flux.train!(custom_loss, nn_internal, batches, opt_state)
 
         # print loss
         if verbose
-            Logging.@info "Epoch: $epoch, Loss: $(Statistics.mean(custom_loss(nn_internal, X, Y)))"
+            Logging.@info "Epoch: $epoch, Loss: $(Statistics.mean(custom_loss(nn_internal, X, Y)))\n"
         end
-
-        # # print accuracy
-        # check if one hot encoding
-        # predictions = predict(nn, X)
-        # accuracy = sum([argmax(predictions[:, i]) == argmax(Y[:, i]) for i in 1:size(Y, 2)]) / size(Y, 2)
-        # println("Epoch: $epoch, Accuracy: $accuracy")
     end
-
-    # display(nn.loss)
-    # display(nn.layers)
-    # display(X)
-    # display(Y)
-    # display(predict(nn, X))
 end
 
 # -------------------------------------------------------

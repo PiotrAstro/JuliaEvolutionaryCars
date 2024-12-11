@@ -12,15 +12,6 @@ function Autoencoder(encoder::AbstractNeuralNetwork, decoder::AbstractNeuralNetw
     return Autoencoder(encoder, decoder, Flux.Chain(get_Flux_representation(encoder), get_Flux_representation(decoder)), mmd_weight, learning_rate)
 end
 
-function get_parameters(nn::Autoencoder) :: Flux.Params
-    return Flux.params(get_Flux_representation(nn.encoder), get_Flux_representation(nn.decoder))
-end
-
-function set_parameters!(nn::Autoencoder, parameters::Flux.Params)
-    Flux.loadparams!(nn.encoder, parameters[1])
-    Flux.loadparams!(nn.decoder, parameters[2])
-end
-
 function get_loss(nn::Autoencoder) :: Function
     return get_loss(nn.decoder)
 end
@@ -46,12 +37,15 @@ function learn!(
     batch_size::Int = 256,
     verbose::Bool = true
 )
-    nn_params = get_parameters(nn)
     nn_loss = get_loss(nn)
     encoder = get_Flux_representation(nn.encoder)
     decoder = get_Flux_representation(nn.decoder)
+    chained = nn.chained
 
-    optimiser = Flux.AdamW(nn.learning_rate)
+    # Set up the optimizer and optimizer state
+    # (params, _) = Flux.setup(encoder, decoder)
+    optimiser_encoder = Optimisers.AdamW(nn.learning_rate)
+    optimiser_state = Flux.setup(optimiser_encoder, chained)
 
     # shuffle x and y the same way
     perm = Random.randperm(size(X, 2))
@@ -67,15 +61,17 @@ function learn!(
 
     for epoch in 1:epochs
         for (x, y) in batches
-            gs = Flux.gradient(() -> custom_loss(encoder, decoder, nn_loss, nn.mmd_weight, x, y), nn_params)
-            Flux.Optimise.update!(optimiser, nn_params, gs)
+            # Compute gradients
+            grads = Flux.gradient((ch) -> custom_loss(ch[1], ch[2], nn_loss, nn.mmd_weight, x, y), chained)
+            # Update the model parameters and optimiser state
+            Flux.update!(optimiser_state, chained, grads[1])
         end
 
         # print loss
         if verbose
             loss_combined_value = Statistics.mean(custom_loss(encoder, decoder, nn_loss, nn.mmd_weight, X, Y))
             loss_reconstruction_value = Statistics.mean(nn_loss(predict(nn, X), Y))
-            Logging.@info "Epoch: $epoch, Loss combined: $loss_combined_value, Loss reconstruction: $loss_reconstruction_value"
+            Logging.@info "Epoch: $epoch, Loss combined: $loss_combined_value, Loss reconstruction: $loss_reconstruction_value\n"
         end
     end
 end

@@ -12,7 +12,7 @@ import Dates
 import JLD
 import Logging
 
-Logging.@info PyCall.python
+Logging.@info PyCall.python * "\n"
 genieclust = PyCall.pyimport("genieclust")
 
 export EnvironmentWrapperStruct, get_action_size, get_groups_number, get_fitness, actualize!, copy, translate_solutions, is_verbose, set_verbose!
