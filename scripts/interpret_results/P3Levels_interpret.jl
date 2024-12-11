@@ -25,13 +25,24 @@ end
 It plots and displays the plot.
 Reads is a dictionary with keys as name of test and values as vector of cases.
 
-column is the column to plot.
+column is the name as symbol of the column to plot
+
+line_function is function used to determine the exact line point in a given place, e.g. mean, median, max, min, etc. We will automatically plot std
+
+It can be nothing, then we will plot all the points without std
+
 """
-function plot(reads::Dict{String, Vector{DataFrames.DataFrame}}, column::Symbol, leading_line::Function = Statistics.median)
+function plot(
+    reads::Dict{String, Vector{DataFrames.DataFrame}},
+    column::Symbol,
+    line_function::Union{Function, Nothing}=nothing
+) :: Plots.Plot
     p = Plots.plot()
     for (name, list) in reads
-        for df in list
-            Plots.plot!(p, df[!, column], label=name)
+        if isnothing(line_function)
+            for df in list
+                Plots.plot!(p, df[!, column], label=name)
+            end
         end
     end
     return p
