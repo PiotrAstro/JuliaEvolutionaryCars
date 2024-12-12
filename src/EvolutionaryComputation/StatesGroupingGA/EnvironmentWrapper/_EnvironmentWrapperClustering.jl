@@ -1,6 +1,8 @@
 
 function _get_exemplars(encoded_states::Matrix{Float32}, encoder::NeuralNetwork.AbstractNeuralNetwork, n_clusters::Int) :: Tuple{Vector{Int}, TreeNode}
     # change encoded states to pyobject
+    genieclust = PyCall.pyimport("genieclust")
+
     encoded_states_py = PyCall.PyObject(encoded_states')
     genie = genieclust.Genie(n_clusters=n_clusters, compute_full_tree=true, verbose=false, gini_threshold=0.05, affinity="cosine")
     

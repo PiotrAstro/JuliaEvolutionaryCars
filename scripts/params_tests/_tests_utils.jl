@@ -254,7 +254,7 @@ end
 """
 It will run one test with the given special_dict and dict_config.
 special dict should be taken from create_all_special_dicts
-dict config is config file, it is deepcopied inside the function
+You should copy dict_config_copied yourself before passing to the function
 
 input:
 special_dict = Dict{Symbol, <:Any}(
@@ -264,18 +264,17 @@ special_dict = Dict{Symbol, <:Any}(
     },
 )
 
-dict_config = normal config dict
+dict_config_copied - it should be copied before!
 """
-function run_one_test(optimizer::Symbol, special_dict::Dict{Symbol, <:Any}, dict_config::Dict{Symbol, <:Any}, case_index::Int, save_dir)
+function run_one_test(optimizer::Symbol, special_dict::Dict{Symbol, <:Any}, dict_config_copied::Dict{Symbol, <:Any}, case_index::Int, save_dir)
     save_n = save_name(optimizer, special_dict, case_index)
     println("Running test with config: ", save_n)
 
-    config_copy = deepcopy(dict_config)
-    change_dict_value!(config_copy, special_dict)
+    change_dict_value!(dict_config_copied, special_dict)
 
     data_frame_result = JuliaEvolutionaryCars.run(
         optimizer,
-        config_copy
+        dict_config_copied
     )
 
     # Save the results to a file

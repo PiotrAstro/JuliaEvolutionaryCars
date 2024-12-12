@@ -1,11 +1,14 @@
 module CustomLoggers
 
-export PlainInfoLogger
+export PlainInfoLogger, SimpleFileLogger
 
 using Logging
+import LoggingExtras
+
+SimpleFileLogger(file_name::String) = LoggingExtras.FileLogger(file_name)
 
 # Define a custom logger type
-struct PlainInfoLogger <: AbstractLogger
+struct PlainInfoLogger <: Logging.AbstractLogger
     min_level::LogLevel
     stream::IO
 end
