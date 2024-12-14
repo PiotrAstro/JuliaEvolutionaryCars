@@ -268,7 +268,7 @@ dict_config_copied - it should be copied before!
 """
 function run_one_test(optimizer::Symbol, special_dict::Dict{Symbol, <:Any}, dict_config_copied::Dict{Symbol, <:Any}, case_index::Int, save_dir)
     save_n = save_name(optimizer, special_dict, case_index)
-    println("Running test with config: ", save_n)
+    Logging.@info "Running test with config: " save_n "\n"
 
     change_dict_value!(dict_config_copied, special_dict)
 
@@ -279,5 +279,5 @@ function run_one_test(optimizer::Symbol, special_dict::Dict{Symbol, <:Any}, dict
 
     # Save the results to a file
     CSV.write(joinpath(save_dir, save_n), data_frame_result)
-    println("Test with config: ", save_n, " finished")
+    Logging.@info "Test with config: " save_n " finished\n"
 end

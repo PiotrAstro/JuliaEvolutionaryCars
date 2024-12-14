@@ -19,8 +19,8 @@ import .EvolutionaryMutatePopulaiton
 include("EvolutionaryComputation/StatesGroupingGA/StatesGroupingGA.jl")
 import .StatesGroupingGA
 
-include("EvolutionaryComputation/ContinuousStatesGrouping/ContinuousStatesGrouping.jl")
-import .ContinuousStatesGrouping
+# include("EvolutionaryComputation/ContinuousStatesGrouping/ContinuousStatesGrouping.jl")
+# import .ContinuousStatesGrouping
 
 function run(optimizer::Symbol, CONSTANTS_DICT::Dict{Symbol}) :: DataFrames.DataFrame
     # Preprocessing data
@@ -49,8 +49,8 @@ function get_optimizer(optimizer::Symbol)
         return StatesGroupingGA.StatesGroupingGA_Algorithm
     elseif optimizer == :EvolutionaryMutatePopulation
         return EvolutionaryMutatePopulaiton.EvolutionaryMutatePopulationAlgorithm
-    elseif optimizer == :ContinuousStatesGrouping
-        return ContinuousStatesGrouping.ContinuousStatesGroupingAlgorithm
+    # elseif optimizer == :ContinuousStatesGrouping
+    #     return ContinuousStatesGrouping.ContinuousStatesGroupingAlgorithm
     else
         throw("Optimizer not found")
     end

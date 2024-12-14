@@ -301,6 +301,8 @@ function _translate_solutions(old_exemplars::Matrix{Float32}, new_exemplars::Mat
     return new_solutions
 end
 
+include("GenieClust.jl")
+import .GenieClust
 include("_EnvironmentWrapperClustering.jl")
 include("_EnvironmentWrapperTimeClustering.jl")
 

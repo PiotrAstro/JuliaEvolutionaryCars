@@ -17,7 +17,6 @@ import .JuliaEvolutionaryCars
 
 include("../custom_loggers.jl")
 import .CustomLoggers
-Logging.global_logger(CustomLoggers.SimpleFileLogger("crash_log.log"))
 
 include("../constants.jl")
 include("_tests_utils.jl")
@@ -88,12 +87,13 @@ How to set TESTED_VALUES:
 
 CASES_PER_TEST = 1
 LOGS_DIR = "log/parameters_tests_" * Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS") * "/"
+OUTPUT_LOG_FILE = "_output.log"
 
 # we will change these values globally for all tests
 CONSTANTS_DICT[:run_config] = Dict(
     :max_generations => 1,
     :max_evaluations => 1_000_000,
-    :log => true,
+    :log => false,
     :visualize_each_n_epochs => 0,
 )
 
@@ -117,13 +117,11 @@ TESTED_VALUES = [
 # --------------------------------------------------------------------------------------------------
 # Run the tests
 mkpath(LOGS_DIR)
+Logging.global_logger(CustomLoggers.SimpleFileLogger(joinpath(LOGS_DIR, OUTPUT_LOG_FILE)))
+
 special_dicts = create_all_special_dicts(TESTED_VALUES)
-println("\n\n will run with the following settings:")
-display(special_dicts)
+Logging.@info "\n\n will run with the following settings:\n" special_dicts
 special_dicts_with_cases = [(optimizer, special_dict, deepcopy(CONSTANTS_DICT), i) for (optimizer, special_dict) in special_dicts, i in 1:CASES_PER_TEST]
-
-println("\n\n\n\n Running tests")
-
 
 Threads.@threads for i in 1:length(special_dicts_with_cases)
 # for i in 1:length(special_dicts_with_cases)
