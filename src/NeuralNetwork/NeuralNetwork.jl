@@ -48,7 +48,7 @@ function learn!(
     epochs::Int = 10,
     batch_size::Int = 256,
     learning_rate::AbstractFloat = 0.003,
-    verbose::Bool = true
+    verbose::Bool = false
 )
     nn_internal = get_Flux_representation(nn)
     nn_loss = get_loss(nn)

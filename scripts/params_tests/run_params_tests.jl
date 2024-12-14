@@ -85,13 +85,13 @@ How to set TESTED_VALUES:
     ]
 """
 
-CASES_PER_TEST = 1
+CASES_PER_TEST = 10
 LOGS_DIR = "log/parameters_tests_" * Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS") * "/"
 OUTPUT_LOG_FILE = "_output.log"
 
 # we will change these values globally for all tests
 CONSTANTS_DICT[:run_config] = Dict(
-    :max_generations => 1,
+    :max_generations => 100,
     :max_evaluations => 1_000_000,
     :log => false,
     :visualize_each_n_epochs => 0,

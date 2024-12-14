@@ -35,7 +35,7 @@ function learn!(
     Y::Array{Float32};
     epochs::Int = 10,
     batch_size::Int = 256,
-    verbose::Bool = true
+    verbose::Bool = false
 )
     nn_loss = get_loss(nn)
     encoder = get_Flux_representation(nn.encoder)
