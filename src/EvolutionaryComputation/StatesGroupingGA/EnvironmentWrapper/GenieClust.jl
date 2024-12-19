@@ -17,20 +17,11 @@ currently supported distance_metrics:
 
 It outputs order of combining clusters
 """
-function genie_clust(encoded_states::Matrix{Float32}; gini_threshold::Float64=0.3, distance_metric::Symbol=:cosine) :: Matrix{Int}
-    if distance_metric == :cosine
-        encoded_states = _normalize_cosine(encoded_states)
-        distance_function = _distance_normalize_cosine
-    elseif distance_metric == :euclidean
-        distance_function = _distance_euclidean_not_sqrt
-    else
-        throw(ArgumentError("distance_metric $distance_metric is not supported"))
-    end
-
-    edges = _compute_mst_on_the_fly(encoded_states, distance_function)
+function genie_clust(encoded_states::Matrix{Float32}; gini_threshold::Float64=0.3, distance_callable) :: Matrix{Int}
+    edges = _compute_mst_on_the_fly(encoded_states, distance_callable)
 
     points_n = size(encoded_states, 2)
-    result = Matrix{Int}(undef, 2, points_n - 1)
+    result = Matrix{Int}(undef, points_n - 1, 2)
     
     clusters = Clusters(points_n)
 
@@ -45,15 +36,15 @@ function genie_clust(encoded_states::Matrix{Float32}; gini_threshold::Float64=0.
             cl_ind1, cl_ind2 = pop_min!(edges, clusters)
         end
         gini = merge_clusters!(clusters, cl_ind1, cl_ind2, gini, i)
-        result[1, i] = cl_ind1
-        result[2, i] = cl_ind2
+        result[i, 1] = cl_ind1
+        result[i, 2] = cl_ind2
     end
     # We will manualy merge last two clusters, so that gini will not be nan
     edge = pop!(edges)
     cl_ind1 = get_cluster_id(clusters, edge.ind1)
     cl_ind2 = get_cluster_id(clusters, edge.ind2)
-    result[1, end] = cl_ind1
-    result[2, end] = cl_ind2
+    result[end, 1] = cl_ind1
+    result[end, 2] = cl_ind2
 
     return result
 end
@@ -178,22 +169,6 @@ function pop_min!(edges::Vector{Edge}, clusters::Clusters) :: Tuple{Int, Int}
     return cl_ind1, cl_ind2
 end
 
-# ------------------------------------------------------------------------------------------
-# Distance methods
-
-function _normalize_cosine(encoded_states::Matrix{Float32}) :: Matrix{Float32}
-    encoded_states .*= inv.(sqrt.(sum(abs2, encoded_states; dims=1)))
-    return encoded_states
-end
-
-function _distance_normalize_cosine(x::AbstractVector{Float32}, y::AbstractVector{Float32}) :: Float32
-    return 1.0f0 - LinearAlgebra.dot(x, y)
-end
-
-function _distance_euclidean_not_sqrt(x::AbstractVector{Float32}, y::AbstractVector{Float32}) :: Float32
-    return sum((x - y) .^ 2)
-end
-
 # ----------------------------------------------------------------------------------
 # general functions
 
@@ -206,7 +181,7 @@ with pairwise distances given by `dist_fn(X[:, i], X[:, j])`.
 returns sorted vector of edges, descending order by distance
 
 """
-function _compute_mst_on_the_fly(X::Matrix{Float32}, dist_fn::Function) :: Vector{Edge}
+function _compute_mst_on_the_fly(X::Matrix{Float32}, dist_callable) :: Vector{Edge}
     n = size(X, 2)
 
     # Large value to represent infinity:
@@ -232,7 +207,7 @@ function _compute_mst_on_the_fly(X::Matrix{Float32}, dist_fn::Function) :: Vecto
         # Threads.@threads for i in 2:Mleft
         for i in 2:Mleft
             v = M[i]
-            curdist = dist_fn(current_view, @view X[:, v])
+            curdist = dist_callable(current_view, @view X[:, v])
             if curdist < Dnn[v]
                 Dnn[v] = curdist
                 Fnn[v] = lastj

@@ -9,25 +9,52 @@ import Dates
 import Logging
 import Printf
 
-export Individual, get_fitness!, copy_individual, actualize_genes!, optimal_mixing_top_to_bottom!, optimal_mixing_bottom_to_top!, FIHC_flat!, FIHC_top_to_bottom!, save_decision_plot
+export Individual, get_flattened_trajectories, get_id_track, get_fitness!, copy_individual, optimal_mixing_top_to_bottom!, optimal_mixing_bottom_to_top!, FIHC_flat!, FIHC_top_to_bottom!, save_decision_plot
+
+global ID::Int = 1
 
 mutable struct Individual
     genes::Vector{Int}
     env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct
+    time_tree::EnvironmentWrapper.TreeNode
+    levels_trajectories::Vector{Vector{<:Environment.Trajectory}}
     _fitness::Float64
     _fitness_actual::Bool
     _verbose::Bool
+    id_track::Int
 end
 
 function Individual(env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct, verbose::Bool=false)
     genes = Random.rand(1:EnvironmentWrapper.get_action_size(env_wrapper), EnvironmentWrapper.get_groups_number(env_wrapper))
     fitness = -Inf
     fitness_actual = false
-    return Individual(genes, env_wrapper, fitness, fitness_actual, verbose)
+    trajectories, time_tree = EnvironmentWrapper.create_time_distance_tree(env_wrapper, genes)
+    return Individual(
+        genes,
+        env_wrapper,
+        time_tree,
+        [trajectories],
+        fitness,
+        fitness_actual,
+        verbose,
+        global ID += 1
+    )
 end
 
 function Individual(env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct)
     return Individual(env_wrapper, EnvironmentWrapper.is_verbose(env_wrapper))
+end
+
+function get_id_track()
+    return global ID
+end
+
+function get_flattened_trajectories(individual::Individual) :: Vector{<:Environment.Trajectory}
+    return vcat(individual.levels_trajectories...)
+end
+
+function get_flattened_trajectories(individuals::Vector{Individual}) :: Vector{<:Environment.Trajectory}
+    return vcat([get_flattened_trajectories(individual) for individual in individuals]...)
 end
 
 function get_fitness!(individual::Individual) :: Float64
@@ -40,7 +67,16 @@ function get_fitness!(individual::Individual) :: Float64
 end
 
 function copy_individual(individual::Individual)
-    return Individual(copy(individual.genes), individual.env_wrapper, individual._fitness, individual._fitness_actual, individual._verbose)
+    return Individual(
+        copy(individual.genes),
+        individual.env_wrapper,
+        individual.time_tree,
+        copy(individual.levels_trajectories),
+        individual._fitness,
+        individual._fitness_actual,
+        individual._verbose,
+        individual.id_track
+    )
 end
 
 function mutate_flat!(individual::Individual, mutation_rate::Float64)
@@ -53,62 +89,15 @@ function mutate_flat!(individual::Individual, mutation_rate::Float64)
     end    
 end
 
-function mutate_top_to_bottom!(individual::Individual, mutation_rate::Float64)
-    root = individual.env_wrapper._similarity_tree
-    tree_levels = [[root.left, root.right]]
-    actions_number = EnvironmentWrapper.get_action_size(individual.env_wrapper)
-
-    i = 1
-    while i <= length(tree_levels)
-        current_level = tree_levels[i]
-        random_perm = Random.randperm(length(current_level))
-
-        for node in current_level[random_perm]
-            if Random.rand() < mutation_rate
-                individual.genes[node.elements] .= Random.rand(1:actions_number)
-                individual._fitness_actual = false
-            end
-
-            if !EnvironmentWrapper.is_leaf(node)
-                if i == length(tree_levels)
-                    push!(tree_levels, [node.left, node.right])
-                else
-                    push!(tree_levels[i+1], node.left, node.right)
-                end
-            end
-        end
-
-        i += 1
-    end
-end
-
-function actualize_genes!(individual::Individual, new_genes::Vector{Int})
-    individual.genes = new_genes
-    individual._fitness_actual = false
-end
-
-function crossover(individual1::Individual, individual2::Individual) :: Tuple{Individual, Individual}
-    new_individual1 = copy_individual(individual1)
-    new_individual2 = copy_individual(individual2)
-    for i in 1:length(new_individual1.genes)
-        if Random.rand() < 0.5
-            new_individual1.genes[i] = individual2.genes[i]
-            new_individual2.genes[i] = individual1.genes[i]
-        end
-    end
-
-    new_individual1._fitness_actual = false
-    new_individual2._fitness_actual = false
-
-    return (new_individual1, new_individual2)
-end
-
 function optimal_mixing_top_to_bottom_2_individuals(individual1::Individual, individual2) :: Individual
     new_individual = copy_individual(individual1)
     # print("\npre optimal mixing fitness: ", get_fitness!(new_individual))
     # root = individual.env_wrapper._similarity_tree
-    root = new_individual.env_wrapper._time_distance_tree
+    root = new_individual.time_tree
     tree_levels = [[root.left, root.right]]
+
+    individual1_genes = individual1.genes
+    individual2_genes = get_other_genes(individual1, individual2, collect(1:length(individual1.genes)))
 
     # this one is test only!!!
     i = 1
@@ -120,17 +109,20 @@ function optimal_mixing_top_to_bottom_2_individuals(individual1::Individual, ind
             old_elements = new_individual.genes[node.elements]
             old_fitness = get_fitness!(new_individual)
 
-            if old_elements != individual1.genes[node.elements]
-                new_individual.genes[node.elements] = individual1.genes[node.elements]
+            if old_elements != individual1_genes[node.elements]
+                new_individual.genes[node.elements] = individual1_genes[node.elements]
                 new_individual._fitness_actual = false
-            elseif old_elements != individual2.genes[node.elements]
-                new_individual.genes[node.elements] = individual2.genes[node.elements]
+            elseif old_elements != individual2_genes[node.elements]
+                new_individual.genes[node.elements] = individual2_genes[node.elements]
                 new_individual._fitness_actual = false
             end
 
             if get_fitness!(new_individual) > old_fitness
                 # println("improvement from $old_fitness  to $(get_fitness!(new_individual))\ttree level $i")
                 # save_decision_plot(individual)
+            else
+                new_individual.genes[node.elements] = old_elements
+                new_individual._fitness = old_fitness
             end
 
             if !EnvironmentWrapper.is_leaf(node)
@@ -155,7 +147,7 @@ function optimal_mixing_top_to_bottom!(individual::Individual, other_individuals
     end
 
     # root = individual.env_wrapper._similarity_tree
-    root = individual.env_wrapper._time_distance_tree
+    root = individual.time_tree
     tree_levels = [[root.left, root.right]]
 
     # this one is test only!!!
@@ -187,8 +179,8 @@ function optimal_mixing_top_to_bottom!(individual::Individual, other_individuals
             for i in 1:length(other_individuals)
                 individual_tmp = copy_individual(individual)
                 individuals_copies[i] = individual_tmp
-
-                individual_tmp.genes[node.elements] = other_individuals[i].genes[node.elements]
+                other_genes = get_other_genes(individual, other_individuals[i], node.elements)
+                individual_tmp.genes[node.elements] = other_genes
                 individual_tmp._fitness_actual = false
                 get_fitness!(individual_tmp)
             end
@@ -221,11 +213,12 @@ function optimal_mixing_top_to_bottom!(individual::Individual, other_individuals
 end
 
 function get_same_genes_percent(individual::Individual, other_individual::Individual) :: Float64
-    return sum(individual.genes .== other_individual.genes) / length(individual.genes)
+    other_individual_genes = get_other_genes(individual, other_individual, collect(1:length(individual.genes)))
+    return sum(individual.genes .== other_individual_genes) / length(individual.genes)
 end
 
 function get_same_genes_percent(individual::Individual, other_individuals::Vector{Individual}) :: Vector{Float64}
-    return [sum(individual.genes .== other_individual.genes) / length(individual.genes) for other_individual in other_individuals]
+    return [get_same_genes_percent(individual, other_individual) for other_individual in other_individuals]
 end
 
 function visualize(individual::Individual, visualization_env::Environment.AbstractEnvironment, visualization_kwargs::Dict{Symbol, Any})
@@ -233,12 +226,21 @@ function visualize(individual::Individual, visualization_env::Environment.Abstra
     Environment.visualize!(visualization_env, nn; visualization_kwargs...)
 end
 
+function get_other_genes(individual::Individual, other_individual::Individual, to_genes_indices::Vector{Int}) :: Vector{Int}
+    return EnvironmentWrapper.translate(
+        other_individual.env_wrapper,
+        individual.env_wrapper,
+        other_individual.genes,
+        to_genes_indices
+    )
+end
+
 function optimal_mixing_bottom_to_top!(individual::Individual, other_individuals::Vector{Individual})
     if individual._verbose
         Logging.@info Printf.@sprintf("\npre optimal mixing fitness: %.2f\n", get_fitness!(individual))
     end
     # root = individual.env_wrapper._similarity_tree
-    root = individual.env_wrapper._time_distance_tree
+    root = individual.time_tree
     tree_levels = [[root.left, root.right]]
 
     i = 1
@@ -286,8 +288,8 @@ function optimal_mixing_bottom_to_top!(individual::Individual, other_individuals
             for i in 1:length(other_individuals)
                 individual_tmp = copy_individual(individual)
                 individuals_copies[i] = individual_tmp
-
-                individual_tmp.genes[node.elements] = other_individuals[i].genes[node.elements]
+                other_genes = get_other_genes(individual, other_individuals[i], node.elements)
+                individual_tmp.genes[node.elements] = other_genes
                 individual_tmp._fitness_actual = false
                 get_fitness!(individual_tmp)
             end
@@ -310,7 +312,9 @@ function optimal_mixing_bottom_to_top!(individual::Individual, other_individuals
     end
 end
 
-
+function actualize_time_tree!(individual::Individual)
+    individual.time_tree = EnvironmentWrapper.create_time_distance_tree(individual.env_wrapper, individual.genes)
+end
 
 function FIHC_flat!(individual::Individual)
     # flat version
@@ -459,5 +463,61 @@ function save_decision_plot(individual::Individual, path::Union{String, Nothing}
 
     Plots.savefig(path)
 end
+
+
+
+
+# ------------------------------------------------------------------------------------------
+# Old functions
+
+# function mutate_top_to_bottom!(individual::Individual, mutation_rate::Float64)
+#     root = individual.env_wrapper._similarity_tree
+#     tree_levels = [[root.left, root.right]]
+#     actions_number = EnvironmentWrapper.get_action_size(individual.env_wrapper)
+
+#     i = 1
+#     while i <= length(tree_levels)
+#         current_level = tree_levels[i]
+#         random_perm = Random.randperm(length(current_level))
+
+#         for node in current_level[random_perm]
+#             if Random.rand() < mutation_rate
+#                 individual.genes[node.elements] .= Random.rand(1:actions_number)
+#                 individual._fitness_actual = false
+#             end
+
+#             if !EnvironmentWrapper.is_leaf(node)
+#                 if i == length(tree_levels)
+#                     push!(tree_levels, [node.left, node.right])
+#                 else
+#                     push!(tree_levels[i+1], node.left, node.right)
+#                 end
+#             end
+#         end
+
+#         i += 1
+#     end
+# end
+
+# function actualize_genes!(individual::Individual, new_genes::Vector{Int})
+#     individual.genes = new_genes
+#     individual._fitness_actual = false
+# end
+
+# function crossover(individual1::Individual, individual2::Individual) :: Tuple{Individual, Individual}
+#     new_individual1 = copy_individual(individual1)
+#     new_individual2 = copy_individual(individual2)
+#     for i in 1:length(new_individual1.genes)
+#         if Random.rand() < 0.5
+#             new_individual1.genes[i] = individual2.genes[i]
+#             new_individual2.genes[i] = individual1.genes[i]
+#         end
+#     end
+
+#     new_individual1._fitness_actual = false
+#     new_individual2._fitness_actual = false
+
+#     return (new_individual1, new_individual2)
+# end
 
 end

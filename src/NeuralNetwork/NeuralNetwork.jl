@@ -14,8 +14,10 @@ import StatsBase
 import Logging
 # import SimilaritySearch
 
-export AbstractNeuralNetwork, predict, learn!, get_parameters, set_parameters!, copy, get_neural_network, get_Flux_representation, get_loss, get_input_representant_nn
-abstract type AbstractNeuralNetwork end
+export AbstractNeuralNetwork, predict, learn!, copy, get_neural_network, get_Flux_representation, get_loss
+
+# concrete implementation should have fist parametric type to be a number of dimensions
+abstract type AbstractNeuralNetwork{ODN} end
 
 function predict(nn::AbstractNeuralNetwork, X::Array{Float32}) :: Array{Float32}
     throw("not implemented")
@@ -23,6 +25,10 @@ end
 
 function get_Flux_representation(nn::AbstractNeuralNetwork)
     throw("not implemented")
+end
+
+function get_output_dimensions_number(::AbstractNeuralNetwork{ODN}) :: Int where {ODN}
+    return ODN
 end
 
 function get_loss(nn::AbstractNeuralNetwork) :: Function

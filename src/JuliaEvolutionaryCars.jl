@@ -97,5 +97,6 @@ end # module EvolutionaryCarsJulia
 # zobaczyć partition crossover - czyli z DSM wywlamy geny, które są te same i budujemy drzewo tylko dla różnych\
 # współczynniki walsha do tworzenia surogatów - może coś z tego wyjść
 
-# ---------------------------------------------------------------------------------------------------------------------
-# Testy co zbadać
+# ------------------------------------------------------------------------------------------------------
+# links:
+# https://arxiv.org/pdf/1810.05691 -> pam fast

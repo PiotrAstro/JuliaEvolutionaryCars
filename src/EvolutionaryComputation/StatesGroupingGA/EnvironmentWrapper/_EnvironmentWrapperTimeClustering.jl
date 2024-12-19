@@ -24,17 +24,30 @@ function _create_time_distance_tree(encoded_states_trajectories::Vector{Matrix{F
         end
     end
 
-    clustering = Clustering.hclust(distances, linkage=:single)
-    tree = _create_tree_hclust(clustering.merges, exemplars_n)
+    # display(distances)
+
+    # used to be :single
+    clustering = Clustering.hclust(distances, linkage=:average)
+    # Plots.plot(clustering, 
+    #     title="Hierarchical Clustering Dendrogram",
+    #     xlabel="Sample Index", 
+    #     ylabel="Distance",
+    #     linewidth=2,
+    #     color=:blues,
+    #     legend=false
+    # )
+    # Plots.savefig("log/dendrogram.png")
+    tree = _create_tree_hclust(clustering.merges)
     return tree
 end
 
-function _create_tree_hclust(merge_matrix::Matrix{Int}, exemplars_n::Int) :: TreeNode
-    leafs = Vector{TreeNode}(undef, exemplars_n)
-    clusters = Vector{TreeNode}(undef, exemplars_n)
+function _create_tree_hclust(merge_matrix::Matrix{Int}) :: TreeNode
+    points_n = size(merge_matrix, 1) + 1
+    leafs = Vector{TreeNode}(undef, points_n)
+    clusters = Vector{TreeNode}(undef, points_n - 1)
 
-    for i in 1:exemplars_n
-        leafs[i] = TreeNode(nothing, nothing, 0.0, [i])
+    for i in 1:points_n
+        leafs[i] = TreeNode(nothing, nothing, [i])
     end
     last_index = 1
 
@@ -44,9 +57,8 @@ function _create_tree_hclust(merge_matrix::Matrix{Int}, exemplars_n::Int) :: Tre
 
         left = left_index >= 0 ? clusters[left_index] : leafs[-left_index]
         right = right_index >= 0 ? clusters[right_index] : leafs[-right_index]
-        distance = -1.0
 
-        clusters[last_index] = TreeNode(left, right, distance, vcat(left.elements, right.elements))
+        clusters[last_index] = TreeNode(left, right, vcat(left.elements, right.elements))
         last_index += 1
     end
     last_index -= 1

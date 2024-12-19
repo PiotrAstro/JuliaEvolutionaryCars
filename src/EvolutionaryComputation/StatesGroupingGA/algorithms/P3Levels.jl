@@ -17,15 +17,15 @@ import DataFrames
 # --------------------------------------------------------------------------------------------------
 # Structs
 
-struct Level 
+struct Level
     individuals::Vector{Ind.Individual}
-    env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct
 end
 
 mutable struct Population_Pyramid
     population::Vector{Level}
     # _dependencies_matrices::Vector{Array{Int, 4}}
     best_individual::Ind.Individual
+    current_env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct
     verbose::Bool
 end
 
@@ -36,22 +36,39 @@ function Population_Pyramid(env_wrapper::EnvironmentWrapper.EnvironmentWrapperSt
     first_individual = Ind.Individual(env_wrapper, verbose)
     Ind.FIHC_top_to_bottom!(first_individual)
 
-    return Population_Pyramid([Level([first_individual], env_wrapper)], first_individual, verbose)
+    return Population_Pyramid([Level([first_individual])], first_individual, env_wrapper, verbose)
 end
 
-function get_n_best_individuals_genes(p3::Population_Pyramid, n::Int) :: Vector{Vector{Int}}
-    all_genes = [individual.genes for individual in sort(reduce(vcat, [level.individuals for level in p3.population]), by=Ind.get_fitness!, rev=true)]
-    best_genes = all_genes[1:min(n, length(all_genes))]
-    return best_genes
+function get_n_best_individuals(p3::Population_Pyramid, n::Int) :: Vector{Ind.Individual}
+    all_individuals = sort(reduce(vcat, [level.individuals for level in p3.population]), by=Ind.get_fitness!, rev=true)
+    best_individuals = all_individuals[1:min(n, length(all_individuals))]
+    return best_individuals
 end
 
+function get_n_best_distinct_individuals(p3::Population_Pyramid, n::Int) :: Vector{Ind.Individual}
+    # get best individuals - from those with the same id, choose the one with the best fitness
+    all_individuals = reduce(vcat, [level.individuals for level in p3.population])
+
+    best_individuals = Dict{Int, Ind.Individual}()
+    for individual in all_individuals
+        id = Ind.get_id_track(individual)
+        other_individual = get!(best_individuals, id, individual)
+        if Ind.get_fitness!(individual) > Ind.get_fitness!(other_individual)
+            best_individuals[id] = individual
+        end
+    end
+    all_distinct_individuals = [individual for individual in values(best_individuals)]
+    all_distinct_individuals_sorted = sort(all_distinct_individuals, by=Ind.get_fitness!, rev=true)
+    best_individuals = all_distinct_individuals_sorted[1:min(n, length(all_distinct_individuals_sorted))]
+    return best_individuals
+end
 
 "Runs new individual, does FIHC, optimal mixing, climbing through levels and returns final individual"
-function run_new_individual!(p3::Population_Pyramid)
+function run_new_individual!(p3::Population_Pyramid) :: Ind.Individual
     if p3.verbose
         Logging.@info Printf.@sprintf("best individual fitness: %.2f\n", Ind.get_fitness!(p3.best_individual))
     end
-    new_individual = Ind.Individual(p3.population[1].env_wrapper, p3.verbose)
+    new_individual = Ind.Individual(p3.current_env_wrapper, p3.verbose)
     Ind.FIHC_top_to_bottom!(new_individual)
     # save_decision_plot(new_individual)
     add_to_next_level = true
@@ -89,14 +106,9 @@ function run_new_individual!(p3::Population_Pyramid)
 
         if new_fitness > old_fitness
             add_to_next_level = true
-
+            Ind.actualize_time_tree!(new_individual)
             if i == length(p3.population)
-                # new_env_wrapper = EnvironmentWrapper.copy(p3.population[i].env_wrapper)
-                # # actually I do not want to actualise any genes, i just want to create new empty level
-                # genes = [individual.genes for individual in p3.population[i].individuals]
-                # EnvironmentWrapper.actualize!(new_env_wrapper, genes, genes)
-                # push!(p3.population, Level(Vector{Individual}(undef, 0), new_env_wrapper))
-                push!(p3.population, Level(Vector{Ind.Individual}(undef, 0), p3.population[i].env_wrapper))
+                push!(p3.population, Level(Vector{Ind.Individual}(undef, 0)))
             end
         else
             add_to_next_level = false
@@ -122,23 +134,21 @@ function run!(
     )
     EnvironmentWrapper.set_verbose!(env_wrapper, false)
     p3 = Population_Pyramid(env_wrapper, log)
-    run_new_individual!(p3)
-    # Preprocessing data
-    best_ever_fitness = -Inf
-    best_ever_fitness_environment_wrapper_version = 0
 
-    # (generation_global, best_fitness_global, generation_local, best_fitness_local)
+    # (generation, best_fitness, local_individual_fitness)
     list_with_results = Vector{Tuple{Int, Float64, Int, Float64}}()
 
-    current_env_wrapper_version = 0
-    generation_this_level = 0
     for generation in 1:max_generations
-        generation_this_level += 1
-        run_new_individual!(p3)
-        if Ind.get_fitness!(p3.best_individual) > best_ever_fitness
-            best_ever_fitness = Ind.get_fitness!(p3.best_individual)
-            best_ever_fitness_environment_wrapper_version = current_env_wrapper_version
-        end
+        new_individual = run_new_individual!(p3)
+        new_individual_fitness = Ind.get_fitness!(new_individual)
+        best_individual_fitness = Ind.get_fitness!(p3.best_individual)
+
+        best_n_distinct_individuals = get_n_best_distinct_individuals(p3, space_explorers_n)
+        p3.current_env_wrapper = EnvironmentWrapper.create_new_based_on(
+            p3.current_env_wrapper,
+            (0.5, Ind.get_flattened_trajectories(best_n_distinct_individuals)),
+            (0.5, Ind.get_flattened_trajectories(new_individual))
+        )
 
         if visualize_each_n_epochs > 0 && generation % visualize_each_n_epochs == 0
             Ind.visualize(p3.best_individual, visualization_env, visualization_kwargs)
@@ -146,28 +156,18 @@ function run!(
 
         if log
             Logging.@info "\n\n\n\n\n\nGeneration $generation\n" *
-            Printf.@sprintf("Generation local: %d   current_env_wrapper_version: %d   current_best_fitness: %.2f\n", generation_this_level, current_env_wrapper_version, Ind.get_fitness!(p3.best_individual)) *
-            Printf.@sprintf("Generation global: %d   best_ever_fitness: %.2f   best_ever_fitness_environment_wrapper_version: %d\n\n\n\n\n\n", generation, best_ever_fitness, best_ever_fitness_environment_wrapper_version)
+            Printf.@sprintf("best_fitness: %.2f\nlocal_individual_fitness: %.2f\n\n\n\n\n", best_individual_fitness, new_individual_fitness)
         end
-
-        if generation_this_level % (2 * 2^current_env_wrapper_version) == 0
-            current_env_wrapper_version += 1
-            env_wrap = EnvironmentWrapper.copy(p3.population[1].env_wrapper)
-            best_individuals = get_n_best_individuals_genes(p3, space_explorers_n)
-            EnvironmentWrapper.actualize!(env_wrap, best_individuals, best_individuals)
-            p3 = P3Levels.Population_Pyramid(env_wrap, p3.verbose)
-            generation_this_level = 0
-        end
-
+        
         push!(
             list_with_results,
-            (generation, best_ever_fitness, generation_this_level, Ind.get_fitness!(p3.best_individual))
+            (generation, best_individual_fitness, new_individual_fitness)
         )
     end
 
     data_frame = DataFrames.DataFrame(
         list_with_results,
-        [:generation_global, :best_fitness_global, :generation_local, :best_fitness_local]
+        [:generation, :best_fitness, :local_individual_fitness]
     )
     return data_frame
 end

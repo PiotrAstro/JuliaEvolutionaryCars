@@ -1,7 +1,7 @@
 export BasicCarEnvironment
 
 "Car dimmensions are half of the width and half of the height."
-mutable struct BasicCarEnvironment <: AbstractEnvironment
+mutable struct BasicCarEnvironment{1} <: AbstractEnvironment{1}
     const map::Matrix{Bool}
     const start_position::Tuple{Float64, Float64}
     const start_angle::Float64
@@ -114,7 +114,7 @@ function reset!(env::BasicCarEnvironment)
     env._is_alive = true
 end
 
-function react!(env::BasicCarEnvironment, action::Vector{Float32}) :: Float64
+function react!(env::BasicCarEnvironment, action::AbstractVector{Float32}) :: Float64
     env.current_step += 1
     
     # for action space with 2 x 3 softmax outputs
@@ -153,6 +153,10 @@ function react!(env::BasicCarEnvironment, action::Vector{Float32}) :: Float64
     return reward
 end
 
+function get_state_dimmensions_number(env::BasicCarEnvironment) :: Int
+    return 1
+end
+
 function get_state_size(env::BasicCarEnvironment) :: Vector{Int}
     return [length(env.rays) + 1]
 end
@@ -161,15 +165,15 @@ function get_action_size(env::BasicCarEnvironment) :: Int
     return 9  # 9 # 3 # 6
 end
 
-function get_state(env::BasicCarEnvironment) :: Array{Float32}
-    inputs = Vector{Float64}([_get_ray_distance(env, env.angle + ray) for ray in env.rays])
+function get_state(env::BasicCarEnvironment) :: Vector{Float32}
+    inputs = Vector{Float32}([_get_ray_distance(env, env.angle + ray) for ray in env.rays])
     inputs = inputs ./ env.rays_distances_scale_factor
     for i in eachindex(inputs)
         inputs[i] = inputs[i] > env.ray_input_clip ? env.ray_input_clip : inputs[i]
     end
     speed_input = env.speed / env.max_speed
     push!(inputs, speed_input)
-    return Array{Float32}(inputs)
+    return inputs
 end
 
 function is_alive(env::BasicCarEnvironment)

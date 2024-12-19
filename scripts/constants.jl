@@ -95,54 +95,59 @@ CONSTANTS_DICT = Dict(
     # method specific staff
 
     :StatesGroupingGA => Dict(
-        :nn_encoder => Dict(
-            :name => :MLP_NN,
-            :kwargs => Dict(
-                :input_size => 10,
-                :output_size => 16,
-                :hidden_layers => 2,
-                :hidden_neurons => 32,  # 32
-                :dropout => 0.0,  # 0.5
-                :activation_function => :relu,  # :relu
-                :last_activation_function => :none
-            )
-        ),
-        :nn_decoder => Dict(
-            :name => :MLP_NN,
-            :kwargs => Dict(
-                :input_size => 16,
-                :output_size => 10,  # it should be 10, 9 is for normal learning
-                :hidden_layers => 2,  # was 1
-                :hidden_neurons => 32,  # 64
-                :dropout => 0.0,  # 0.5
-                :activation_function => :relu,  # :relu
-                :input_activation_function => :relu,
-                :last_activation_function => :none, # was :none
-                :loss => Flux.mse  # was Flux.mse
-            )
-        ),
-        :nn_autoencoder => Dict(
-            :mmd_weight => 0.01,
-            :learning_rate => 0.001
-        ),
-        :nn_game_decoder => Dict(
-            :name => :MLP_NN,
-            :kwargs => Dict(
-                :input_size => 16,  # 32
-                :output_size => 9,
-                :hidden_layers => 2,
-                :hidden_neurons => 32,  # 64
-                :dropout => 0.0,  # 0.5,
-                :activation_function => :relu,  # :relu
-                :input_activation_function => :none,  # :relu,
-                :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
-                :loss => Flux.crossentropy
-            )
-        ),
-        :space_explorers_n => 50,
-        :max_states_considered => 10_000,
-        :fuzzy_logic_of_n_closest => 5,
-        :n_clusters => 40,  # 40 and 200 works very well
+        :env_wrapper => Dict(
+            :encoder_dict => Dict(
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 10,
+                    :output_size => 16,
+                    :hidden_layers => 2,
+                    :hidden_neurons => 32,  # 32
+                    :dropout => 0.0,  # 0.5
+                    :activation_function => :relu,  # :relu
+                    :last_activation_function => :none
+                )
+            ),
+            :decoder_dict => Dict(
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 16,
+                    :output_size => 10,  # it should be 10, 9 is for normal learning
+                    :hidden_layers => 2,  # was 1
+                    :hidden_neurons => 32,  # 64
+                    :dropout => 0.0,  # 0.5
+                    :activation_function => :relu,  # :relu
+                    :input_activation_function => :relu,
+                    :last_activation_function => :none, # was :none
+                    :loss => Flux.mse  # was Flux.mse
+                )
+            ),
+            :autoencoder_dict => Dict(
+                :mmd_weight => 0.0,
+                :learning_rate => 0.001
+            ),
+            :game_decoder_dict => Dict(  # used only in the first collection on states
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 16,  # 32
+                    :output_size => 9,
+                    :hidden_layers => 2,
+                    :hidden_neurons => 32,  # 64
+                    :dropout => 0.0,  # 0.5,
+                    :activation_function => :relu,  # :relu
+                    :input_activation_function => :none,  # :relu,
+                    :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
+                    :loss => Flux.crossentropy
+                )
+            ),
+            :initial_space_explorers_n => 50,
+            :max_states_considered => 10_000,
+            :fuzzy_logic_of_n_closest => 5,
+            :n_clusters => 40,  # 40 and 200 works very well
+            :verbose => false,
+            :distance_metric => :cosine,
+            :exemplars_clustering => :genie
+        )
     ),
 
 

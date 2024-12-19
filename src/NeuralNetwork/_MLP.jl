@@ -1,12 +1,12 @@
 export MLP_NN
 
-struct MLP_NN <: AbstractNeuralNetwork
+struct MLP_NN{2, F} <: AbstractNeuralNetwork{2}
     layers::Flux.Chain
-    loss::Function
+    loss::F
 end
 
-function MLP_NN(layers::Vector{MLP_NN}) :: MLP_NN
-    layers_new = Flux.Chain([layer.layers for layer in layers])
+function MLP_NN(layers::Vector{<:MLP_NN}) :: MLP_NN
+    layers_new = Flux.Chain([layer.layers for layer in layers]...)
     loss = layers[end].loss
 
     return MLP_NN(layers_new, loss)
@@ -61,19 +61,12 @@ function MLP_NN(;
             push!(layers, Flux.Dense(hidden_neurons, output_size))
             push!(layers, activation_last_tmp[1])
         end
-    # elseif typeof(last_activation_function) <: Vector
-    #     push!(layers, Flux.Dense(hidden_neurons, output_size))
-
-    #     @assert output_size == sum([num for (_, num) in last_activation_function])
-    #     final_activation = _generate_activation_function(last_activation_function)
-    #     push!(layers, final_activation)
     elseif typeof(last_activation_function) <: Function
         push!(layers, Flux.Dense(hidden_neurons, output_size))
         push!(layers, last_activation_function)
     end
     
-    return MLP_NN(Flux.Chain(layers), loss)
-
+    return MLP_NN(Flux.Chain(layers...), loss)
 end
 
 function get_loss(nn::MLP_NN) :: Function
@@ -84,7 +77,7 @@ function get_Flux_representation(nn::MLP_NN)
     return nn.layers
 end
 
-function predict(nn::MLP_NN, X::Array{Float32}) :: Array{Float32}
+function predict(nn::MLP_NN, X::Matrix{Float32}) :: Matrix{Float32}
     # return Flux.testmode!(nn.layers(X))
     return nn.layers(X)
 end
