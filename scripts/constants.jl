@@ -122,7 +122,7 @@ CONSTANTS_DICT = Dict(
             )
         ),
         :nn_autoencoder => Dict(
-            :mmd_weight => 0.1,
+            :mmd_weight => 0.01,
             :learning_rate => 0.001
         ),
         :nn_game_decoder => Dict(
