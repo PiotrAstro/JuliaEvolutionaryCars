@@ -100,3 +100,8 @@ end # module EvolutionaryCarsJulia
 # ------------------------------------------------------------------------------------------------------
 # links:
 # https://arxiv.org/pdf/1810.05691 -> pam fast
+
+# Pomysl na usprawnienie tego co jest obecnie:
+# - zrobić lekkiego local searcha wartości przy optimal mixie - czyli np. sprawdzać co by było gdybyśmy wzięli drugą najbardziej popularną odpowiedź, nie tylko tą najbardziej popularną
+# - zamiast tłumaczyć z tamtego reprezentanta, można spróbować zapożyczyć w jakiś sposób jego reprezentantów?
+#   Albo w jakiś sposób decydować czy powinien on zastąpić mojego czy też nie, albo po prosu ich dokładać, albo usuwać moich n- najbliższych sąsiadów

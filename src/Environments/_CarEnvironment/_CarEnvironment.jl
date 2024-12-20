@@ -1,7 +1,44 @@
-export BasicCarEnvironment
+export BasicCarEnvironment, CarSequence
+
+struct CarSequence <: AbstractStateSequence{Vector{Float32}}
+    states::Matrix{Float32}
+end
+
+function CarSequence(states::Vector{Vector{Float32}})
+    states_matrix = reduce(hcat, states)
+    return CarSequence(states_matrix)
+end
+
+function CarSequence(seqs::Vector{CarSequence}) :: CarSequence
+    states = reduce(hcat, [seq.states for seq in seqs])
+    return CarSequence(states)
+end
+
+function copy_nth_state(seq::CarSequence, n::Int) :: Vector{Float32}
+    return seq.states[:, n]
+end
+
+function get_length(seq::CarSequence) :: Int
+    return size(seq.states, 2)
+end
+
+function get_sequence_with_ids(seq::CarSequence, ids::AbstractVector{Int}) :: CarSequence
+    return CarSequence(seq.states[:, ids])
+end
+
+function remove_nth_state(seq::CarSequence, n::Int) :: CarSequence
+    states = seq.states[:, 1:end .!= n]
+    return CarSequence(states)
+end
+
+function get_nn_input(seq::CarSequence)
+    return seq.states
+end
+
+# ------------------------------------------------------------------------------------------------
 
 "Car dimmensions are half of the width and half of the height."
-mutable struct BasicCarEnvironment{1} <: AbstractEnvironment{1}
+mutable struct BasicCarEnvironment <: AbstractEnvironment{CarSequence}
     const map::Matrix{Bool}
     const start_position::Tuple{Float64, Float64}
     const start_angle::Float64
@@ -151,10 +188,6 @@ function react!(env::BasicCarEnvironment, action::AbstractVector{Float32}) :: Fl
     end
 
     return reward
-end
-
-function get_state_dimmensions_number(env::BasicCarEnvironment) :: Int
-    return 1
 end
 
 function get_state_size(env::BasicCarEnvironment) :: Vector{Int}

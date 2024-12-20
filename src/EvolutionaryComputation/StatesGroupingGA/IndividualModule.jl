@@ -45,8 +45,8 @@ function Individual(env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct)
     return Individual(env_wrapper, EnvironmentWrapper.is_verbose(env_wrapper))
 end
 
-function get_id_track()
-    return global ID
+function get_id_track(individual::Individual)
+    return individual.id_track
 end
 
 function get_flattened_trajectories(individual::Individual) :: Vector{<:Environment.Trajectory}
@@ -291,6 +291,7 @@ function optimal_mixing_bottom_to_top!(individual::Individual, other_individuals
                 other_genes = get_other_genes(individual, other_individuals[i], node.elements)
                 individual_tmp.genes[node.elements] = other_genes
                 individual_tmp._fitness_actual = false
+                # FIHC_flat!(individual_tmp, node.elements)
                 get_fitness!(individual_tmp)
             end
 
@@ -312,16 +313,18 @@ function optimal_mixing_bottom_to_top!(individual::Individual, other_individuals
     end
 end
 
-function actualize_time_tree!(individual::Individual)
-    individual.time_tree = EnvironmentWrapper.create_time_distance_tree(individual.env_wrapper, individual.genes)
+function new_level_cosideration!(individual::Individual)
+    trajectory, time_tree = EnvironmentWrapper.create_time_distance_tree(individual.env_wrapper, individual.genes)
+    individual.time_tree = time_tree
+    push!(individual.levels_trajectories, trajectory)
 end
 
-function FIHC_flat!(individual::Individual)
+function FIHC_flat!(individual::Individual, indicies=collect(1:length(individual.genes)))
     # flat version
-    if individual._verbose
-        Logging.@info Printf.@sprintf("\npre FIHC fitness: %.2f\n", get_fitness!(individual))
-    end
-    random_perm = Random.randperm(length(individual.genes))
+    # if individual._verbose
+    #     Logging.@info Printf.@sprintf("\npre FIHC fitness: %.2f\n", get_fitness!(individual))
+    # end
+    random_perm = Random.shuffle(indicies)  # Random.randperm(length(individual.genes))
     actions_number = EnvironmentWrapper.get_action_size(individual.env_wrapper)
 
     for gene_index in random_perm
@@ -343,9 +346,9 @@ function FIHC_flat!(individual::Individual)
         if get_fitness!(max_copy) > previous_fitness
             individual.genes[gene_index] = max_copy.genes[gene_index]
             individual._fitness = max_copy._fitness
-            if individual._verbose
-                Logging.@info Printf.@sprintf("improvement from %.2f  to %.2f\n", previous_fitness, get_fitness!(max_copy))
-            end
+            # if individual._verbose
+            #     Logging.@info Printf.@sprintf("improvement from %.2f  to %.2f\n", previous_fitness, get_fitness!(max_copy))
+            # end
             # save_decision_plot(individual)
         end
 
@@ -362,9 +365,9 @@ function FIHC_flat!(individual::Individual)
         # end
     end
 
-    if individual._verbose
-        Logging.@info Printf.@sprintf("\npost FIHC fitness: %.2f\n", get_fitness!(individual))
-    end
+    # if individual._verbose
+    #     Logging.@info Printf.@sprintf("\npost FIHC fitness: %.2f\n", get_fitness!(individual))
+    # end
 end
 
 function FIHC_top_to_bottom!(individual::Individual)

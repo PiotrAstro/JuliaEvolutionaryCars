@@ -30,7 +30,7 @@ mutable struct EnvironmentWrapperStruct
     _decoder::NeuralNetwork.AbstractNeuralNetwork
     _autoencoder::NeuralNetwork.AbstractNeuralNetwork
     _encoded_exemplars::Matrix{Float32}
-    _raw_exemplars::Array{Float32}
+    _raw_exemplars::Environment.AbstractStateSequence
     _similarity_tree::TreeNode
     _max_states_considered::Int
     _fuzzy_logic_of_n_closest::Int
@@ -77,16 +77,18 @@ function EnvironmentWrapperStruct(
     ]
     # states collection
     trajectories = _collect_trajectories(envs, NNs)
-    states = _combine_states_from_trajectories((1.0, trajectories), max_states_considered)
-    NeuralNetwork.learn!(autoencoder, states, states; verbose=verbose)
+    states = _combine_states_from_trajectories([(1.0, trajectories)], max_states_considered)
+    states_nn_input = Environment.get_nn_input(states)
+    NeuralNetwork.learn!(autoencoder, states_nn_input, states_nn_input; verbose=verbose)
 
     if verbose
         Logging.@info "Autoencoder trained"
     end
 
-    encoded_states = NeuralNetwork.predict(encoder, states)
-    exemplars_ids, similarity_tree = _get_exemplars(encoded_states, encoder, n_clusters; distance_metric, exemplars_clustering)
+    encoded_states = NeuralNetwork.predict(encoder, states_nn_input)
+    exemplars_ids, similarity_tree = _get_exemplars(encoded_states, n_clusters; distance_metric, exemplars_clustering)
     encoded_exemplars = encoded_states[:, exemplars_ids]
+    states_exeplars = Environment.get_sequence_with_ids(states, exemplars_ids)
 
     if verbose
         Logging.@info "Exemplars tree created"
@@ -99,7 +101,7 @@ function EnvironmentWrapperStruct(
         decoder,
         autoencoder,
         encoded_exemplars,
-        states[:, exemplars_ids],
+        states_exeplars,
         similarity_tree,
         max_states_considered,
         fuzzy_logic_of_n_closest,
@@ -117,7 +119,7 @@ returns Tuple{Vector{Trajectory}, TreeNode}
 function create_time_distance_tree(env_wrap::EnvironmentWrapperStruct, ind::Vector{Int})
     trajectories = _collect_trajectories(env_wrap._envs, [get_full_NN(env_wrap, ind)])
     states_in_trajectories = [trajectory.states for trajectory in trajectories]
-    encoded_states_by_trajectory = [NeuralNetwork.predict(env_wrap._encoder, states_one_traj) for states_one_traj in states_in_trajectories]
+    encoded_states_by_trajectory = [NeuralNetwork.predict(env_wrap._encoder, Environment.get_nn_input(states_one_traj)) for states_one_traj in states_in_trajectories]
     return trajectories, _create_time_distance_tree(encoded_states_by_trajectory, env_wrap._encoded_exemplars)
 end
 
@@ -187,42 +189,59 @@ function get_fitness(env_wrap::EnvironmentWrapperStruct, genes::Vector{Int}) :: 
     return result
 end
 
+
 """
 Create new env_wrapper based on the trajectories and percentages of them.
 It will take percent of internal max states considered from each group of trajectories,
 
+args:
+env_wrap::EnvironmentWrapperStruct,
+trajectories_and_percentages::Vector{Tuple{Float64, Vector{<:Environment.Trajectory}}}
+
+kwargs:
+new_n_clusters::Int=-1,
+
+this vector sometimes has a problem with casting on callee side, so we will cast it here
 States in trajectories are equal - each states has the same chance of beeing picked (the are added to the same array).
 
 In the future, one can adapt some values of env_wrapper e.g. n_clusters, max_states_considered, fuzzy_logic_of_n_closest etc.
 """
 function create_new_based_on(
         env_wrap::EnvironmentWrapperStruct,
-        trajectories_and_percentages::Vector{Tuple{Float64, Vector{<:Environment.Trajectory}}};
+        trajectories_and_percentages::Vector{<:Any};
         new_n_clusters::Int=-1,
     ) :: EnvironmentWrapperStruct
     if new_n_clusters == -1
         new_n_clusters = env_wrap._n_clusters
     end
+    TSEQ = typeof(trajectories_and_percentages[1][2][1].states) # type of states sequences
+    trajectories_and_percentages_casted = Vector{Tuple{Float64, Vector{Environment.Trajectory{TSEQ}}}}(trajectories_and_percentages)
+
     new_env_wrapper = copy(env_wrap, false)
 
-    new_states = _combine_states_from_trajectories(trajectories_and_percentages, new_env_wrapper._max_states_considered)
-    NeuralNetwork.learn!(new_env_wrapper._autoencoder, new_states, new_states; verbose=new_env_wrapper._verbose)
+    new_states = _combine_states_from_trajectories(trajectories_and_percentages_casted, new_env_wrapper._max_states_considered)
+    new_states_nn_input = Environment.get_nn_input(new_states)
+    NeuralNetwork.learn!(new_env_wrapper._autoencoder, new_states_nn_input, new_states_nn_input; verbose=new_env_wrapper._verbose)
 
     if env_wrap._verbose
         Logging.@info "Autoencoder retrained"
     end
 
-    new_encoded_states = NeuralNetwork.predict(new_env_wrapper._encoder, new_states)
+    new_encoded_states = NeuralNetwork.predict(new_env_wrapper._encoder, new_states_nn_input)
 
     # # get new exemplars, states and newly encoded states
-    new_exemplars_ids, new_similarity_tree = _get_exemplars(new_encoded_states, new_encoded_states._encoder, new_n_clusters)
+    new_exemplars_ids, new_similarity_tree = _get_exemplars(new_encoded_states, new_n_clusters; distance_metric=env_wrap._distance_metric, exemplars_clustering=env_wrap._exemplars_clustering)
     new_exemplars = new_encoded_states[:, new_exemplars_ids]
+    new_raw_exemplars = Environment.get_sequence_with_ids(new_states, new_exemplars_ids)
 
     new_env_wrapper._encoded_exemplars = new_exemplars
+    new_env_wrapper._raw_exemplars = new_raw_exemplars
     new_env_wrapper._similarity_tree = new_similarity_tree
     new_env_wrapper._result_memory = Dict{Vector{Int}, Float64}()
     new_env_wrapper._result_memory_mutex = ReentrantLock()
     new_env_wrapper._n_clusters = new_n_clusters
+
+    return new_env_wrapper
 end
 
 function translate(
@@ -237,9 +256,9 @@ function translate(
         return from_genes[to_genes_indices]
     else
         from_NN = get_full_NN(from_env_wrap, from_genes)
-        to_raw_exemplars = Environment.copy_slice_at_positions(to_env_wrap._raw_exemplars, to_genes_indices)
-        nn_output = NeuralNetwork.predict(from_NN, to_raw_exemplars)
-        to_genes = argmax(nn_output, dims=1)[:]
+        to_raw_exemplars = Environment.get_sequence_with_ids(to_env_wrap._raw_exemplars, to_genes_indices)
+        nn_output = NeuralNetwork.predict(from_NN, Environment.get_nn_input(to_raw_exemplars))
+        to_genes = argmax.(eachcol(nn_output))
         return to_genes
     end
 end
@@ -266,8 +285,8 @@ end
 # --------------------------------------------------------------------------------------------------
 # Private functions
 
-function _collect_trajectories(envs::Vector{<:Environment.AbstractEnvironment}, NNs::Vector{<:NeuralNetwork.AbstractNeuralNetwork}) :: Vector{Environment.Trajectory}
-    trajectories = Vector{Vector{Environment.Trajectory}}(undef, length(NNs))
+function _collect_trajectories(envs::Vector{E}, NNs::Vector{<:NeuralNetwork.AbstractNeuralNetwork}) :: Vector{Environment.Trajectory{SEQ}} where {SEQ<:Environment.AbstractStateSequence, E<:Environment.AbstractEnvironment{SEQ}}
+    trajectories = Vector{Vector{Environment.Trajectory{SEQ}}}(undef, length(NNs))
 
     # Threads.@threads for i in 1:length(NNs)
     for i in 1:length(NNs)
@@ -279,21 +298,23 @@ function _collect_trajectories(envs::Vector{<:Environment.AbstractEnvironment}, 
     return trajectories_flat
 end
 
-function _combine_states_from_trajectories(trajectories_and_percentages::Vector{Tuple{Float64, Vector{Environment.Trajectory{IDN, ODN}}}}, pick_states_n::Int) :: Array{Float32, IDN} where {IDN, ODN}
+function _combine_states_from_trajectories(trajectories_and_percentages::Vector{Tuple{Float64, Vector{Environment.Trajectory{SEQ}}}}, pick_states_n::Int) :: SEQ where {SEQ<:Environment.AbstractStateSequence}
     @assert sum([percentage for (percentage, _) in trajectories_and_percentages]) ≈ 1.0
-    states_to_combine = Vector{Array{Float32}}()
+    states_to_combine = Vector{SEQ}()
 
     for (percentage, trajectories) in trajectories_and_percentages
         states_to_pick_n = Int(round(percentage * pick_states_n))
-        states_total_n = sum([length(trajectory.states) for trajectory in trajectories])
+        states_total_n = sum([Environment.get_length(trajectory.states) for trajectory in trajectories])
         states_to_pick_n = min(states_to_pick_n, states_total_n)
 
-        states_local_combined = cat([trajectory.states for trajectory in trajectories]..., dims=IDN)
+        states_local_combined = SEQ([trajectory.states for trajectory in trajectories])
         states_to_pick = rand(1:states_total_n, states_to_pick_n)
-        states_local_combined = Environment.copy_slice_at_positions(states_local_combined, states_to_pick)
+        states_local_combined = Environment.get_sequence_with_ids(states_local_combined, states_to_pick)
         push!(states_to_combine, states_local_combined)
     end
-    states_combined = cat(states_to_combine..., dims=IDN)
+    states_combined = SEQ(states_to_combine)
+
+    println("States combined: ", Environment.get_length(states_combined))
 
     return states_combined
 end

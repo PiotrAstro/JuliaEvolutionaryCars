@@ -1,10 +1,9 @@
 
 function _get_exemplars(
         encoded_states::Matrix{Float32},
-        encoder::NeuralNetwork.AbstractNeuralNetwork,
         n_clusters::Int;
-        distance_metric::Symbol=:cosine, # :cosine or :euclidean or cityblock
-        exemplars_clustering::Symbol=:genie # :genie or :pam or :kmedoids
+        distance_metric::Symbol, # :cosine or :euclidean or cityblock
+        exemplars_clustering::Symbol # :genie or :pam or :kmedoids
     ) :: Tuple{Vector{Int}, TreeNode}
     if distance_metric == :cosine
         distance_premetric = Distances.CosineDist()
@@ -65,7 +64,7 @@ function exemplars_pam(
     distances_of_exemplars = Distances.pairwise(distance_premetric, encoded_states[:, exemplars])
 
     # create tree with normal hclust
-    clustering = Clustering.hclust(distances_of_exemplars, linkage=:average)
+    clustering = Clustering.hclust(distances_of_exemplars, linkage=:complete)
     tree = _create_tree_hclust(clustering.merges)
     return (exemplars, tree)
 end
@@ -81,7 +80,7 @@ function exemplars_kmedoids(
     distances_of_exemplars = Distances.pairwise(distance_premetric, encoded_states[:, exemplars])
 
     # create tree with normal hclust
-    clustering = Clustering.hclust(distances_of_exemplars, linkage=:average)
+    clustering = Clustering.hclust(distances_of_exemplars, linkage=:complete)
     tree = _create_tree_hclust(clustering.merges)
     return (exemplars, tree)
 end

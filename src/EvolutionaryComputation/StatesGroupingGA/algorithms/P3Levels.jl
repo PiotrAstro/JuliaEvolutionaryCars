@@ -65,26 +65,19 @@ end
 
 "Runs new individual, does FIHC, optimal mixing, climbing through levels and returns final individual"
 function run_new_individual!(p3::Population_Pyramid) :: Ind.Individual
-    if p3.verbose
-        Logging.@info Printf.@sprintf("best individual fitness: %.2f\n", Ind.get_fitness!(p3.best_individual))
-    end
     new_individual = Ind.Individual(p3.current_env_wrapper, p3.verbose)
-    Ind.FIHC_top_to_bottom!(new_individual)
-    # save_decision_plot(new_individual)
     add_to_next_level = true
 
     i = 1
     while i <= length(p3.population)
-        new_individual = Ind.copy_individual(new_individual)
-        if i > 1
-            Ind.FIHC_top_to_bottom!(new_individual)
-        end
+        Ind.FIHC_top_to_bottom!(new_individual)
 
         if p3.verbose
             Logging.@info Printf.@sprintf("\nGenes pre mixing: %s\n", Ind.get_same_genes_percent(new_individual, p3.population[i].individuals))
         end
 
         if add_to_next_level
+            Ind.new_level_cosideration!(new_individual)
             push!(p3.population[i].individuals, new_individual)
         end
         new_individual = Ind.copy_individual(new_individual)
@@ -97,16 +90,8 @@ function run_new_individual!(p3::Population_Pyramid) :: Ind.Individual
         end
         new_fitness = Ind.get_fitness!(new_individual)
 
-        if Ind.get_fitness!(p3.best_individual) < new_fitness
-            p3.best_individual = Ind.copy_individual(new_individual)
-            if p3.verbose
-                Logging.@info Printf.@sprintf("\n\nnew best individual fitness: %.2f\n\n", Ind.get_fitness!(p3.best_individual))
-            end
-        end
-
         if new_fitness > old_fitness
             add_to_next_level = true
-            Ind.actualize_time_tree!(new_individual)
             if i == length(p3.population)
                 push!(p3.population, Level(Vector{Ind.Individual}(undef, 0)))
             end
@@ -114,8 +99,17 @@ function run_new_individual!(p3::Population_Pyramid) :: Ind.Individual
             add_to_next_level = false
         end
 
+        if Ind.get_fitness!(p3.best_individual) < new_fitness
+            p3.best_individual = Ind.copy_individual(new_individual)
+            if p3.verbose
+                Logging.@info Printf.@sprintf("\n\nnew best individual fitness: %.2f\n\n", Ind.get_fitness!(p3.best_individual))
+            end
+        end
+
         i += 1
     end
+
+    return new_individual
 end
 
 
@@ -132,11 +126,11 @@ function run!(
         log::Bool=true,
         visualize_each_n_epochs::Int=0
     )
-    EnvironmentWrapper.set_verbose!(env_wrapper, false)
+    EnvironmentWrapper.set_verbose!(env_wrapper, log)
     p3 = Population_Pyramid(env_wrapper, log)
 
     # (generation, best_fitness, local_individual_fitness)
-    list_with_results = Vector{Tuple{Int, Float64, Int, Float64}}()
+    list_with_results = Vector{Tuple{Int, Float64, Float64}}()
 
     for generation in 1:max_generations
         new_individual = run_new_individual!(p3)
@@ -146,8 +140,10 @@ function run!(
         best_n_distinct_individuals = get_n_best_distinct_individuals(p3, space_explorers_n)
         p3.current_env_wrapper = EnvironmentWrapper.create_new_based_on(
             p3.current_env_wrapper,
-            (0.5, Ind.get_flattened_trajectories(best_n_distinct_individuals)),
-            (0.5, Ind.get_flattened_trajectories(new_individual))
+            [
+                (1.0, Ind.get_flattened_trajectories(best_n_distinct_individuals)),
+                # (0.5, Ind.get_flattened_trajectories(new_individual))
+            ]
         )
 
         if visualize_each_n_epochs > 0 && generation % visualize_each_n_epochs == 0

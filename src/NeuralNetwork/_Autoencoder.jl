@@ -1,21 +1,20 @@
 export Autoencoder
 
-# ODN - Output Dimensions Number
-struct Autoencoder{ODN, E<:AbstractNeuralNetwork, D<:AbstractNeuralNetwork } <: AbstractNeuralNetwork{ODN}
+struct Autoencoder{E<:AbstractNeuralNetwork, D<:AbstractNeuralNetwork } <: AbstractNeuralNetwork
     encoder::E
     decoder::D
     chained::Flux.Chain
-    mmd_weight::AbstractFloat
-    learning_rate::AbstractFloat
+    mmd_weight::Float64
+    learning_rate::Float64
 end
 
 function Autoencoder(
-        encoder::AbstractNeuralNetwork,
-        decoder::AbstractNeuralNetwork{ODN};
-        mmd_weight::AbstractFloat,
-        learning_rate::AbstractFloat
-    ) :: Autoencoder where {ODN}
-    return Autoencoder{ODN}(encoder, decoder, Flux.Chain(get_Flux_representation(encoder), get_Flux_representation(decoder)), mmd_weight, learning_rate)
+        encoder::E,
+        decoder::D;
+        mmd_weight::Float64,
+        learning_rate::Float64
+    ) where {E<:AbstractNeuralNetwork, D<:AbstractNeuralNetwork}
+    return Autoencoder{E, D}(encoder, decoder, Flux.Chain(get_Flux_representation(encoder), get_Flux_representation(decoder)), mmd_weight, learning_rate)
 end
 
 function get_loss(nn::Autoencoder) :: Function
@@ -31,8 +30,8 @@ function predict(nn::Autoencoder, X::Array{Float32}) :: Array{Float32}
     return nn.chained(X)
 end
 
-function copy(nn::Autoencoder{ODN}) :: Autoencoder where {ODN}
-    return Autoencoder{ODN}(copy(nn.encoder), copy(nn.decoder); mmd_weight=nn.mmd_weight, learning_rate=nn.learning_rate)
+function copy(nn::Autoencoder)
+    return Autoencoder(copy(nn.encoder), copy(nn.decoder); mmd_weight=nn.mmd_weight, learning_rate=nn.learning_rate)
 end
 
 function learn!(

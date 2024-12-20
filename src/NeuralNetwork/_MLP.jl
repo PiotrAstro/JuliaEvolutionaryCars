@@ -1,6 +1,6 @@
 export MLP_NN
 
-struct MLP_NN{2, F} <: AbstractNeuralNetwork{2}
+struct MLP_NN{F} <: AbstractNeuralNetwork
     layers::Flux.Chain
     loss::F
 end

@@ -5,9 +5,9 @@ DistanceBasedClassificator
 encoded exemplars have (number of exemplars, features) shape
 translation is a vector of size number of exemplars
 """
-struct DistanceBasedClassificator{2, N <: AbstractNeuralNetwork, F1<:Function, F2<:Function} <: AbstractNeuralNetwork{2}
+struct DistanceBasedClassificator{N <: AbstractNeuralNetwork, F1<:Function, F2<:Function} <: AbstractNeuralNetwork
     encoder::N
-    encoded_exemplars::Matrix{Float32}  # encoded exemplars are normalized (unit vectors) and transposed for better performance, so it should be clusters_n x features
+    encoded_exemplars::Matrix{Float32}
     translation::Vector{Int}
     actions_number::Int
     fuzzy_logic_of_n_closest::Int
@@ -36,8 +36,11 @@ struct DistanceBasedClassificator{2, N <: AbstractNeuralNetwork, F1<:Function, F
         else
             throw(ArgumentError("Unknown distance metric: $distance_metric"))
         end
+        F1 = typeof(closest_exemplars)
+        F2 = typeof(final_dist_prepare)
 
-        new(encoder, encoded_exemplars, translation, actions_number, fuzzy_logic_of_n_closest, closest_exemplars, final_dist_prepare)
+        # Call new with all type parameters specified
+        new{N, F1, F2}(encoder, encoded_exemplars, translation, actions_number, fuzzy_logic_of_n_closest, closest_exemplars, final_dist_prepare)
     end
 end
 
@@ -69,7 +72,7 @@ end
 # ------------------------------------------------------------------------------------------
 # functions that will pick closest exemplars
 
-function prepare_closest_exemplars_cosine(nn::DistanceBasedClassificator, encoded_x::Matrix{Float32}) :: Tuple{Vector{Vector{Int}}, Vector{Vector{Float32}}}
+function prepare_closest_exemplars_cosine(nn::DistanceBasedClassificator, encoded_x::Matrix{Float32}) :: Vector{Tuple{Vector{Int}, Vector{Float32}}}
     # normalize length - make it a unit vector
     encoded_x .*= inv.(sqrt.(sum(abs2, encoded_x; dims=1)))
     similarity = nn.encoded_exemplars * encoded_x
@@ -77,14 +80,16 @@ function prepare_closest_exemplars_cosine(nn::DistanceBasedClassificator, encode
     return closest_exemplars
 end
 
-function prepare_closest_exemplars_euclidean(nn::DistanceBasedClassificator, encoded_x::Matrix{Float32}) :: Tuple{Vector{Vector{Int}}, Vector{Vector{Float32}}}
-    distances = Distances.pairwise(Distances.Euclidean(), nn.encoded_exemplars, encoded_x)
+function prepare_closest_exemplars_euclidean(nn::DistanceBasedClassificator, encoded_x::Matrix{Float32}) :: Vector{Tuple{Vector{Int}, Vector{Float32}}}
+    # distances = Distances.pairwise(Distances.Euclidean(), nn.encoded_exemplars, encoded_x)
+    @tullio threads=false distances[i,j] := (nn.encoded_exemplars[k,i] - encoded_x[k,j])^2 |> sqrt;
     closest_exemplars = [_get_n_lowest_indices(one_col, nn.fuzzy_logic_of_n_closest) for one_col in eachcol(distances)]
     return closest_exemplars
 end
 
-function prepare_closest_exemplars_city_block(nn::DistanceBasedClassificator, encoded_x::Matrix{Float32}) :: Tuple{Vector{Vector{Int}}, Vector{Vector{Float32}}}
-    distances = Distances.pairwise(Distances.Cityblock(), nn.encoded_exemplars, encoded_x)
+function prepare_closest_exemplars_city_block(nn::DistanceBasedClassificator, encoded_x::Matrix{Float32}) :: Vector{Tuple{Vector{Int}, Vector{Float32}}}
+    # distances = Distances.pairwise(Distances.Cityblock(), nn.encoded_exemplars, encoded_x)
+    @tullio threads=false distances[i,j] := abs(nn.encoded_exemplars[k,i] - encoded_x[k,j]);
     closest_exemplars = [_get_n_lowest_indices(one_col, nn.fuzzy_logic_of_n_closest) for one_col in eachcol(distances)]
     return closest_exemplars
 end
@@ -92,16 +97,18 @@ end
 # ------------------------------------------------------------------------------------------
 # functions that will prepare final distances, numerical stability etc.
 
+global const EPSILON::Float32 = Float32(1e-10)
+
 function final_dist_prepare_cosine(distances::AbstractVector{Float32}) :: Vector{Float32}
-    return max.(1.0 .- distances, 1e-10)
+    return max.(1.0 .- distances, EPSILON)
 end
 
 function final_dist_prepare_euclidean(distances::AbstractVector{Float32}) :: Vector{Float32}
-    return max.(distances, 1e-10)
+    return max.(distances, EPSILON)
 end
 
 function final_dist_prepare_city_block(distances::AbstractVector{Float32}) :: Vector{Float32}
-    return max.(distances, 1e-10)
+    return max.(distances, EPSILON)
 end
 
 # ------------------------------------------------------------------------------------------
