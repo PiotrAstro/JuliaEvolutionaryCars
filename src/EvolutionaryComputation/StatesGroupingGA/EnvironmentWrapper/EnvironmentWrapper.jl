@@ -314,8 +314,6 @@ function _combine_states_from_trajectories(trajectories_and_percentages::Vector{
     end
     states_combined = SEQ(states_to_combine)
 
-    println("States combined: ", Environment.get_length(states_combined))
-
     return states_combined
 end
 

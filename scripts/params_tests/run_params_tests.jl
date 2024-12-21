@@ -91,7 +91,7 @@ OUTPUT_LOG_FILE = "_output.log"
 
 # we will change these values globally for all tests
 CONSTANTS_DICT[:run_config] = Dict(
-    :max_generations => 100,
+    :max_generations => 200,
     :max_evaluations => 1_000_000,
     :log => false,
     :visualize_each_n_epochs => 0,
@@ -103,10 +103,13 @@ TESTED_VALUES = [
         :StatesGroupingGA,
         Dict(
             :StatesGroupingGA => Dict(
-                :nn_autoencoder => Dict(
-                    :mmd_weight => [0.0, 0.1, 1.0],
-                ),
-                :fuzzy_logic_of_n_closest => [1, 5],
+                # :nn_autoencoder => Dict(
+                #     :mmd_weight => [0.0, 0.1, 1.0],
+                # ),
+                # :fuzzy_logic_of_n_closest => [1, 5],
+                :n_clusters => [40, 100],
+                :distance_metric => [:cosine, :euclidean],  # :euclidean or :cosine or :cityblock
+                :exemplars_clustering => [:genie, :kmedoids, :pam],  # :genie or :pam or :kmedoids
             )
         ),
     ),

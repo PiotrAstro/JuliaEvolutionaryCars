@@ -1,4 +1,5 @@
 
+
 function _get_exemplars(
         encoded_states::Matrix{Float32},
         n_clusters::Int;
@@ -25,15 +26,24 @@ function _get_exemplars(
         throw(ArgumentError("Unknown exemplars_clustering: $exemplars_clustering"))
     end
 
-    # normalized_states = GenieClust._normalize_cosine(encoded_states)
-    # @time distances = 1 .- (normalized_states' * normalized_states)
-    # @time exemplars_pam = Clustering.kmedoids(distances, n_clusters).medoids  # PAM.pam(distances, n_clusters)
-    # # @time exemplars_pam, _ = PAM.pam(distances, n_clusters)
 
+    # kmedoids = PyCall.pyimport("kmedoids")
+
+    # @time begin
+    #     distances = PyCall.PyObject(Distances.pairwise(distance_premetric, encoded_states)')
+    #     exp_python = Vector{Int}(kmedoids.fasterpam(distances, n_clusters, max_iter=100, init="random", n_cpu=1).medoids)
+    # end
+    # @time exp_genie, _ = exemplars_genie(encoded_states, n_clusters, distance_premetric)
+    # @time exp_pam, _ = exemplars_pam(encoded_states, n_clusters, distance_premetric)
+    # @time exp_kmedoids, _ = exemplars_kmedoids(encoded_states, n_clusters, distance_premetric)
+
+    # println("n_clusters: $(n_clusters)\nn_states: $(size(encoded_states, 2))")
     # Plots.scatter(encoded_states[1, :], encoded_states[2, :], label="States", size=(1500, 1500), markerstrokewidth = 0.1)
-    # Plots.scatter!(encoded_states[1, exemplars], encoded_states[2, exemplars], label="Exemplars_genie", markerstrokewidth = 0.1)
-    # Plots.scatter!(encoded_states[1, exemplars_pam], encoded_states[2, exemplars_pam], label="Exemplars_pam", markerstrokewidth = 0.1, color=:purple)
-    # Plots.savefig("log/encoded_states.png")
+    # Plots.scatter!(encoded_states[1, exp_genie], encoded_states[2, exp_genie], label="Exemplars_genie", markerstrokewidth = 0.1; color=:red)
+    # Plots.scatter!(encoded_states[1, exp_pam], encoded_states[2, exp_pam], label="Exemplars_pam", markerstrokewidth = 0.1, color=:pink)
+    # Plots.scatter!(encoded_states[1, exp_kmedoids], encoded_states[2, exp_kmedoids], label="Exemplars_kmedoids", markerstrokewidth = 0.1, color=:purple)
+    # Plots.scatter!(encoded_states[1, exp_python], encoded_states[2, exp_python], label="Exemplars_python", markerstrokewidth = 0.1, color=:orange)
+    # Plots.savefig("log/encoded_states_pam_genie_kmedoids.png")
 end
 
 # ------------------------------------------------------------------------------------------
@@ -50,7 +60,7 @@ function exemplars_genie(
 
     elements = collect(1:length(tree.elements))
     tree_correct_exemplars_inds = _tree_elements_to_indicies(tree, elements)
-    return (exemplars, tree_correct_exemplars_inds)
+    return exemplars, tree_correct_exemplars_inds
 end
 
 function exemplars_pam(
@@ -60,13 +70,13 @@ function exemplars_pam(
     ) :: Tuple{Vector{Int}, TreeNode}
 
     distances = Distances.pairwise(distance_premetric, encoded_states)
-    exemplars = Clustering.kmedoids(distances, n_clusters).medoids
+    exemplars = PAM.faster_pam(distances, n_clusters)
     distances_of_exemplars = Distances.pairwise(distance_premetric, encoded_states[:, exemplars])
 
     # create tree with normal hclust
     clustering = Clustering.hclust(distances_of_exemplars, linkage=:complete)
     tree = _create_tree_hclust(clustering.merges)
-    return (exemplars, tree)
+    return exemplars, tree
 end
 
 function exemplars_kmedoids(
@@ -82,7 +92,7 @@ function exemplars_kmedoids(
     # create tree with normal hclust
     clustering = Clustering.hclust(distances_of_exemplars, linkage=:complete)
     tree = _create_tree_hclust(clustering.merges)
-    return (exemplars, tree)
+    return exemplars, tree
 end
 
 # ------------------------------------------------------------------------------------------
