@@ -123,7 +123,7 @@ CONSTANTS_DICT = Dict(
                 )
             ),
             :autoencoder_dict => Dict(
-                :mmd_weight => 0.0,
+                :mmd_weight => 0.0,  # IDK why, but in early tests clearly 0.0 was the best, so MMD wasnt used
                 :learning_rate => 0.001
             ),
             :game_decoder_dict => Dict(  # used only in the first collection on states

@@ -1,6 +1,10 @@
 
 # We can use either multithreaded or single threaded version
 # comment or uncomment one line in _compute_mst_on_the_fly function
+
+# Genieclust based on https://genieclust.gagolewski.com/index.html
+# it is just small part of implementation - for my usage
+# article: https://arxiv.org/pdf/2209.05757
 module GenieClust
 
 export genie_clust
