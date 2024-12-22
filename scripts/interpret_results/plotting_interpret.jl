@@ -1,4 +1,3 @@
-module P3Levels_interpret
 
 import Plots
 using Plots.PlotMeasures
@@ -17,7 +16,7 @@ TEST_POSTFIX = ".csv"  # will be removed from plot entries
 TEST_PREFIX = "logs_opt=StaGroGA_"  # will be removed from plot entries
 
 COLUMN = :best_fitness_global
-LINE_METHOD = :median
+LINE_METHOD = :mean
 
 # will stay in the plot entries, used for filtering
 # entry should have all of these (there is and between them)
@@ -53,6 +52,8 @@ PLOT_MARGIN = 10mm
 PLOT_TOP_MARGIN = 15mm
 LINE_WIDTH = 3
 RIBBON_FILL_ALPHA = 0.1
+X_LABEL = "Generation"
+Y_LABEL = "Fitness"
 
 function get_name_string(file_name::String) :: String
     remove_prefix = replace(file_name, TEST_PREFIX => "")
@@ -87,16 +88,16 @@ function plot(
     line_function::Symbol = :all
 )
     infix_test = "[" * join([isa(infix_el, Tuple) ? join(infix_el, " | ") : infix_el for infix_el in TEST_INFIX_LIST], " & ") * "]"
-    plot_name = "Col=$column  function=$line_function  Prefix=$TEST_PREFIX  Infix=$infix_test"
+    plot_name = "function--$line_function  Col--$column  Prefix--$TEST_PREFIX  Infix--$infix_test"
     println("Plotting: $plot_name")
     plot_save_name = replace("_"*plot_name, " " => "_")
 
     p = Plots.plot(
         legend=:topleft,
-        xlabel="Generation",
-        ylabel="Fitness",
+        xlabel=X_LABEL,
+        ylabel=Y_LABEL,
         title=plot_name,
-        size=(1500, 1000),
+        size=PLOT_SIZE,
         margin=PLOT_MARGIN,
         top_margin=PLOT_TOP_MARGIN,
     )
@@ -158,9 +159,6 @@ function run()
     plot(reads, COLUMN, LINE_METHOD)
 end
 
-end # module P3Levels_interpret
-
 # ------------------------------------------------------------------------------------------------
 # run
-import .P3Levels_interpret
-P3Levels_interpret.run()
+run()
