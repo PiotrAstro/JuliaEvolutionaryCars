@@ -127,7 +127,7 @@ Distributed.@everywhere begin
     import Logging
     import Dates
     import Random
-    seed = time_ns() ⊻ UInt64(hash(Distributed.myid()))
+    seed = time_ns() ⊻ UInt64(hash(Distributed.myid())) # xor between time nano seconds and hash of worker id
     Random.seed!(seed)
     println("Worker $(Distributed.myid()) started at $(Dates.now()) with seed: $seed")
 
@@ -146,13 +146,19 @@ println("Number of BLAS threads: $(BLAS.get_num_threads())")
 println("Number of Julia threads: $(Threads.nthreads())")
 
 mkpath(LOGS_DIR)
+println("Logs will be saved in: $LOGS_DIR")
+
 file_logger = CustomLoggers.SimpleFileLogger(joinpath(LOGS_DIR, OUTPUT_LOG_FILE))
 Logging.global_logger(file_logger)
 
 special_dicts = create_all_special_dicts(TESTED_VALUES)
+
 io = IOBuffer()
-display(io, special_dicts)
+show(io, MIME"text/plain"(), TESTED_VALUES)
+Logging.@info "\n\n Tested values settings:\n" * String(take!(io))
+show(io, MIME"text/plain"(), special_dicts)
 Logging.@info "\n\n will run with the following settings:\n" * String(take!(io))
+
 special_dicts_with_cases = [(optimizer, special_dict, deepcopy(CONSTANTS_DICT), i) for (optimizer, special_dict) in special_dicts, i in 1:CASES_PER_TEST]
 
 results = Distributed.pmap(eachindex(special_dicts_with_cases)) do i 
