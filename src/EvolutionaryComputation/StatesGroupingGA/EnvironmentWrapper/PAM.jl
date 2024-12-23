@@ -140,7 +140,7 @@ function eager_swap_pam(distance_matrix::Matrix{F}, medoids_initial::Vector{Int}
                     break
                 end
 
-                @inbounds for medoid_id in 1:medoids_n
+                @inbounds @simd for medoid_id in 1:medoids_n
                     deltaTD[medoid_id] = removal_loss[medoid_id]
                 end
 
@@ -174,7 +174,6 @@ function eager_swap_pam(distance_matrix::Matrix{F}, medoids_initial::Vector{Int}
                     is_medoid[old_medoid_point] = false
                     is_medoid[new_medoid_point] = true
                     medoids[medoid_id_min] = new_medoid_point
-                    removal_loss[medoid_id_min] = zero(F)
 
                     @inbounds for other_point in 1:points_n
                         if other_point != new_medoid_point

@@ -100,7 +100,7 @@ end
 global const EPSILON::Float32 = Float32(1e-10)
 
 function final_dist_prepare_cosine(distances::AbstractVector{Float32}) :: Vector{Float32}
-    return max.(1.0 .- distances, EPSILON)
+    return max.(1.0f0 .- distances, EPSILON)
 end
 
 function final_dist_prepare_euclidean(distances::AbstractVector{Float32}) :: Vector{Float32}

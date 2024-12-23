@@ -1,28 +1,9 @@
-# important things to improve performance on intel CPUs:
-using MKL
-using LinearAlgebra
-BLAS.set_num_threads(1)
-println("BLAS kernel: $(BLAS.get_config())")
-println("Number of BLAS threads: $(BLAS.get_num_threads())")
-println("Number of Julia threads: $(Threads.nthreads())")
-
-import CSV
-import DataFrames
-import Logging
+import Distributed
 import Dates
-
-# --------------------------------------------------------------------------------------------------
-include("../../src/JuliaEvolutionaryCars.jl")
-import .JuliaEvolutionaryCars
-
-include("../custom_loggers.jl")
-import .CustomLoggers
+import ProgressMeter
 
 include("../constants.jl")
-include("_tests_utils.jl")
-
 # --------------------------------------------------------------------------------------------------
-
 """
 How to set TESTED_VALUES:
     It should be:
@@ -84,9 +65,11 @@ How to set TESTED_VALUES:
         ),
     ]
 """
+USE_N_WORKERS = 8  # how many workers to use, main worker is worker 1 and is not included - it doesnt perform calculations
+BLAS_THREADS_PER_WORKER = 1
 
 CASES_PER_TEST = 10
-LOGS_DIR = "log/parameters_tests_" * Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS") * "/"
+LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_" * Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS"))
 OUTPUT_LOG_FILE = "_output.log"
 
 # we will change these values globally for all tests
@@ -116,15 +99,78 @@ TESTED_VALUES = [
 
 # --------------------------------------------------------------------------------------------------
 # Run the tests
+
+# check how many workers there are - rm if needed
+# -1 worker case worker 1 doesnt do calculations, but is included in Distributed.workers()
+function set_proper_workers(workers_n)
+    real_processes_n = workers_n + 1
+    difference_in_workers_n = length(Distributed.workers()) - real_processes_n
+    if difference_in_workers_n < 0
+        Distributed.addprocs(-difference_in_workers_n)
+    elseif difference_in_workers_n > 0
+        for pid in Distributed.workers()
+            Distributed.rmprocs(pid)
+            if length(Distributed.workers()) == real_processes_n
+                break
+            end
+        end
+    end
+end
+set_proper_workers(USE_N_WORKERS)
+
+Distributed.@everywhere begin
+    # important things to improve performance on intel CPUs:
+    using MKL
+    using LinearAlgebra
+
+    import CSV
+    import DataFrames
+    import Logging
+    import Dates
+    import Random
+    seed = time_ns() ⊻ UInt64(hash(Distributed.myid()))
+    Random.seed!(seed)
+    println("Worker $(Distributed.myid()) started at $(Dates.now()) with seed: $seed")
+
+    include("../../src/JuliaEvolutionaryCars.jl")
+    import .JuliaEvolutionaryCars
+
+    include("../custom_loggers.jl")
+    import .CustomLoggers
+
+    include("_tests_utils.jl")
+    BLAS.set_num_threads($BLAS_THREADS_PER_WORKER)
+end
+
+println("BLAS kernel: $(BLAS.get_config())")
+println("Number of BLAS threads: $(BLAS.get_num_threads())")
+println("Number of Julia threads: $(Threads.nthreads())")
+
 mkpath(LOGS_DIR)
-Logging.global_logger(CustomLoggers.SimpleFileLogger(joinpath(LOGS_DIR, OUTPUT_LOG_FILE)))
+file_logger = CustomLoggers.SimpleFileLogger(joinpath(LOGS_DIR, OUTPUT_LOG_FILE))
+Logging.global_logger(file_logger)
 
 special_dicts = create_all_special_dicts(TESTED_VALUES)
 Logging.@info "\n\n will run with the following settings:\n" special_dicts
 special_dicts_with_cases = [(optimizer, special_dict, deepcopy(CONSTANTS_DICT), i) for (optimizer, special_dict) in special_dicts, i in 1:CASES_PER_TEST]
 
-Threads.@threads for i in 1:length(special_dicts_with_cases)
-# for i in 1:length(special_dicts_with_cases)
-    optimizer, special_dict, config_copy, case = special_dicts_with_cases[i]
-    run_one_test(optimizer, special_dict, config_copy, case, LOGS_DIR)
+results = ProgressMeter.@showprogress Distributed.pmap(eachindex(special_dicts_with_cases)) do i 
+    Logging.global_logger(CustomLoggers.RemoteLogger())
+    try
+        optimizer, special_dict, config_copy, case = special_dicts_with_cases[i]
+        run_one_test(optimizer, special_dict, config_copy, case, LOGS_DIR, Distributed.myid())
+        return true
+    catch e
+        Logging.@error "workerid $(Distributed.myid()) failed with error: $e"
+        return false
+    end
 end
+
+
+texts = [
+    (result ? "success" : "failed") * "  ->  " * save_name(optimizer, special_dict, case)
+    for (result, (optimizer, special_dict, _, case)) in zip(results, special_dicts_with_cases)
+]
+
+text_log = "\n\nFinished computation, result:\n" * join(texts, "\n")
+Logging.@info text_log

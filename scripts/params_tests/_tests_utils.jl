@@ -266,9 +266,15 @@ special_dict = Dict{Symbol, <:Any}(
 
 dict_config_copied - it should be copied before!
 """
-function run_one_test(optimizer::Symbol, special_dict::Dict{Symbol, <:Any}, dict_config_copied::Dict{Symbol, <:Any}, case_index::Int, save_dir)
+function run_one_test(
+        optimizer::Symbol,
+        special_dict::Dict{Symbol, <:Any},
+        dict_config_copied::Dict{Symbol, <:Any},
+        case_index::Int, save_dir,
+        worker_id::Int
+        )
     save_n = save_name(optimizer, special_dict, case_index)
-    Logging.@info "Running test with config: " save_n
+    Logging.@info "Worker $(worker_id) Running test with config:\n" * save_n
 
     change_dict_value!(dict_config_copied, special_dict)
 
@@ -279,5 +285,5 @@ function run_one_test(optimizer::Symbol, special_dict::Dict{Symbol, <:Any}, dict
 
     # Save the results to a file
     CSV.write(joinpath(save_dir, save_n), data_frame_result)
-    Logging.@info "Finished with config: " save_n
+    Logging.@info "Worker $(worker_id) Finished with config:\n" * save_n
 end

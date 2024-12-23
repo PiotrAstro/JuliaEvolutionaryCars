@@ -190,10 +190,6 @@ function react!(env::BasicCarEnvironment, action::AbstractVector{Float32}) :: Fl
     return reward
 end
 
-function get_state_size(env::BasicCarEnvironment) :: Vector{Int}
-    return [length(env.rays) + 1]
-end
-
 function get_action_size(env::BasicCarEnvironment) :: Int
     return 9  # 9 # 3 # 6
 end

@@ -10,13 +10,13 @@ import Statistics
 # My params
 
 
-TEST_DIR = joinpath("log", "parameters_tests_2024-12-15_13-44-03")
+TEST_DIR = joinpath("log", "parameters_tests_2024-12-14_20-24-45")
 
 TEST_POSTFIX = ".csv"  # will be removed from plot entries
 TEST_PREFIX = "logs_opt=StaGroGA_"  # will be removed from plot entries
 
 COLUMN = :best_fitness_global
-LINE_METHOD = :mean
+LINE_METHOD = :median
 
 # will stay in the plot entries, used for filtering
 # entry should have all of these (there is and between them)
@@ -85,7 +85,7 @@ All of them except for :all will plot the std as well
 function plot(
     reads::Dict{String, Vector{DataFrames.DataFrame}},
     column::Symbol,
-    line_function::Symbol = :all
+    line_function::Symbol
 )
     infix_test = "[" * join([isa(infix_el, Tuple) ? join(infix_el, " | ") : infix_el for infix_el in TEST_INFIX_LIST], " & ") * "]"
     plot_name = "function--$line_function  Col--$column  Prefix--$TEST_PREFIX  Infix--$infix_test"
@@ -104,29 +104,29 @@ function plot(
     current_colour = 1
 
     for (name, list) in reads
-        all_values = [df[!, column] for df in list]
-        max_length = maximum(length, all_values)
-        values_each_point = [[values[i] for values in all_values if i <= length(values)] for i in 1:max_length]
-        std_each_point = [Statistics.std(values) for values in values_each_point]
+        all_lists = [df[!, column] for df in list]
+        max_length = maximum(length, all_lists)
+        values_each_step = [[values[i] for values in all_lists if i <= length(values)] for i in 1:max_length]
+        std_each_step = [Statistics.std(values) for values in values_each_step]
 
         if line_function == :all
             label_name = name
-            for values in all_values
+            for values in all_lists
                 Plots.plot!(p, values, label=label_name, color=DISTINT_COLOURS[current_colour], linewidth=LINE_WIDTH)
                 label_name = ""
             end
         elseif line_function == :mean
-            Plots.plot!(p, Statistics.mean.(values_each_point), ribbon=std_each_point, label=name, color=DISTINT_COLOURS[current_colour], fillalpha=RIBBON_FILL_ALPHA, linewidth=LINE_WIDTH)
+            Plots.plot!(p, Statistics.mean.(values_each_step), ribbon=std_each_step, label=name, color=DISTINT_COLOURS[current_colour], fillalpha=RIBBON_FILL_ALPHA, linewidth=LINE_WIDTH)
         elseif line_function == :median
-            Plots.plot!(p, Statistics.median.(values_each_point), ribbon=std_each_point, label=name, color=DISTINT_COLOURS[current_colour], fillalpha=RIBBON_FILL_ALPHA, linewidth=LINE_WIDTH)
+            Plots.plot!(p, Statistics.median.(values_each_step), ribbon=std_each_step, label=name, color=DISTINT_COLOURS[current_colour], fillalpha=RIBBON_FILL_ALPHA, linewidth=LINE_WIDTH)
         elseif line_function == :max
             # ribbon = (2 .* std_each_point, zeros(length(std_each_point)))
-            ribbon = (std_each_point, zeros(length(std_each_point))) # currently I plot just +std, idk if I should do +2*std
-            Plots.plot!(p, maximum.(values_each_point), ribbon=ribbon, label=name, color=DISTINT_COLOURS[current_colour], fillalpha=RIBBON_FILL_ALPHA, linewidth=LINE_WIDTH)
+            ribbon = (std_each_step, zeros(length(std_each_step))) # currently I plot just +std, idk if I should do +2*std
+            Plots.plot!(p, maximum.(values_each_step), ribbon=ribbon, label=name, color=DISTINT_COLOURS[current_colour], fillalpha=RIBBON_FILL_ALPHA, linewidth=LINE_WIDTH)
         elseif line_function == :min
             # ribbon = (zeros(length(std_each_point)), 2 .* std_each_point)
-            ribbon = (zeros(length(std_each_point)), std_each_point) # currently I plot just +std, idk if I should do +2*std
-            Plots.plot!(p, minimum.(values_each_point), ribbon=ribbon, label=name, color=DISTINT_COLOURS[current_colour], fillalpha=RIBBON_FILL_ALPHA, linewidth=LINE_WIDTH)
+            ribbon = (zeros(length(std_each_step)), std_each_step) # currently I plot just +std, idk if I should do +2*std
+            Plots.plot!(p, minimum.(values_each_step), ribbon=ribbon, label=name, color=DISTINT_COLOURS[current_colour], fillalpha=RIBBON_FILL_ALPHA, linewidth=LINE_WIDTH)
         else
             throw("Unknown line function")
         end

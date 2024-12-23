@@ -9,9 +9,9 @@ import Dates
 import Logging
 import Printf
 
-export Individual, get_flattened_trajectories, get_id_track, get_fitness!, copy_individual, optimal_mixing_top_to_bottom!, optimal_mixing_bottom_to_top!, FIHC_flat!, FIHC_top_to_bottom!, save_decision_plot
+export Individual, get_flattened_trajectories, get_id_track, get_fitness!, copy_individual, optimal_mixing_top_to_bottom!, optimal_mixing_bottom_to_top!, FIHC_flat!, FIHC_top_to_bottom!, save_decision_plot, clear_trajectory_memory!
 
-global ID::Int = 1
+global ID::Int = 0
 
 mutable struct Individual
     genes::Vector{Int}
@@ -29,6 +29,7 @@ function Individual(env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct, ve
     fitness = -Inf
     fitness_actual = false
     trajectories, time_tree = EnvironmentWrapper.create_time_distance_tree(env_wrapper, genes)
+    global ID += 1
     return Individual(
         genes,
         env_wrapper,
@@ -37,7 +38,7 @@ function Individual(env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct, ve
         fitness,
         fitness_actual,
         verbose,
-        global ID += 1
+        ID
     )
 end
 
@@ -71,12 +72,20 @@ function copy_individual(individual::Individual)
         copy(individual.genes),
         individual.env_wrapper,
         individual.time_tree,
-        copy(individual.levels_trajectories),
+        [trajectories for trajectories in individual.levels_trajectories],
         individual._fitness,
         individual._fitness_actual,
         individual._verbose,
         individual.id_track
     )
+end
+
+function clear_trajectory_memory!(individual::Individual)
+    if !isempty(individual.levels_trajectories)
+        type_trajectories_levels = typeof(individual.levels_trajectories)
+        individual.levels_trajectories = type_trajectories_levels()
+        individual.time_tree = EnvironmentWrapper.TreeNode(nothing, nothing, Vector{Int}())
+    end
 end
 
 function mutate_flat!(individual::Individual, mutation_rate::Float64)

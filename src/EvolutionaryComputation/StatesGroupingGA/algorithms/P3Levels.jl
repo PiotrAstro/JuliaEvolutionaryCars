@@ -39,13 +39,8 @@ function Population_Pyramid(env_wrapper::EnvironmentWrapper.EnvironmentWrapperSt
     return Population_Pyramid([Level([first_individual])], first_individual, env_wrapper, verbose)
 end
 
-function get_n_best_individuals(p3::Population_Pyramid, n::Int) :: Vector{Ind.Individual}
-    all_individuals = sort(reduce(vcat, [level.individuals for level in p3.population]), by=Ind.get_fitness!, rev=true)
-    best_individuals = all_individuals[1:min(n, length(all_individuals))]
-    return best_individuals
-end
-
-function get_n_best_distinct_individuals(p3::Population_Pyramid, n::Int) :: Vector{Ind.Individual}
+# it will also clear trajectories of not best individuals
+function get_n_best_distinct_individuals_clear_rest_memory!(p3::Population_Pyramid, n::Int) :: Vector{Ind.Individual}
     # get best individuals - from those with the same id, choose the one with the best fitness
     all_individuals = reduce(vcat, [level.individuals for level in p3.population])
 
@@ -54,12 +49,22 @@ function get_n_best_distinct_individuals(p3::Population_Pyramid, n::Int) :: Vect
         id = Ind.get_id_track(individual)
         other_individual = get!(best_individuals, id, individual)
         if Ind.get_fitness!(individual) > Ind.get_fitness!(other_individual)
+
+            # !!! clearing memory
+            Ind.clear_trajectory_memory!(other_individual)
             best_individuals[id] = individual
         end
     end
     all_distinct_individuals = [individual for individual in values(best_individuals)]
     all_distinct_individuals_sorted = sort(all_distinct_individuals, by=Ind.get_fitness!, rev=true)
-    best_individuals = all_distinct_individuals_sorted[1:min(n, length(all_distinct_individuals_sorted))]
+    take_n_individuals = min(n, length(all_distinct_individuals_sorted))
+
+    # !!! clearing memory
+    for individual in all_distinct_individuals_sorted[(take_n_individuals+1):end]
+        Ind.clear_trajectory_memory!(individual)
+    end
+
+    best_individuals = all_distinct_individuals_sorted[1:take_n_individuals]
     return best_individuals
 end
 
@@ -137,7 +142,7 @@ function run!(
         new_individual_fitness = Ind.get_fitness!(new_individual)
         best_individual_fitness = Ind.get_fitness!(p3.best_individual)
 
-        best_n_distinct_individuals = get_n_best_distinct_individuals(p3, space_explorers_n)
+        best_n_distinct_individuals = get_n_best_distinct_individuals_clear_rest_memory!(p3, space_explorers_n)
         p3.current_env_wrapper = EnvironmentWrapper.create_new_based_on(
             p3.current_env_wrapper,
             [

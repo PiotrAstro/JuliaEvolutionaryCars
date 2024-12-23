@@ -10,25 +10,27 @@ function cosine_theirs(states)
 end
 
 function cosine_mine(states1, states2)
-    # states = states .* inv.(sqrt.(sum(abs2, states; dims=1)))
+    # states = states1 .* inv.(sqrt.(sum(abs2, states1; dims=1)))
     # states2 = states2 .* inv.(sqrt.(sum(abs2, states2; dims=1)))
     # return 1.0f0 .- states2' * states
 
-    # tullio implementation
-    @tullio dot[i,j] := states1[k,i] * states2[k,j]
+    # states1 .*= inv.(sqrt.(sum(abs2, states1; dims=1)))
+    result = Matrix{Float32}(undef, size(states1, 2), size(states2, 2))
+    @inbounds for i in 1:size(states1, 2)
+        s = 1.0f0
+        @inbounds @simd for j in 1:size(states1, 1)
+            s += states1[j, i] * states1[j, i]
+        end
+        norm = 1f0 / sqrt(s)
+        @inbounds @simd for j in 1:size(states1, 1)
+            states1[j, i] *= norm
+        end
 
-    # Step 2: Compute the norms of each column for states1 and states2.
-    # We sum the squares and then take the square root.
-    @tullio norms1[i] := (states1[k,i])^2
-    @tullio norms2[j] := (states2[k,j])^2
-    norms1 = sqrt.(norms1)
-    norms2 = sqrt.(norms2)
-
-    # Step 3: Compute the cosine similarity and then the cosine distance.
-    # Cosine similarity(i,j) = dot[i,j] / (norms1[i]*norms2[j])
-    # Cosine distance(i,j) = 1 - Cosine similarity(i,j)
-    @tullio out[i,j] := 1 - (dot[i,j] / (norms1[i]*norms2[j]))
-    return out
+        @inbounds @simd for j in 1:size(states2, 2)
+            @views result[i, j] = 1.0f0 - LinearAlgebra.dot(states1[:, i], states2[:, j])
+        end
+    end
+    return result # 1.0f0 .- states2 * states1
 end
 
 function euclidean_theirs(states)
@@ -92,10 +94,8 @@ end
 function tests()
     random_states = rand(Float32, 30, 10)
     random_states2 = rand(Float32, 30, 1000)
-    n = 1_00
+    n = 1_0000
     # x = 0.0f0
-
-
     # view_vector1 = @view random_states[:, 1]
     # view_vector2 = @view random_states[:, 2]
 
@@ -117,8 +117,9 @@ function tests()
     end
 
     println("cosine_mine")
+    states_2_normalized = random_states2  # (random_states2 .* inv.(sqrt.(sum(abs2, random_states2; dims=1))))'
     @time for _ in 1:n
-        t = cosine_mine(random_states, random_states2)
+        t = cosine_mine(random_states, states_2_normalized)
     end
 
     println("euclidean")

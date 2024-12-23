@@ -140,13 +140,13 @@ CONSTANTS_DICT = Dict(
                     :loss => Flux.crossentropy
                 )
             ),
-            :initial_space_explorers_n => 50,
+            :initial_space_explorers_n => 30,
             :max_states_considered => 10_000,
             :fuzzy_logic_of_n_closest => 5,
             :n_clusters => 40,  # 40 and 200 works very well
             :verbose => false,
             :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock
-            :exemplars_clustering => :genie  # :genie or :kmedoids or :pam
+            :exemplars_clustering => :pam  # :genie or :kmedoids or :pam
         )
     ),
 
