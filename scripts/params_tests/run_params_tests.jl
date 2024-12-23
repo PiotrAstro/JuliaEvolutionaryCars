@@ -1,6 +1,5 @@
 import Distributed
 import Dates
-import ProgressMeter
 
 include("../constants.jl")
 # --------------------------------------------------------------------------------------------------
@@ -151,10 +150,12 @@ file_logger = CustomLoggers.SimpleFileLogger(joinpath(LOGS_DIR, OUTPUT_LOG_FILE)
 Logging.global_logger(file_logger)
 
 special_dicts = create_all_special_dicts(TESTED_VALUES)
-Logging.@info "\n\n will run with the following settings:\n" special_dicts
+io = IOBuffer()
+display(io, special_dicts)
+Logging.@info "\n\n will run with the following settings:\n" * String(take!(io))
 special_dicts_with_cases = [(optimizer, special_dict, deepcopy(CONSTANTS_DICT), i) for (optimizer, special_dict) in special_dicts, i in 1:CASES_PER_TEST]
 
-results = ProgressMeter.@showprogress Distributed.pmap(eachindex(special_dicts_with_cases)) do i 
+results = Distributed.pmap(eachindex(special_dicts_with_cases)) do i 
     Logging.global_logger(CustomLoggers.RemoteLogger())
     try
         optimizer, special_dict, config_copy, case = special_dicts_with_cases[i]

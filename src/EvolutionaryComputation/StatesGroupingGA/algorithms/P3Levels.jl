@@ -138,6 +138,7 @@ function run!(
     list_with_results = Vector{Tuple{Int, Float64, Float64}}()
 
     for generation in 1:max_generations
+        Base.GC.gc(true)  # we want to reclaim all possible memory, true means we will do full GC
         new_individual = run_new_individual!(p3)
         new_individual_fitness = Ind.get_fitness!(new_individual)
         best_individual_fitness = Ind.get_fitness!(p3.best_individual)

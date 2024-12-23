@@ -42,8 +42,8 @@ struct PlainInfoLogger <: MyLoggers
     stream::IO
 end
 
-PlainInfoLogger() = PlainInfoLogger(Info, ReentrantLock, stdout)
-PlainInfoLogger(min_level::LogLevel) = PlainInfoLogger(min_level, ReentrantLock, stdout)
+PlainInfoLogger() = PlainInfoLogger(Info, ReentrantLock(), stdout)
+PlainInfoLogger(min_level::LogLevel) = PlainInfoLogger(min_level, ReentrantLock(), stdout)
 
 # Define how to handle logging messages for different levels
 function Logging.handle_message(logger::PlainInfoLogger, level::LogLevel, message, _module, group, id, filepath, line; kwargs...)

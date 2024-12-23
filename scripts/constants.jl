@@ -123,7 +123,7 @@ CONSTANTS_DICT = Dict(
                 )
             ),
             :autoencoder_dict => Dict(
-                :mmd_weight => 0.0,  # IDK why, but in early tests clearly 0.0 was the best, so MMD wasnt used
+                :mmd_weight => 0.0,  # IDK why, but in early tests clearly 0.0 was the best, so MMD wasnt used at all, there was a huge difference
                 :learning_rate => 0.001
             ),
             :game_decoder_dict => Dict(  # used only in the first collection on states
@@ -142,10 +142,10 @@ CONSTANTS_DICT = Dict(
             ),
             :initial_space_explorers_n => 30,
             :max_states_considered => 10_000,
-            :fuzzy_logic_of_n_closest => 5,
-            :n_clusters => 40,  # 40 and 200 works very well
+            :fuzzy_logic_of_n_closest => 5,  # it improves results, at least vs 1, should try different values, e.g. 3, 5, 10, 20
+            :n_clusters => 40,  # 40 and 200 works very well, should try different values
             :verbose => false,
-            :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock
+            :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock, after some initial tests it should definatelly be cosine!
             :exemplars_clustering => :pam  # :genie or :kmedoids or :pam
         )
     ),
