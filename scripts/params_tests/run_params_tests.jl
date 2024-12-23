@@ -102,10 +102,10 @@ TESTED_VALUES = [
 # check how many workers there are - rm if needed
 # -1 worker case worker 1 doesnt do calculations, but is included in Distributed.workers()
 function set_proper_workers(workers_n)
-    for pid in Distributed.workers()
-        Distributed.rmprocs(pid)
-        if length(Distributed.workers()) == 1
-            break
+    if length(Distributed.procs()) > 1
+        for pid in Distributed.workers()
+            Distributed.rmprocs(pid)
+            println("Removed worker $pid")
         end
     end
     
@@ -123,6 +123,7 @@ Distributed.@everywhere begin
     import Logging
     import Dates
     import Random
+    import ProgressMeter
     seed = time_ns() ⊻ UInt64(hash(Distributed.myid())) # xor between time nano seconds and hash of worker id
     Random.seed!(seed)
     println("Worker $(Distributed.myid()) started at $(Dates.now()) with seed: $seed")
@@ -157,11 +158,12 @@ Logging.@info "\n\n will run with the following settings:\n" * String(take!(io))
 
 special_dicts_with_cases = [(optimizer, special_dict, deepcopy(CONSTANTS_DICT), i) for (optimizer, special_dict) in special_dicts, i in 1:CASES_PER_TEST]
 
-results = Distributed.pmap(eachindex(special_dicts_with_cases)) do i 
+results = ProgressMeter.@showprogress Distributed.pmap(eachindex(special_dicts_with_cases)) do i 
     Logging.global_logger(CustomLoggers.RemoteLogger())
     try
         optimizer, special_dict, config_copy, case = special_dicts_with_cases[i]
-        run_one_test(optimizer, special_dict, config_copy, case, LOGS_DIR, Distributed.myid())
+        # run_one_test(optimizer, special_dict, config_copy, case, LOGS_DIR, Distributed.myid())
+        Logging.@info "workerid $(Distributed.myid()) started test $i"
         return true
     catch e
         Logging.@error "workerid $(Distributed.myid()) failed with error: $e"
