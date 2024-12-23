@@ -102,18 +102,14 @@ TESTED_VALUES = [
 # check how many workers there are - rm if needed
 # -1 worker case worker 1 doesnt do calculations, but is included in Distributed.workers()
 function set_proper_workers(workers_n)
-    real_processes_n = workers_n + 1
-    difference_in_workers_n = length(Distributed.workers()) - real_processes_n
-    if difference_in_workers_n < 0
-        Distributed.addprocs(-difference_in_workers_n)
-    elseif difference_in_workers_n > 0
-        for pid in Distributed.workers()
-            Distributed.rmprocs(pid)
-            if length(Distributed.workers()) == real_processes_n
-                break
-            end
+    for pid in Distributed.workers()
+        Distributed.rmprocs(pid)
+        if length(Distributed.workers()) == 1
+            break
         end
     end
+    
+    Distributed.addprocs(workers_n)
 end
 set_proper_workers(USE_N_WORKERS)
 
