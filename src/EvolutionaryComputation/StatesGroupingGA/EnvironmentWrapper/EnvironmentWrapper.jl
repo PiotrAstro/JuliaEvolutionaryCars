@@ -12,7 +12,7 @@ import JLD
 import Logging
 using StatsPlots
 
-export EnvironmentWrapperStruct, get_action_size, get_groups_number, get_fitness, copy, is_verbose, set_verbose!, translate, create_new_based_on, create_time_distance_tree
+export EnvironmentWrapperStruct, get_action_size, get_groups_number, get_fitness, copy, is_verbose, set_verbose!, translate, create_new_based_on, create_time_distance_tree, clean_memory!
 
 # --------------------------------------------------------------------------------------------------
 # Structs
@@ -158,6 +158,12 @@ end
 
 function is_leaf(tree::TreeNode) :: Bool
     return isnothing(tree.left) && isnothing(tree.right)
+end
+
+function clean_memory!(env_wrap::EnvironmentWrapperStruct)
+    lock(env_wrap._result_memory_mutex)
+    env_wrap._result_memory = Dict{Vector{Int}, Float64}()
+    unlock(env_wrap._result_memory_mutex)
 end
 
 function get_action_size(env_wrap::EnvironmentWrapperStruct) :: Int

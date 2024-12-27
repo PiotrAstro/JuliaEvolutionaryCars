@@ -143,6 +143,9 @@ function run!(
         new_individual_fitness = Ind.get_fitness!(new_individual)
         best_individual_fitness = Ind.get_fitness!(p3.best_individual)
 
+        # before creating new env wrapper, we will clean memory of the current one, so that we will have enough memory for new one
+        Environment.clean_memory!(p3.current_env_wrapper)
+
         best_n_distinct_individuals = get_n_best_distinct_individuals_clear_rest_memory!(p3, space_explorers_n)
         p3.current_env_wrapper = EnvironmentWrapper.create_new_based_on(
             p3.current_env_wrapper,

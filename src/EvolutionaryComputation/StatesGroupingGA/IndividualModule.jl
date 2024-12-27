@@ -437,7 +437,9 @@ function FIHC_top_to_bottom!(individual::Individual)
             if get_fitness!(max_copy) > old_fitness
                 individual.genes[node.elements] = max_copy.genes[node.elements]
                 individual._fitness = max_copy._fitness
-                println("improvement from $old_fitness  to $(get_fitness!(max_copy))\ttree level $i")
+                if individual._verbose
+                    println("improvement from $old_fitness  to $(get_fitness!(max_copy))\ttree level $i")
+                end
                 # save_decision_plot(individual)
             end
 
