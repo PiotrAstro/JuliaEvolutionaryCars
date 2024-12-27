@@ -5,6 +5,7 @@ export PlainInfoLogger, SimpleFileLogger
 using Logging
 import Distributed
 import LoggingExtras
+import Dates
 
 
 # ---------------------------------------------------------------------------------------------------------------------------------
@@ -22,16 +23,26 @@ Logging.shouldlog(logger::MyLoggers, level::LogLevel, _module, group, id) = leve
 struct SimpleFileLogger <: MyLoggers
     min_level::LogLevel
     wrapped_logger::LoggingExtras.FileLogger
+    print_logged::Bool
     locker::ReentrantLock
 end
 
-SimpleFileLogger(file_name::String) = SimpleFileLogger(Info, LoggingExtras.FileLogger(file_name), ReentrantLock())
-SimpleFileLogger(min_level::LogLevel, file_name::String) = SimpleFileLogger(min_level, LoggingExtras.FileLogger(file_name), ReentrantLock())
+SimpleFileLogger(file_name::String) = SimpleFileLogger(file_name, false)
+SimpleFileLogger(file_name::String, print_logged::Bool) = SimpleFileLogger(file_name, Info, print_logged)
+SimpleFileLogger(file_name::String, min_level::LogLevel, print_logged::Bool) = SimpleFileLogger(min_level, LoggingExtras.FileLogger(file_name), print_logged, ReentrantLock())
 
 function Logging.handle_message(logger::SimpleFileLogger, level::LogLevel, message, _module, group, id, filepath, line; kwargs...)
     lock(logger.locker)
-    Logging.handle_message(logger.wrapped_logger, level, message, _module, group, id, filepath, line; kwargs...)
-    unlock(logger.locker)
+    try
+        Logging.handle_message(logger.wrapped_logger, level, message, _module, group, id, filepath, line; kwargs...)
+    finally
+        unlock(logger.locker)
+    end
+
+    if logger.print_logged
+        logged_text = string("\n", level, ": ", Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS"), "\n", message)
+        println(logged_text)
+    end
 end
 
 # ---------------------------------------------------------------------------------------------------------------------------------
@@ -75,8 +86,11 @@ end
 
 function Logging.handle_message(logger::RemoteLogger, level::LogLevel, message, _module, group, id, filepath, line; kwargs...)
     lock(logger.locker)
-    Distributed.remotecall(CustomLoggers.call_on_main_process, logger.main_process_id, level, message)
-    unlock(logger.locker)
+    try
+        Distributed.remotecall(CustomLoggers.call_on_main_process, logger.main_process_id, level, message)
+    finally
+        unlock(logger.locker)
+    end
 end
 
 end

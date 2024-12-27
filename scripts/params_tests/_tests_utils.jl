@@ -1,4 +1,28 @@
 
+
+"""
+It will remove all cases that are already done from the special_dicts_with_cases in a given directory, it is done so that when something interupts calculations, we are able to rerun the script and it will not run the same cases again.
+special dicts should be:
+special_dicts_with_cases::Vector{Tuple{Symbol, <:Dict{Symbol}, <:Dict{Symbol}, Int}}
+
+"""
+function consider_done_cases!(special_dicts_with_cases::Vector, save_dir::String)
+    log_text = "Checking for existing test cases in $save_dir"
+    i = 1
+    while i <= length(special_dicts_with_cases)
+        (optimiser, special_dict, _, case_index) = special_dicts_with_cases[i]
+        save_n = save_name(optimiser, special_dict, case_index)
+        if isfile(joinpath(save_dir, save_n))
+            log_text = log_text * "\ntest case existing, will not run: $save_n"
+            deleteat!(special_dicts_with_cases, i)
+        else
+            i += 1
+        end
+    end
+    Logging.@info log_text
+end
+
+
 """
 Finds all lists in a dictionary.
 :param dict_to_search: The dictionary to search
