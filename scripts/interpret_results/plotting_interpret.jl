@@ -10,12 +10,12 @@ import Statistics
 # My params
 
 
-TEST_DIR = joinpath("log", "parameters_tests_2024-12-14_20-24-45")
+TEST_DIR = joinpath("log", "partial_results__parameters_tests_2024-12-23_03-24-57")
 
 TEST_POSTFIX = ".csv"  # will be removed from plot entries
 TEST_PREFIX = "logs_opt=StaGroGA_"  # will be removed from plot entries
 
-COLUMN = :best_fitness_global
+COLUMN = :best_fitness
 LINE_METHOD = :median
 
 # will stay in the plot entries, used for filtering
@@ -23,7 +23,7 @@ LINE_METHOD = :median
 # but you can also use tuple inside, then there is or, e.g.
 # TEST_INFIX_LIST = ["40", ("30", "50")]  ->  contains("40") && (contains("30") || contains("50"))
 # usually you should use it like this TEST_INFIX_LIST = ["(MmdWei=0.0)"] 
-TEST_INFIX_LIST = []
+TEST_INFIX_LIST = ["NClu=100"]
 
 
 

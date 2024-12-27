@@ -184,8 +184,8 @@ function optimal_mixing_top_to_bottom!(individual::Individual, other_individuals
             #     end
             # end
             individuals_copies = Vector{Individual}(undef, length(other_individuals))
-            # Threads.@threads for i in 1:length(other_individuals)
-            for i in 1:length(other_individuals)
+            Threads.@threads for i in 1:length(other_individuals)
+            # for i in 1:length(other_individuals)
                 individual_tmp = copy_individual(individual)
                 individuals_copies[i] = individual_tmp
                 other_genes = get_other_genes(individual, other_individuals[i], node.elements)
@@ -293,8 +293,8 @@ function optimal_mixing_bottom_to_top!(individual::Individual, other_individuals
             #     end
             # end
             individuals_copies = Vector{Individual}(undef, length(other_individuals))
-            # Threads.@threads for i in 1:length(other_individuals)
-            for i in 1:length(other_individuals)
+            Threads.@threads for i in 1:length(other_individuals)
+            # for i in 1:length(other_individuals)
                 individual_tmp = copy_individual(individual)
                 individuals_copies[i] = individual_tmp
                 other_genes = get_other_genes(individual, other_individuals[i], node.elements)
@@ -342,8 +342,8 @@ function FIHC_flat!(individual::Individual, indicies=collect(1:length(individual
         random_loci_order = [i for i in Random.randperm(actions_number) if i != previous_gene]
 
         individuals_copies = Vector{Individual}(undef, length(random_loci_order))
-        # Threads.@threads for i in eachindex(random_loci_order)
-        for i in eachindex(random_loci_order)
+        Threads.@threads for i in eachindex(random_loci_order)
+        # for i in eachindex(random_loci_order)
             individual_tmp = copy_individual(individual)
             individuals_copies[i] = individual_tmp
             individual_tmp.genes[gene_index] = random_loci_order[i]
@@ -402,44 +402,44 @@ function FIHC_top_to_bottom!(individual::Individual)
             old_elements = individual.genes[node.elements]
             old_fitness = get_fitness!(individual)
             
-            for chosen_action in random_perm_actions
-                individual.genes[node.elements] .= chosen_action
-                individual._fitness_actual = false
-                new_fitness = get_fitness!(individual)
-                overall_fitness_ckecks += 1
+            # for chosen_action in random_perm_actions
+            #     individual.genes[node.elements] .= chosen_action
+            #     individual._fitness_actual = false
+            #     new_fitness = get_fitness!(individual)
+            #     overall_fitness_ckecks += 1
 
-                if old_fitness >= new_fitness
-                    individual.genes[node.elements] = old_elements
-                    individual._fitness = old_fitness
-                else
-                    if individual._verbose
-                        Logging.@info Printf.@sprintf("improvement from %.2f  to %.2f\ttree level %d\n", old_fitness, new_fitness, i)
-                    end
-                    # save_decision_plot(individual)
-                    old_fitness = new_fitness
-                    old_elements = individual.genes[node.elements]
-                    break
-                end
+            #     if old_fitness >= new_fitness
+            #         individual.genes[node.elements] = old_elements
+            #         individual._fitness = old_fitness
+            #     else
+            #         if individual._verbose
+            #             Logging.@info Printf.@sprintf("improvement from %.2f  to %.2f\ttree level %d\n", old_fitness, new_fitness, i)
+            #         end
+            #         # save_decision_plot(individual)
+            #         old_fitness = new_fitness
+            #         old_elements = individual.genes[node.elements]
+            #         break
+            #     end
+            # end
+
+            individuals_copies = Vector{Individual}(undef, actions_number)
+            Threads.@threads for chosen_action in random_perm_actions
+                individual_tmp = copy_individual(individual)
+                individuals_copies[chosen_action] = individual_tmp
+                individual_tmp.genes[node.elements] .= chosen_action
+                individual_tmp._fitness_actual = false
+                get_fitness!(individual)
             end
 
-            # individuals_copies = Vector{Individual}(undef, actions_number)
-            # Threads.@threads for chosen_action in random_perm_actions
-            #     individual_tmp = copy_individual(individual)
-            #     individuals_copies[chosen_action] = individual_tmp
-            #     individual_tmp.genes[node.elements] .= chosen_action
-            #     individual_tmp._fitness_actual = false
-            #     get_fitness!(individual)
-            # end
+            overall_fitness_ckecks += actions_number
 
-            # overall_fitness_ckecks += actions_number
-
-            # max_copy = argmax(get_fitness!, individuals_copies)
-            # if get_fitness!(max_copy) > old_fitness
-            #     individual.genes[node.elements] = max_copy.genes[node.elements]
-            #     individual._fitness = max_copy._fitness
-            #     println("improvement from $old_fitness  to $(get_fitness!(max_copy))\ttree level $i")
-            #     # save_decision_plot(individual)
-            # end
+            max_copy = argmax(get_fitness!, individuals_copies)
+            if get_fitness!(max_copy) > old_fitness
+                individual.genes[node.elements] = max_copy.genes[node.elements]
+                individual._fitness = max_copy._fitness
+                println("improvement from $old_fitness  to $(get_fitness!(max_copy))\ttree level $i")
+                # save_decision_plot(individual)
+            end
 
             if !EnvironmentWrapper.is_leaf(node)
                 if i == length(tree_levels)

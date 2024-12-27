@@ -69,16 +69,16 @@ How to set TESTED_VALUES:
 timestamp = Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS")
 
 USE_N_WORKERS = 8  # how many workers to use, main worker is worker 1 and is not included - it doesnt perform calculations
-BLAS_THREADS_PER_WORKER = 1
-JULIA_THREADS_PER_WORKER = 1
+BLAS_THREADS_PER_WORKER = 8
+JULIA_THREADS_PER_WORKER = 4
 
 CASES_PER_TEST = 1
 OUTPUT_LOG_FILE = "_output_$(timestamp)_.log"
 
 # running test from scratch
-# LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_" * Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS"))
+LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_" * Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS"))
 # running test from some start_position
-LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_2024-12-27_12-31-13")
+# LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_2024-12-27_12-31-13")
 
 # we will change these values globally for all tests
 CONSTANTS_DICT[:run_config] = Dict(

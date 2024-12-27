@@ -288,8 +288,8 @@ end
 function _collect_trajectories(envs::Vector{E}, NNs::Vector{<:NeuralNetwork.AbstractNeuralNetwork}) :: Vector{Environment.Trajectory{SEQ}} where {SEQ<:Environment.AbstractStateSequence, E<:Environment.AbstractEnvironment{SEQ}}
     trajectories = Vector{Vector{Environment.Trajectory{SEQ}}}(undef, length(NNs))
 
-    # Threads.@threads for i in 1:length(NNs)
-    for i in 1:length(NNs)
+    Threads.@threads for i in 1:length(NNs)
+    # for i in 1:length(NNs)
         envs_copy = [Environment.copy(env) for env in envs]
         nn = NNs[i]
         trajectories[i] = Environment.get_trajectory_data!(envs_copy, nn)

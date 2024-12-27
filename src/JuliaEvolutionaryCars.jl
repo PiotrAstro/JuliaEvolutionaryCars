@@ -105,3 +105,10 @@ end # module EvolutionaryCarsJulia
 # - zrobić lekkiego local searcha wartości przy optimal mixie - czyli np. sprawdzać co by było gdybyśmy wzięli drugą najbardziej popularną odpowiedź, nie tylko tą najbardziej popularną
 # - zamiast tłumaczyć z tamtego reprezentanta, można spróbować zapożyczyć w jakiś sposób jego reprezentantów?
 #   Albo w jakiś sposób decydować czy powinien on zastąpić mojego czy też nie, albo po prosu ich dokładać, albo usuwać moich n- najbliższych sąsiadów
+
+# inny pomysł - wrócic do motywu posiadania osobnej sieci dekodującej:
+# ma to wady w postaci braku determinizmu i potrzebie nauki
+# natomiast będziemy to uczyli tylko na exemplarach, więc będzie dość szybkie
+# mamy dużą elastyczność, od razu dostajemy rozmyte przynależności
+# łatwiej też robić crossovera - puszczamy tych reprezentantów których chcemy połączyć przez drugą sieć i uczymy na wynikach
+# potencjalnie można też wziąć reprezentantów z drugiej sieci i uczyć na tych reprezentantach, ale tu trzeba jeszcze przemyśleć, jak ich wybierać i czy zastępować nimi któryś z naszych reprezentantów
