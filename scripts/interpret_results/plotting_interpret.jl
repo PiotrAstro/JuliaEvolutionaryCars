@@ -10,13 +10,13 @@ import Statistics
 # My params
 
 
-TEST_DIR = joinpath("log", "partial_results__parameters_tests_2024-12-23_03-24-57")
+TEST_DIR = joinpath("log", "parameters_tests_2024-12-23_03-24-57")
 
 TEST_POSTFIX = ".csv"  # will be removed from plot entries
 TEST_PREFIX = "logs_opt=StaGroGA_"  # will be removed from plot entries
 
 COLUMN = :best_fitness
-LINE_METHOD = :median
+LINE_METHOD = :mean
 
 # will stay in the plot entries, used for filtering
 # entry should have all of these (there is and between them)
@@ -103,7 +103,9 @@ function plot(
     )
     current_colour = 1
 
-    for (name, list) in reads
+    names = sort(collect(keys(reads)))
+    for name in names
+        list = reads[name]
         all_lists = [df[!, column] for df in list]
         max_length = maximum(length, all_lists)
         values_each_step = [[values[i] for values in all_lists if i <= length(values)] for i in 1:max_length]

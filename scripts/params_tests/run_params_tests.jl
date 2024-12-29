@@ -68,15 +68,16 @@ How to set TESTED_VALUES:
 # --------------------------------------------------------------------------------------------------
 timestamp = Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS")
 
-USE_N_WORKERS = 8  # how many workers to use, main worker is worker 1 and is not included - it doesnt perform calculations
-BLAS_THREADS_PER_WORKER = 8
-JULIA_THREADS_PER_WORKER = 4
+USE_N_WORKERS = 26  # how many workers to use, main worker is worker 1 and is not included - it doesnt perform calculations
+BLAS_THREADS_PER_WORKER = 1
+JULIA_THREADS_PER_WORKER = 1
 
-CASES_PER_TEST = 1
+CASES_PER_TEST = 15
 OUTPUT_LOG_FILE = "_output_$(timestamp)_.log"
 
 # running test from scratch
 LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_" * Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS"))
+CONSTANTS_FILE_TO_COPY = joinpath(pwd(), "scripts", "constants.jl") # copy constants.jl to logs dir, so that I know what were the exact settings when I ran it
 # running test from some start_position
 # LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_2024-12-27_12-31-13")
 
@@ -95,9 +96,8 @@ TESTED_VALUES = [
         Dict(
             :StatesGroupingGA => Dict(
                 :env_wrapper => Dict(
-                    :n_clusters => [40, 100],  # 40 or 100
-                    :distance_metric => [:cosine, :euclidean],  # :euclidean or :cosine or :cityblock
-                    :exemplars_clustering => [:genie, :kmedoids, :pam],  # :genie or :pam or :kmedoids
+                    :n_clusters => [20, 40, 100],
+                    :fuzzy_logic_of_n_closest => [1, 5, 10, 20],
                 )
             )
         ),
@@ -159,6 +159,8 @@ end
 
 mkpath(LOGS_DIR)
 println("Logs will be saved in: $LOGS_DIR")
+cp(CONSTANTS_FILE_TO_COPY, joinpath(LOGS_DIR, "_constants.jl"))
+println("Copied constants.jl to logs dir")
 
 file_logger = CustomLoggers.SimpleFileLogger(joinpath(LOGS_DIR, OUTPUT_LOG_FILE), true)
 Logging.global_logger(file_logger)
