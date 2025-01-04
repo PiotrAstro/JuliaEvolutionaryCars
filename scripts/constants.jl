@@ -146,6 +146,8 @@ CONSTANTS_DICT = Dict(
             :n_clusters => 40,  # 40 and 200 works very well, should try different values
             :verbose => false,
             :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock, after some initial tests it should definatelly be cosine!
+            :hclust_distance => :ward,  # :ward or :single or :complete or :average
+            :hclust_time => :ward,  # :ward or :single or :complete or :average
             :exemplars_clustering => :pam  # :genie or :kmedoids or :pam
         )
     ),

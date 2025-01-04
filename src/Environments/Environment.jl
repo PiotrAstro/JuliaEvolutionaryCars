@@ -3,22 +3,22 @@ module Environment
 
 import ..NeuralNetwork
 
-export AbstractEnvironment, get_safe_data, load_safe_data!, copy, reset!, react!, get_state, get_state_size, get_action_size, is_alive, get_trajectory_data!, get_trajectory_rewards!, get_environment, prepare_environments_kwargs, visualize!
+export AbstractEnvironment, get_safe_data, load_safe_data!, copy, reset!, react!, get_state, get_action_size, is_alive, get_trajectory_data!, get_trajectory_rewards!, get_environment, prepare_environments_kwargs, visualize!
 export AbstractStateSequence, get_length, copy_nth_state, get_sequence_with_ids, remove_nth_state, get_nn_input
 
 # ------------------------------------------------------------------------------------------------
 # state sequences managers
 
 # INTERNAL - internal concrete type, environment will receive it for reaction, e.g. Vector{Float32} or Array{Float32, 3} for rgb images
-abstract type AbstractStateSequence{INTR} end
+abstract type AbstractStateSequence{INTERNAL} end
 
 # AbstractStateSequence should have the same type in return
-function (::AbstractStateSequence{INTERNAL})(states::Vector{INTERNAL}) :: AbstractStateSequence{INTERNAL} where {INTERNAL}
+function (::AbstractStateSequence{INTERNAL})(states::AbstractVector{INTERNAL}) :: AbstractStateSequence{INTERNAL} where {INTERNAL}
     throw("unimplemented")
 end
 
 # AbstractStateSequence should have the same type in return
-function (::AbstractStateSequence{INTERNAL})(seqs::Vector{AbstractStateSequence{INTERNAL}}) :: AbstractStateSequence{INTERNAL} where {INTERNAL}
+function (::AbstractStateSequence{INTERNAL})(seqs::AbstractVector{AbstractStateSequence{INTERNAL}}) :: AbstractStateSequence{INTERNAL} where {INTERNAL}
     throw("unimplemented")
 end
 

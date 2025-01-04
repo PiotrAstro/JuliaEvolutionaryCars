@@ -4,7 +4,8 @@ function _get_exemplars(
         encoded_states::Matrix{Float32},
         n_clusters::Int;
         distance_metric::Symbol, # :cosine or :euclidean or cityblock
-        exemplars_clustering::Symbol # :genie or :pam or :kmedoids
+        exemplars_clustering::Symbol, # :genie or :pam or :kmedoids
+        hclust_distance::Symbol # :complete or :average or :single or :ward, ignored for genie
     ) :: Tuple{Vector{Int}, TreeNode}
     if distance_metric == :cosine
         distance_premetric = Distances.CosineDist()
@@ -19,9 +20,9 @@ function _get_exemplars(
     if exemplars_clustering == :genie
         return exemplars_genie(encoded_states, n_clusters, distance_premetric)
     elseif exemplars_clustering == :pam
-        return exemplars_pam(encoded_states, n_clusters, distance_premetric)
+        return exemplars_pam(encoded_states, n_clusters, distance_premetric, hclust_distance)
     elseif exemplars_clustering == :kmedoids
-        return exemplars_kmedoids(encoded_states, n_clusters, distance_premetric)
+        return exemplars_kmedoids(encoded_states, n_clusters, distance_premetric, hclust_distance)
     else
         throw(ArgumentError("Unknown exemplars_clustering: $exemplars_clustering"))
     end
@@ -66,7 +67,8 @@ end
 function exemplars_pam(
         encoded_states::Matrix{Float32},
         n_clusters::Int,
-        distance_premetric::Distances.PreMetric
+        distance_premetric::Distances.PreMetric,
+        hclust_distance::Symbol
     ) :: Tuple{Vector{Int}, TreeNode}
 
     distances = Distances.pairwise(distance_premetric, encoded_states)
@@ -74,7 +76,7 @@ function exemplars_pam(
     distances_of_exemplars = Distances.pairwise(distance_premetric, encoded_states[:, exemplars])
 
     # create tree with normal hclust
-    clustering = Clustering.hclust(distances_of_exemplars, linkage=:complete)
+    clustering = Clustering.hclust(distances_of_exemplars, linkage=hclust_distance)
     tree = _create_tree_hclust(clustering.merges)
     return exemplars, tree
 end
@@ -82,7 +84,8 @@ end
 function exemplars_kmedoids(
     encoded_states::Matrix{Float32},
     n_clusters::Int,
-    distance_premetric::Distances.PreMetric
+    distance_premetric::Distances.PreMetric,
+    hclust_distance::Symbol
 ) :: Tuple{Vector{Int}, TreeNode}
 
     distances = Distances.pairwise(distance_premetric, encoded_states)
@@ -90,7 +93,7 @@ function exemplars_kmedoids(
     distances_of_exemplars = Distances.pairwise(distance_premetric, encoded_states[:, exemplars])
 
     # create tree with normal hclust
-    clustering = Clustering.hclust(distances_of_exemplars, linkage=:complete)
+    clustering = Clustering.hclust(distances_of_exemplars, linkage=hclust_distance)
     tree = _create_tree_hclust(clustering.merges)
     return exemplars, tree
 end

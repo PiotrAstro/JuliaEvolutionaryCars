@@ -2,7 +2,7 @@
 
 julia_version = "1.11.2"
 manifest_format = "2.0"
-project_hash = "4e0304a07e42cf9e7d7918a021e5c9bc7a5b18ef"
+project_hash = "e5b775679df981057d3be3d3052f9527fa35e4ae"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1591,6 +1591,12 @@ version = "1.1.1"
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
+
+[[deps.ObjectOriented]]
+deps = ["DataStructures", "MLStyle", "MacroTools", "Reexport"]
+git-tree-sha1 = "43b678a00a1f9a096104f462d52412d2b59c1b68"
+uuid = "5736bd91-ca84-4f49-a8c7-a30743b4409d"
+version = "0.1.4"
 
 [[deps.Observables]]
 git-tree-sha1 = "7438a59546cf62428fc9d1bc94729146d37a7225"

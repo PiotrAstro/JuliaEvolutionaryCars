@@ -38,6 +38,8 @@ mutable struct EnvironmentWrapperStruct
     _result_memory_mutex::ReentrantLock
     _distance_metric::Symbol  # :euclidean or :cosine or :cityblock
     _exemplars_clustering::Symbol  # :genieclust or :pam or :kmedoids
+    _hclust_distance::Symbol  # :ward or :single or :complete or :average
+    _hclust_time::Symbol  # :ward or :single or :complete or :average
     _verbose::Bool
 end
 
@@ -57,6 +59,8 @@ function EnvironmentWrapperStruct(
     fuzzy_logic_of_n_closest::Int,
     distance_metric::Symbol = :cosine,
     exemplars_clustering::Symbol = :genieclust,
+    hclust_distance::Symbol = :ward,
+    hclust_time::Symbol = :ward,
     verbose::Bool = false
 ) :: EnvironmentWrapperStruct
 
@@ -86,7 +90,7 @@ function EnvironmentWrapperStruct(
     end
 
     encoded_states = NeuralNetwork.predict(encoder, states_nn_input)
-    exemplars_ids, similarity_tree = _get_exemplars(encoded_states, n_clusters; distance_metric, exemplars_clustering)
+    exemplars_ids, similarity_tree = _get_exemplars(encoded_states, n_clusters; distance_metric, exemplars_clustering, hclust_distance)
     encoded_exemplars = encoded_states[:, exemplars_ids]
     states_exeplars = Environment.get_sequence_with_ids(states, exemplars_ids)
 
@@ -109,6 +113,8 @@ function EnvironmentWrapperStruct(
         ReentrantLock(),
         distance_metric,
         exemplars_clustering,
+        hclust_distance,
+        hclust_time,
         verbose
     )
 end
@@ -120,7 +126,7 @@ function create_time_distance_tree(env_wrap::EnvironmentWrapperStruct, ind::Vect
     trajectories = _collect_trajectories(env_wrap._envs, [get_full_NN(env_wrap, ind)])
     states_in_trajectories = [trajectory.states for trajectory in trajectories]
     encoded_states_by_trajectory = [NeuralNetwork.predict(env_wrap._encoder, Environment.get_nn_input(states_one_traj)) for states_one_traj in states_in_trajectories]
-    return trajectories, _create_time_distance_tree(encoded_states_by_trajectory, env_wrap._encoded_exemplars)
+    return trajectories, _create_time_distance_tree(encoded_states_by_trajectory, env_wrap._encoded_exemplars, env_wrap._hclust_time)
 end
 
 function copy(env_wrap::EnvironmentWrapperStruct, copy_dict::Bool=true) :: EnvironmentWrapperStruct
@@ -152,6 +158,8 @@ function copy(env_wrap::EnvironmentWrapperStruct, copy_dict::Bool=true) :: Envir
         ReentrantLock(),
         env_wrap._distance_metric,
         env_wrap._exemplars_clustering,
+        env_wrap._hclust_distance,
+        env_wrap._hclust_time,
         env_wrap._verbose
     )
 end
@@ -236,7 +244,7 @@ function create_new_based_on(
     new_encoded_states = NeuralNetwork.predict(new_env_wrapper._encoder, new_states_nn_input)
 
     # # get new exemplars, states and newly encoded states
-    new_exemplars_ids, new_similarity_tree = _get_exemplars(new_encoded_states, new_n_clusters; distance_metric=env_wrap._distance_metric, exemplars_clustering=env_wrap._exemplars_clustering)
+    new_exemplars_ids, new_similarity_tree = _get_exemplars(new_encoded_states, new_n_clusters; distance_metric=env_wrap._distance_metric, exemplars_clustering=env_wrap._exemplars_clustering, hclust_distance=env_wrap._hclust_distance)
     new_exemplars = new_encoded_states[:, new_exemplars_ids]
     new_raw_exemplars = Environment.get_sequence_with_ids(new_states, new_exemplars_ids)
 

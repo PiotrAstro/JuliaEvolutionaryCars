@@ -1,9 +1,9 @@
 import Distributed
 import Dates
+timestamp = Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS")
 
 include("../constants.jl")
 
-# --------------------------------------------------------------------------------------------------
 """
 How to set TESTED_VALUES:
     It should be:
@@ -65,21 +65,16 @@ How to set TESTED_VALUES:
         ),
     ]
 """
+
 # --------------------------------------------------------------------------------------------------
-timestamp = Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS")
+# Start of real settings
+# --------------------------------------------------------------------------------------------------
+
+
 
 USE_N_WORKERS = 26  # how many workers to use, main worker is worker 1 and is not included - it doesnt perform calculations
 BLAS_THREADS_PER_WORKER = 1
 JULIA_THREADS_PER_WORKER = 1
-
-CASES_PER_TEST = 15
-OUTPUT_LOG_FILE = "_output_$(timestamp)_.log"
-
-# running test from scratch
-LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_" * Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS"))
-CONSTANTS_FILE_TO_COPY = joinpath(pwd(), "scripts", "constants.jl") # copy constants.jl to logs dir, so that I know what were the exact settings when I ran it
-# running test from some start_position
-# LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_2024-12-27_12-31-13")
 
 # we will change these values globally for all tests
 CONSTANTS_DICT[:run_config] = Dict(
@@ -89,6 +84,9 @@ CONSTANTS_DICT[:run_config] = Dict(
     :visualize_each_n_epochs => 0,
 )
 
+# Number of run tests per each combination of tested values
+CASES_PER_TEST = 10
+
 # Values that will be tested
 TESTED_VALUES = [
     (
@@ -96,18 +94,38 @@ TESTED_VALUES = [
         Dict(
             :StatesGroupingGA => Dict(
                 :env_wrapper => Dict(
-                    :n_clusters => [20, 40, 100],
-                    :fuzzy_logic_of_n_closest => [1, 5, 10, 20],
-                )
-            )
+                    :hclust_distance => [:ward, :single, :complete, :average],
+                    :hclust_time => [:ward, :single, :complete, :average],
+                ),
+            ),
         ),
     ),
 ]
 
+# running test from scratch
+LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_" * timestamp)
+# running test from some start_position
+# LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_2024-12-27_12-31-13")
+
+OUTPUT_LOG_FILE = "_output_$(timestamp).log"
+CONSTANTS_FILE_TO_COPY = joinpath(pwd(), "scripts", "constants.jl") # copy constants.jl to logs dir, so that I know what were the exact settings when I ran it
+SRC_DIR_TO_COPY = joinpath(pwd(), "src")  # copy src dir to logs dir, so that I know what was the code when I ran it
+
+
+
+LOGS_DIR_RESULTS = joinpath(LOGS_DIR, "results")
+LOGS_DIR_CONFIGS = joinpath(LOGS_DIR, "configs")
+LOGS_DIR_ANALYSIS = joinpath(LOGS_DIR, "analysis")
+
+
+# --------------------------------------------------------------------------------------------------
+# End of real settings
+# --------------------------------------------------------------------------------------------------
+
+
 
 # --------------------------------------------------------------------------------------------------
 # Run the tests
-
 """
 Set proper number of separate workers from main worker.
 """
@@ -158,9 +176,14 @@ Distributed.@everywhere begin
 end
 
 mkpath(LOGS_DIR)
+mkpath(LOGS_DIR_RESULTS)
+mkpath(LOGS_DIR_CONFIGS)
+mkpath(LOGS_DIR_ANALYSIS)
 println("Logs will be saved in: $LOGS_DIR")
-cp(CONSTANTS_FILE_TO_COPY, joinpath(LOGS_DIR, "_constants.jl"))
+cp(CONSTANTS_FILE_TO_COPY, joinpath(LOGS_DIR_CONFIGS, "constants.jl"))
 println("Copied constants.jl to logs dir")
+cp(SRC_DIR_TO_COPY, joinpath(LOGS_DIR_CONFIGS, "src"))
+println("Copied src dir to logs dir")
 
 file_logger = CustomLoggers.SimpleFileLogger(joinpath(LOGS_DIR, OUTPUT_LOG_FILE), true)
 Logging.global_logger(file_logger)
@@ -178,13 +201,13 @@ special_dicts_with_cases = [
     (optimizer, special_dict, deepcopy(CONSTANTS_DICT), i)
     for (optimizer, special_dict, i) in vec([(optimizer, special_dict, i) for (optimizer, special_dict) in special_dicts, i in 1:CASES_PER_TEST])
 ]
-consider_done_cases!(special_dicts_with_cases, LOGS_DIR)
+consider_done_cases!(special_dicts_with_cases, LOGS_DIR_RESULTS)
 
 results = ProgressMeter.@showprogress Distributed.pmap(eachindex(special_dicts_with_cases)) do i 
     Logging.global_logger(CustomLoggers.RemoteLogger())
     try
         optimizer, special_dict, config_copy, case = special_dicts_with_cases[i]
-        run_one_test(optimizer, special_dict, config_copy, case, LOGS_DIR, Distributed.myid())
+        run_one_test(optimizer, special_dict, config_copy, case, LOGS_DIR_RESULTS, Distributed.myid())
         return true
     catch e
         Logging.@error "workerid $(Distributed.myid()) failed with error: $e"

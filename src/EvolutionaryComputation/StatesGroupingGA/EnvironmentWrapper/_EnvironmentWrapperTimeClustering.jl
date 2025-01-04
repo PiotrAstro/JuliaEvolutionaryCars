@@ -1,4 +1,8 @@
-function _create_time_distance_tree(encoded_states_trajectories::Vector{Matrix{Float32}}, encoded_exemplars)
+function _create_time_distance_tree(
+        encoded_states_trajectories::Vector{Matrix{Float32}},
+        encoded_exemplars,
+        hclust_time::Symbol = :average  # :single, :complete, :average, :ward
+    )
     exemplars_n = size(encoded_exemplars, 2)
 
     trajectories_time_distances_by_exemplar = [Vector{Matrix{Int}}() for _ in 1:length(encoded_states_trajectories)]
@@ -27,7 +31,7 @@ function _create_time_distance_tree(encoded_states_trajectories::Vector{Matrix{F
     # display(distances)
 
     # used to be :single
-    clustering = Clustering.hclust(distances, linkage=:average)
+    clustering = Clustering.hclust(distances, linkage=hclust_time)
     # Plots.plot(clustering, 
     #     title="Hierarchical Clustering Dendrogram",
     #     xlabel="Sample Index", 

@@ -10,7 +10,9 @@ import Statistics
 # My params
 
 
-TEST_DIR = joinpath("log", "parameters_tests_2024-12-23_03-24-57")
+TEST_DIR = joinpath("log", "parameters_tests_2024-12-30_00-00-41")
+RESULTS_DIR = TEST_DIR  # joinpath(TEST_DIR, "results")
+ANALYSIS_DIR = joinpath(TEST_DIR, "analysis")
 
 TEST_POSTFIX = ".csv"  # will be removed from plot entries
 TEST_PREFIX = "logs_opt=StaGroGA_"  # will be removed from plot entries
@@ -23,7 +25,7 @@ LINE_METHOD = :mean
 # but you can also use tuple inside, then there is or, e.g.
 # TEST_INFIX_LIST = ["40", ("30", "50")]  ->  contains("40") && (contains("30") || contains("50"))
 # usually you should use it like this TEST_INFIX_LIST = ["(MmdWei=0.0)"] 
-TEST_INFIX_LIST = ["NClu=100"]
+TEST_INFIX_LIST = []
 
 
 
@@ -87,6 +89,7 @@ function plot(
     column::Symbol,
     line_function::Symbol
 )
+    mkpath(ANALYSIS_DIR)
     infix_test = "[" * join([isa(infix_el, Tuple) ? join(infix_el, " | ") : infix_el for infix_el in TEST_INFIX_LIST], " & ") * "]"
     plot_name = "function--$line_function  Col--$column  Prefix--$TEST_PREFIX  Infix--$infix_test"
     println("Plotting: $plot_name")
@@ -135,19 +138,19 @@ function plot(
         current_colour = current_colour % length(DISTINT_COLOURS) + 1
     end
 
-    Plots.savefig(joinpath(TEST_DIR, "$plot_save_name.png"))
+    Plots.savefig(joinpath(ANALYSIS_DIR, "$plot_save_name.png"))
 end
 
 function read_tests() :: Dict{String, Vector{DataFrames.DataFrame}}
     reads = Dict{String, Vector{DataFrames.DataFrame}}()
-    for file in readdir(TEST_DIR)
+    for file in readdir(RESULTS_DIR)
         contains_satisfied = all(
             isa(infix, Tuple) ? any(contains(file, infix_elem) for infix_elem in infix) :
             contains(file, infix)
             for infix in TEST_INFIX_LIST
         )
         if endswith(file, TEST_POSTFIX) && startswith(file, TEST_PREFIX) && contains_satisfied
-            file_whole = joinpath(TEST_DIR, file)
+            file_whole = joinpath(RESULTS_DIR, file)
             df = CSV.read(file_whole, DataFrames.DataFrame)
             list = get!(reads, get_name_string(file), Vector{DataFrames.DataFrame}())
             push!(list, df)
