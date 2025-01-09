@@ -19,3 +19,4 @@ import .JuliaEvolutionaryCars
 
 # Run the algorithm
 JuliaEvolutionaryCars.run(:StatesGroupingGA, CONSTANTS_DICT)
+# JuliaEvolutionaryCars.run(:ContinuousStatesGroupingP3, CONSTANTS_DICT)

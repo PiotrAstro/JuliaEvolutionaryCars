@@ -1,48 +1,116 @@
-export DistanceBasedClassificator
+export DistanceBasedClassificator, membership, encoded_membership
 
 """
 DistanceBasedClassificator
 encoded exemplars have (number of exemplars, features) shape
 translation is a vector of size number of exemplars
 """
-struct DistanceBasedClassificator{N <: AbstractNeuralNetwork, F1<:Function, F2<:Function} <: AbstractNeuralNetwork
+struct DistanceBasedClassificator{M<:Val, N <: AbstractNeuralNetwork, F<:Function, F2<:Function} <: AbstractNeuralNetwork
     encoder::N
     encoded_exemplars::Matrix{Float32}
-    translation::Vector{Int}
+    translation::Matrix{Float32}
     actions_number::Int
     fuzzy_logic_of_n_closest::Int
-    closest_exemplars::F1
-    final_dist_prepare::F2
-    # distance_metric::Symbol # euclidean or cosine or cityblock
+    distance_function!::F
+    predict_function::F2
 
     function DistanceBasedClassificator(
         encoder::N,
         encoded_exemplars::Matrix{Float32},
-        translation::Vector{Int},
+        translation::Matrix{Float32},
         actions_number::Int,
         fuzzy_logic_of_n_closest::Int,
-        distance_metric::Symbol
+        distance_metric::Symbol,
+        m_value::Int = 1,  # m value for fuzzy membership function, it is (1 / distance[i]) ^ m_value, usually 2, I used 1
     ) where N
         if distance_metric == :cosine
-            encoded_exemplars = (encoded_exemplars .* inv.(sqrt.(sum(abs2, encoded_exemplars; dims=1))))'
-            closest_exemplars = prepare_closest_exemplars_cosine
-            final_dist_prepare = final_dist_prepare_cosine
+            encoded_exemplars = collect(normalize_unit(encoded_exemplars)')
+            distance_function! = distance_cosine!
         elseif distance_metric == :euclidean
-            closest_exemplars = prepare_closest_exemplars_euclidean
-            final_dist_prepare = final_dist_prepare_euclidean
+            distance_function! = distance_euclidean
         elseif distance_metric == :cityblock
-            closest_exemplars = prepare_closest_exemplars_city_block
-            final_dist_prepare = final_dist_prepare_city_block
+            distance_function! = distance_cityblock
         else
             throw(ArgumentError("Unknown distance metric: $distance_metric"))
         end
-        F1 = typeof(closest_exemplars)
-        F2 = typeof(final_dist_prepare)
+
+        if m_value < 1
+            throw(ArgumentError("m_value should be greater than 0"))
+        end
+
+        predict_function = predict_n_closest
+        if fuzzy_logic_of_n_closest == size(encoded_exemplars, 1) || fuzzy_logic_of_n_closest < 1
+            predict_function = predict_all
+        end
+
+        F = typeof(distance_function!)
+        F2 = typeof(predict_function)
 
         # Call new with all type parameters specified
-        new{N, F1, F2}(encoder, encoded_exemplars, translation, actions_number, fuzzy_logic_of_n_closest, closest_exemplars, final_dist_prepare)
+        new{Val{m_value}, N, F, F2}(encoder, encoded_exemplars, translation, actions_number, fuzzy_logic_of_n_closest, distance_function!, predict_function)
     end
 end
+
+function DistanceBasedClassificator(
+    encoder::N,
+    encoded_exemplars::Matrix{Float32},
+    translation::Vector{Int},
+    actions_number::Int,
+    fuzzy_logic_of_n_closest::Int,
+    distance_metric::Symbol,
+    m_value::Int = 1,  # m value for fuzzy membership function, it is (1 / distance[i]) ^ m_value, usually 2, I used 1
+) where N
+    translation_new = zeros(Float32, actions_number, length(translation))
+    for (i, row) in enumerate(translation)
+        translation_new[row, i] = 1.0f0
+    end
+    return DistanceBasedClassificator(
+        encoder,
+        encoded_exemplars,
+        translation_new,
+        actions_number,
+        fuzzy_logic_of_n_closest,
+        distance_metric,
+        m_value
+    )
+end
+
+function get_neural_network(name::Val{:DistanceBasedClassificator})
+    return DistanceBasedClassificator
+end
+
+function predict_n_closest(nn::DistanceBasedClassificator{Val{MINT}}, distances::Matrix{Float32})::Matrix{Float32} where {MINT}
+    closest_exemplars = [_get_n_lowest_indices(one_col, nn.fuzzy_logic_of_n_closest) for one_col in eachcol(distances)]
+    result_matrix = zeros(Float32, nn.actions_number, size(distances, 2))
+    @inbounds for (result_col, (closest_exemplars_indicies, closest_exemplars_dist)) in zip(eachcol(result_matrix), closest_exemplars)
+        @fastmath for i in eachindex(closest_exemplars_dist)
+            member = (1.0f0 / closest_exemplars_dist[i]) ^ MINT
+            exemplars_id = closest_exemplars_indicies[i]
+            @simd for row in 1:nn.actions_number
+                result_col[row] += nn.translation[row, exemplars_id] * member
+            end
+        end
+        result_col ./= sum(result_col)
+    end
+    return result_matrix
+end
+
+function predict_all(nn::DistanceBasedClassificator{Val{M_INT}}, distances::Matrix{Float32})::Matrix{Float32} where {M_INT}
+    result_matrix = zeros(Float32, nn.actions_number, size(distances, 2))
+    @inbounds for (i, result_col) in enumerate(eachcol(result_matrix))
+        LoopVectorization.@turbo for exemplar_id in axes(nn.translation, 2)
+            member = (1.0f0 / distances[exemplar_id, i]) ^ M_INT
+            for row in 1:nn.actions_number
+                result_col[row] += nn.translation[row, exemplar_id] * member
+            end
+        end
+        @fastmath inv_sum = 1.0f0 / sum(result_col)
+        @fastmath result_col .*= inv_sum
+    end
+    return result_matrix
+end
+
+global const EPSILON::Float32 = Float32(1e-6)
 
 function get_loss(nn::DistanceBasedClassificator) :: Function
     return get_loss(nn.encoder)
@@ -52,84 +120,124 @@ function get_Flux_representation(nn::DistanceBasedClassificator)
     return get_Flux_representation(nn.encoder)
 end
 
-function predict(nn::DistanceBasedClassificator, X::Array{Float32}) ::Matrix{Float32}
+# using BenchmarkTools
+function predict(nn::DistanceBasedClassificator, X)::Matrix{Float32}
+    # encoded_x = predict(nn.encoder, X)
+    # distances = nn.distance_function!(nn.encoded_exemplars, encoded_x)
+    # # display(nn.translation)
+    # # sleep(2)
+    # display(distances)
+    # sleep(2)
+    # display(membership(nn, X))
+    # sleep(2)
+    # display(predict_n_closest(nn, distances))
+    # sleep(2)
+    # display(predict_all(nn, distances))
+    # sleep(2)
+
+    # b = @benchmark predict(($nn).encoder, $X)
+    # display(b)
+    # sleep(2)
+
+    # b = @benchmark ($nn).distance_function!(($nn).encoded_exemplars, predict(($nn).encoder, $X))
+    # display(b)
+    # sleep(2)
+
+    # distances = nn.distance_function!(nn.encoded_exemplars, predict(nn.encoder, X))
+
+    # # b = @benchmark begin
+    # #     nn = $nn
+    # #     encoded_x = predict(nn.encoder, $X)
+    # #     distances = nn.distance_function(nn.encoded_exemplars, encoded_x)
+    # #     fdsfds = predict_n_closest(nn, distances)
+    # # end
+    # b = @benchmark predict_n_closest($nn, $distances)
+    # display(b)
+    # sleep(2)
+
+    # # b = @benchmark begin
+    # #     nn = $nn
+    # #     encoded_x = predict(nn.encoder, $X)
+    # #     distances = nn.distance_function(nn.encoded_exemplars, encoded_x)
+    # #     sevd = predict_all(nn, distances)
+    # # end
+    # b = @benchmark predict_all($nn, $distances)
+    # display(b)
+    # sleep(2)
+
+    # println("Predicted\n\n")
+    # throw("random hgidfg")
+
     encoded_x = predict(nn.encoder, X)
-    closest_exemplars = nn.closest_exemplars(nn, encoded_x)
-    result_matrix = zeros(Float32, nn.actions_number, size(X, 2))
-    @inbounds for (result_col, (closest_exemplars_indicies, closest_exemplars_dist)) in zip(eachcol(result_matrix), closest_exemplars)
-        dist = nn.final_dist_prepare(closest_exemplars_dist)
-        min_dist = minimum(dist)
-        for (i, row) in enumerate(nn.translation[closest_exemplars_indicies])
-            # my fancy formula to get something like percentage
-            result_col[row] += min_dist / dist[i]
+    distances = nn.distance_function!(nn.encoded_exemplars, encoded_x)
+    return nn.predict_function(nn, distances)
+end
+
+function membership(nn::DistanceBasedClassificator{Val{MINT}}, X)::Matrix{Float32} where {MINT}
+    encoded_x = predict(nn.encoder, X)
+    return encoded_membership(nn, encoded_x)
+end
+
+function encoded_membership(nn::DistanceBasedClassificator{Val{MINT}}, encoded_x::Matrix{Float32})::Matrix{Float32} where {MINT}
+    encoded_copy = Base.copy(encoded_x)
+    distances = nn.distance_function!(nn.encoded_exemplars, encoded_copy)
+    membership_matrix = zeros(Float32, size(distances, 1), size(distances, 2))
+    @inbounds @fastmath for (i, col) in enumerate(eachcol(membership_matrix))
+        # Could be turbo? LoopVectorization.@turbo 
+        @simd for row_ind in eachindex(col)
+            col[row_ind] = (1.0f0 / distances[row_ind, i]) ^ MINT
         end
-        # normalize it to look like percentages of each action
-        result_col ./= sum(result_col)
+        col ./= sum(col)
     end
-    return result_matrix
+    return membership_matrix
 end
 
 # ------------------------------------------------------------------------------------------
-# functions that will pick closest exemplars
 
-function prepare_closest_exemplars_cosine(nn::DistanceBasedClassificator, encoded_x::Matrix{Float32}) :: Vector{Tuple{Vector{Int}, Vector{Float32}}}
-    # normalize length - make it a unit vector
-    encoded_x .*= inv.(sqrt.(sum(abs2, encoded_x; dims=1)))
-    similarity = nn.encoded_exemplars * encoded_x
-    closest_exemplars = [_get_n_largest_indices(one_col, nn.fuzzy_logic_of_n_closest) for one_col in eachcol(similarity)]
-    return closest_exemplars
+function distance_cosine!(exemplars::Matrix{Float32}, encoded_x::Matrix{Float32}) :: Matrix{Float32}
+    normalize_unit!(encoded_x)
+    distances = exemplars * encoded_x
+    @inbounds @fastmath for i in eachindex(distances)
+        val = 1.0f0 - distances[i]
+        distances[i] = ifelse(val < EPSILON, EPSILON, val)
+    end
+    return distances
 end
 
-function prepare_closest_exemplars_euclidean(nn::DistanceBasedClassificator, encoded_x::Matrix{Float32}) :: Vector{Tuple{Vector{Int}, Vector{Float32}}}
+function distance_euclidean(exemplars::Matrix{Float32}, encoded_x::Matrix{Float32}) :: Matrix{Float32}
     # distances = Distances.pairwise(Distances.Euclidean(), nn.encoded_exemplars, encoded_x)
-    @tullio threads=false distances[i,j] := (nn.encoded_exemplars[k,i] - encoded_x[k,j])^2 |> sqrt;
-    closest_exemplars = [_get_n_lowest_indices(one_col, nn.fuzzy_logic_of_n_closest) for one_col in eachcol(distances)]
-    return closest_exemplars
+    @tullio threads=false distances[i,j] := (exemplars[k,i] - encoded_x[k,j])^2 |> sqrt;
+    @inbounds @simd for i in eachindex(distances)
+        distances[i] = ifelse(distances[i] < EPSILON, EPSILON, distances[i])
+    end
+    return distances
 end
 
-function prepare_closest_exemplars_city_block(nn::DistanceBasedClassificator, encoded_x::Matrix{Float32}) :: Vector{Tuple{Vector{Int}, Vector{Float32}}}
+function distance_cityblock(exemplars::Matrix{Float32}, encoded_x::Matrix{Float32}) :: Matrix{Float32}
     # distances = Distances.pairwise(Distances.Cityblock(), nn.encoded_exemplars, encoded_x)
-    @tullio threads=false distances[i,j] := abs(nn.encoded_exemplars[k,i] - encoded_x[k,j]);
-    closest_exemplars = [_get_n_lowest_indices(one_col, nn.fuzzy_logic_of_n_closest) for one_col in eachcol(distances)]
-    return closest_exemplars
+    @tullio threads=false distances[i,j] := abs(exemplars[k,i] - encoded_x[k,j]);
+    @inbounds @simd for i in eachindex(distances)
+        distances[i] = ifelse(distances[i] < EPSILON, EPSILON, distances[i])
+    end
+    return distances
 end
 
 # ------------------------------------------------------------------------------------------
-# functions that will prepare final distances, numerical stability etc.
 
-global const EPSILON::Float32 = Float32(1e-10)
-
-function final_dist_prepare_cosine(distances::AbstractVector{Float32}) :: Vector{Float32}
-    return max.(1.0f0 .- distances, EPSILON)
+function normalize_unit(x::Matrix{Float32}) :: Matrix{Float32}
+    copied = Base.copy(x)
+    normalize_unit!(copied)
+    return copied
 end
 
-function final_dist_prepare_euclidean(distances::AbstractVector{Float32}) :: Vector{Float32}
-    return max.(distances, EPSILON)
-end
-
-function final_dist_prepare_city_block(distances::AbstractVector{Float32}) :: Vector{Float32}
-    return max.(distances, EPSILON)
+function normalize_unit!(x::Matrix{Float32})
+    for col in eachcol(x)
+        LinearAlgebra.normalize!(col)
+    end
 end
 
 # ------------------------------------------------------------------------------------------
 # additional functions
-
-function _get_n_largest_indices(arr::AbstractVector{Float32}, n::Int) :: Tuple{Vector{Int}, Vector{Float32}}
-    result = collect(1:n)
-    result_values = arr[result]
-    min_value, argmin_value = findmin(result_values)
-
-    @inbounds for i in n+1:length(arr)
-        value = arr[i]
-        if value > min_value
-            result[argmin_value] = i
-            result_values[argmin_value] = value
-            min_value, argmin_value = findmin(result_values)
-        end
-    end
-
-    return result, result_values
-end
 
 function _get_n_lowest_indices(arr::AbstractVector{Float32}, n::Int) :: Tuple{Vector{Int}, Vector{Float32}}
     result = collect(1:n)
@@ -148,62 +256,37 @@ function _get_n_lowest_indices(arr::AbstractVector{Float32}, n::Int) :: Tuple{Ve
     return result, result_values
 end
 
-# function euclidean_mine_no_sqrt(states1::Matrix{Float32}, states2::Matrix{Float32}) :: Matrix{Float32}
-#     n1, n2 = size(states1, 2), size(states2, 2)
-#     features = size(states1, 1)
-#     result = Matrix{Float32}(undef, n1, n2)
 
-#     @inbounds for i in 1:n1
-#         for j in 1:n2
-#             s = 0.0f0
-#             @simd for k in 1:features
-#                 tmp = states1[k, i] - states2[k, j]
-#                 s += tmp * tmp
-#             end
-#             result[i, j] = s
+
+
+
+
+
+
+
+# function predict_n_closest(nn::DistanceBasedClassificator{Val{MINT}}, distances::Matrix{Float32})::Matrix{Float32} where {MINT}
+#     closest_exemplars = [_get_n_lowest_indices(one_col, nn.fuzzy_logic_of_n_closest) for one_col in eachcol(distances)]
+#     result_matrix = zeros(Float32, nn.actions_number, size(distances, 2))
+#     @inbounds for (result_col, (closest_exemplars_indicies, closest_exemplars_dist)) in zip(eachcol(result_matrix), closest_exemplars)
+#         for (i, row) in enumerate(@view nn.translation[closest_exemplars_indicies])
+#             @fastmath result_col[row] += (1.0f0 / closest_exemplars_dist[i]) ^ MINT
 #         end
+#         @fastmath result_col ./= sum(result_col)
 #     end
-#     return result
+#     return result_matrix
 # end
 
-# function cityblock_mine(states1::Matrix{Float32}, states2::Matrix{Float32}) :: Matrix{Float32}
-#     n1, n2 = size(states1, 2), size(states2, 2)
-#     features = size(states1, 1)
-#     result = Matrix{Float32}(undef, n1, n2)
-
-#     @inbounds for i in 1:n1
-#         for j in 1:n2
-#             s = 0.0f0
-#             @simd for k in 1:features
-#                 s += abs(states1[k, i] - states2[k, j])
-#             end
-#             result[i, j] = s
+# function predict_all(nn::DistanceBasedClassificator{Val{M_INT}}, distances::Matrix{Float32})::Matrix{Float32} where {M_INT}
+#     result_matrix = zeros(Float32, nn.actions_number, size(distances, 2))
+#     @inbounds for (i, result_col) in enumerate(eachcol(result_matrix))
+#         @fastmath @simd for exemplar_id in eachindex(nn.translation)
+#             result_col[nn.translation[exemplar_id]] += (1.0f0 / distances[exemplar_id, i]) ^ M_INT
 #         end
-#     end
-
-#     return result
-# end
-
-
-
-# function predict_cosine(nn::DistanceBasedClassificator, X::Array{Float32}) :: Array{Float32}
-#     encoded_x = predict(nn.encoder, X)
-
-#     # normalize length - make it a unit vector
-#     encoded_x .*= inv.(sqrt.(sum(abs2, encoded_x; dims=1)))
-#     similarity = nn.encoded_exemplars * encoded_x
-#     closest_exemplars = [_get_n_largest_indices(one_col, nn.fuzzy_logic_of_n_closest) for one_col in eachcol(similarity)]
-#     result_matrix = zeros(Float32, nn.actions_number, size(X, 2))
-#     @inbounds for (result_col, (closest_exemplars_indicies, closest_exemplars_sim)) in zip(eachcol(result_matrix), closest_exemplars)
-#         # change similarity to distance and clamp from bottom to avoid division by zero
-#         dist = max.(1.0 .- closest_exemplars_sim, 1e-10)
-#         min_dist = minimum(dist)
-#         for (i, row) in enumerate(nn.translation[closest_exemplars_indicies])
-#             # my fancy formula to get something like percentage
-#             result_col[row] += min_dist / dist[i]
-#         end
-#         # actually, this sum is currently not needed, cause I take max anyway
 #         result_col ./= sum(result_col)
 #     end
 #     return result_matrix
 # end
+
+
+# ------------------------------------------------------------------------------------------
+# Concrete continuous based

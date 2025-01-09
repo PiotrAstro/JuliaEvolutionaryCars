@@ -20,7 +20,11 @@ export AbstractNeuralNetwork, predict, learn!, copy, get_neural_network, get_Flu
 # concrete implementation should have fist parametric type to be a number of dimensions
 abstract type AbstractNeuralNetwork end
 
-function predict(nn::AbstractNeuralNetwork, X::Array{Float32}) :: Array{Float32}
+function get_neural_network(name::Val{T}) where T
+    throw("not implemented")
+end
+
+function predict(nn::AbstractNeuralNetwork, X) :: Array{Float32}
     throw("not implemented")
 end
 
@@ -92,21 +96,11 @@ include("_Autoencoder.jl")
 # -------------------------------------------------------
 # module functions:
 
-"Should return Type{T} where T<:AbstractNeuralNetwork, but it is impossible to write like that"
-function get_neural_network(name::Symbol) :: Type
-    if name == :MLP_NN
-        return MLP_NN
-    elseif name == :Combined_NN
-        return Combined_NN
-    elseif name == :DistanceBasedClassificator
-        return DistanceBasedClassificator
-    elseif name == :DummyNN
-        return DummyNN
-    elseif name == :Autoencoder
-        return Autoencoder
-    else
-        throw("Neural Network not found")
-    end
+"""
+Use this function:
+"""
+function get_neural_network(name::Symbol)
+    return get_neural_network(Val(name))
 end
 
 end # module

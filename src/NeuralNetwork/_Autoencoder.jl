@@ -17,6 +17,10 @@ function Autoencoder(
     return Autoencoder{E, D}(encoder, decoder, Flux.Chain(get_Flux_representation(encoder), get_Flux_representation(decoder)), mmd_weight, learning_rate)
 end
 
+function get_neural_network(name::Val{:Autoencoder})
+    return Autoencoder
+end
+
 function get_loss(nn::Autoencoder) :: Function
     return get_loss(nn.decoder)
 end

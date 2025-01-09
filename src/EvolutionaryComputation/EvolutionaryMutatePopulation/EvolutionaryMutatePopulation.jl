@@ -2,6 +2,7 @@ module EvolutionaryMutatePopulaiton
     
 import ..NeuralNetwork
 import ..Environment
+import ..AbstractOptimizerModule
 
 import Statistics as St
 import Printf as Pf
@@ -189,7 +190,7 @@ end
 #--------------------------------------------------------------------------------------------------------
 # public
 
-mutable struct EvolutionaryMutatePopulationAlgorithm
+mutable struct EvolutionaryMutatePopulationAlgorithm <: AbstractOptimizerModule.AbstractOptimizer
     population::Vector{Individual{T, N}} where {T<:Environment.AbstractEnvironment, N<:NeuralNetwork.AbstractNeuralNetwork}
     population_size::Int
     mutation_rate::Float64
@@ -197,6 +198,10 @@ mutable struct EvolutionaryMutatePopulationAlgorithm
     const visualization_environment::Environment.AbstractEnvironment
     best_individual::Individual
     const n_threads::Int
+end
+
+function AbstractOptimizerModule.get_optimizer(::Val{:Evolutionary_Mutate_Population})
+    return EvolutionaryMutatePopulationAlgorithm
 end
 
 function EvolutionaryMutatePopulationAlgorithm(;
@@ -235,7 +240,7 @@ function EvolutionaryMutatePopulationAlgorithm(;
     )
 end
 
-function run!(algo::EvolutionaryMutatePopulationAlgorithm; max_generations::Int, max_evaluations::Int, log::Bool=true, visualize_each_n_epochs::Int=0)
+function AbstractOptimizerModule.run!(algo::EvolutionaryMutatePopulationAlgorithm; max_generations::Int, max_evaluations::Int, log::Bool=true, visualize_each_n_epochs::Int=0)
     for generation in 1:max_generations
         if generation * algo.population_size >= max_evaluations
             break

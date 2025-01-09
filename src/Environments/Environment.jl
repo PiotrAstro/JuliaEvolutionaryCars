@@ -62,6 +62,10 @@ end
 # ------------------------------------------------------------------------------------------------
 # Interface functions
 
+function get_environment(environment::Val{T}) where T
+    throw("unimplemented")
+end
+
 "Doesnt reset environment afterwards, real implementation will have some kwargs"
 function visualize!(env::AbstractEnvironment, model::NeuralNetwork.AbstractNeuralNetwork, reset::Bool = true;)
     throw("unimplemented")
@@ -102,7 +106,11 @@ end
 # Some general functions, not interface functions
 
 "Get the rewards of the trajectory of the environments using the neural network. Returns sum of rewards for each environment. Modifies state of environments - resets them before and leaves them used"
-function get_trajectory_rewards!(envs::Vector{E}, neural_network::NeuralNetwork.AbstractNeuralNetwork; reset::Bool = true) :: Vector{Float64} where {INTERNAL, ASSEQ<:AbstractStateSequence{INTERNAL}, E<:AbstractEnvironment{ASSEQ}}
+function get_trajectory_rewards!(
+        envs::Vector{E},
+        neural_network::NeuralNetwork.AbstractNeuralNetwork;
+        reset::Bool = true
+    ) :: Vector{Float64} where {INTERNAL, ASSEQ<:AbstractStateSequence{INTERNAL}, E<:AbstractEnvironment{ASSEQ}}
     rewards = zeros(Float64, length(envs))
 
     if reset
@@ -181,12 +189,8 @@ include("_CarEnvironment/_CarEnvironment.jl")
 
 
 # functions using includes
-function get_environment(name::Symbol) :: Type
-    if name == :BasicCarEnvironment
-        return BasicCarEnvironment
-    else
-        throw("Environment not found")
-    end
+function get_environment(name::Symbol)
+    return get_environment(Val(name))
 end
 
 function prepare_environments_kwargs(dict_universal::Dict{Symbol, Any}, dict_changeable::Vector{Dict{Symbol, Any}}) :: Vector{Dict{Symbol, Any}}

@@ -85,7 +85,7 @@ CONSTANTS_DICT[:run_config] = Dict(
 )
 
 # Number of run tests per each combination of tested values
-CASES_PER_TEST = 10
+CASES_PER_TEST = 15
 
 # Values that will be tested
 TESTED_VALUES = [
@@ -94,8 +94,8 @@ TESTED_VALUES = [
         Dict(
             :StatesGroupingGA => Dict(
                 :env_wrapper => Dict(
-                    :hclust_distance => [:ward, :single, :complete, :average],
-                    :hclust_time => [:ward, :single, :complete, :average],
+                    :n_clusters => [40, 100],
+                    :m_value => [1, 2]
                 ),
             ),
         ),
@@ -114,7 +114,7 @@ SRC_DIR_TO_COPY = joinpath(pwd(), "src")  # copy src dir to logs dir, so that I 
 
 
 LOGS_DIR_RESULTS = joinpath(LOGS_DIR, "results")
-LOGS_DIR_CONFIGS = joinpath(LOGS_DIR, "configs")
+LOGS_DIR_SRC = joinpath(LOGS_DIR, "src")
 LOGS_DIR_ANALYSIS = joinpath(LOGS_DIR, "analysis")
 
 
@@ -177,12 +177,12 @@ end
 
 mkpath(LOGS_DIR)
 mkpath(LOGS_DIR_RESULTS)
-mkpath(LOGS_DIR_CONFIGS)
+mkpath(LOGS_DIR_SRC)
 mkpath(LOGS_DIR_ANALYSIS)
 println("Logs will be saved in: $LOGS_DIR")
-cp(CONSTANTS_FILE_TO_COPY, joinpath(LOGS_DIR_CONFIGS, "constants.jl"))
+cp(CONSTANTS_FILE_TO_COPY, joinpath(LOGS_DIR_SRC, "constants.jl"))
 println("Copied constants.jl to logs dir")
-cp(SRC_DIR_TO_COPY, joinpath(LOGS_DIR_CONFIGS, "src"))
+cp(SRC_DIR_TO_COPY, joinpath(LOGS_DIR_SRC, "src"))
 println("Copied src dir to logs dir")
 
 file_logger = CustomLoggers.SimpleFileLogger(joinpath(LOGS_DIR, OUTPUT_LOG_FILE), true)

@@ -69,6 +69,11 @@ mutable struct BasicCarEnvironment <: AbstractEnvironment{CarSequence}
 end
 
 
+function get_environment(environment::Val{T}) where T
+    return BasicCarEnvironment
+end
+
+
 """
 Contructor for the BasicCarEnvironment struct.
 
@@ -195,13 +200,13 @@ function get_action_size(env::BasicCarEnvironment) :: Int
 end
 
 function get_state(env::BasicCarEnvironment) :: Vector{Float32}
-    inputs = Vector{Float32}([_get_ray_distance(env, env.angle + ray) for ray in env.rays])
-    inputs = inputs ./ env.rays_distances_scale_factor
-    for i in eachindex(inputs)
-        inputs[i] = inputs[i] > env.ray_input_clip ? env.ray_input_clip : inputs[i]
+    inputs = Vector{Float32}(undef, length(env.rays) + 1)
+    for i in eachindex(env.rays)
+        ray_distance = Float32(_get_ray_distance(env, env.angle + env.rays[i])) / env.rays_distances_scale_factor
+        inputs[i] = ray_distance > env.ray_input_clip ? env.ray_input_clip : ray_distance
     end
     speed_input = env.speed / env.max_speed
-    push!(inputs, speed_input)
+    inputs[end] = speed_input
     return inputs
 end
 

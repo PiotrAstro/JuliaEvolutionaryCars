@@ -13,14 +13,17 @@ import .NeuralNetwork
 include("Environments/Environment.jl")
 import .Environment
 
+include("utils/utils.jl")
+using .Utils
+
 include("EvolutionaryComputation/EvolutionaryMutatePopulation/EvolutionaryMutatePopulation.jl")
 import .EvolutionaryMutatePopulaiton
 
 include("EvolutionaryComputation/StatesGroupingGA/StatesGroupingGA.jl")
 import .StatesGroupingGA
 
-# include("EvolutionaryComputation/ContinuousStatesGrouping/ContinuousStatesGrouping.jl")
-# import .ContinuousStatesGrouping
+include("EvolutionaryComputation/ContinuousStatesGroupingGA/ContinuousStatesGroupingP3.jl")
+import .ContinuousStatesGroupingP3
 
 function run(optimizer::Symbol, CONSTANTS_DICT::Dict{Symbol}) :: DataFrames.DataFrame
     # Preprocessing data
@@ -39,21 +42,9 @@ function run(optimizer::Symbol, CONSTANTS_DICT::Dict{Symbol}) :: DataFrames.Data
         :environment => CONSTANTS_DICT[:environment][:name]
     )
 
-    optimizer_instance = get_optimizer(optimizer)(;final_dict...)
+    optimizer_instance = AbstractOptimizerModule.get_optimizer(optimizer)(;final_dict...)
     data_frame = AbstractOptimizerModule.run!(optimizer_instance; CONSTANTS_DICT[:run_config]...)
     return data_frame
-end
-
-function get_optimizer(optimizer::Symbol)
-    if optimizer == :StatesGroupingGA
-        return StatesGroupingGA.StatesGroupingGA_Algorithm
-    elseif optimizer == :EvolutionaryMutatePopulation
-        return EvolutionaryMutatePopulaiton.EvolutionaryMutatePopulationAlgorithm
-    # elseif optimizer == :ContinuousStatesGrouping
-    #     return ContinuousStatesGrouping.ContinuousStatesGroupingAlgorithm
-    else
-        throw("Optimizer not found")
-    end
 end
 
 end # module EvolutionaryCarsJulia
@@ -112,3 +103,15 @@ end # module EvolutionaryCarsJulia
 # mamy dużą elastyczność, od razu dostajemy rozmyte przynależności
 # łatwiej też robić crossovera - puszczamy tych reprezentantów których chcemy połączyć przez drugą sieć i uczymy na wynikach
 # potencjalnie można też wziąć reprezentantów z drugiej sieci i uczyć na tych reprezentantach, ale tu trzeba jeszcze przemyśleć, jak ich wybierać i czy zastępować nimi któryś z naszych reprezentantów
+
+
+
+
+# ------------------------------------------------------------------------------------------------------
+# kolejny zupełnie inny pomysł xD:
+# - przechodzimy na wartości ciągłe
+# - każdy indiwidual przechowuje swojego game decodera i matrix wartości docelowych
+# - matrix wartości docelowych zmieniamy np. poprzez dodanie do jakiegoś pola 1.0 i dzielenie, żeby suma całości była równa 1.0
+# - docelowo można zrobić coś z zapożyczaniem reprezentantów
+# - można zrobić wtedy różne ilości klastrów - np. do fihca nbajpierw będziemy dodawali 1.0 do 20 klastrów, poem zrobimy sobie 40 klastrów i będziemy dodawali po 0.5, potem 80 klastrów i będziemy dodawali 0.25
+# trochę nadal problem co zrobić z time distance tree

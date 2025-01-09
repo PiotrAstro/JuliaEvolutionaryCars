@@ -2,6 +2,7 @@ module IndividualModule
 
 import ..Environment
 import ..EnvironmentWrapper
+import ..StatesGrouping
 
 import Random
 import Plots
@@ -16,7 +17,7 @@ global ID::Int = 0
 mutable struct Individual
     genes::Vector{Int}
     env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct
-    time_tree::EnvironmentWrapper.TreeNode
+    time_tree::StatesGrouping.TreeNode
     levels_trajectories::Vector{Vector{<:Environment.Trajectory}}
     _fitness::Float64
     _fitness_actual::Bool
@@ -84,7 +85,7 @@ function clear_trajectory_memory!(individual::Individual)
     if !isempty(individual.levels_trajectories)
         type_trajectories_levels = typeof(individual.levels_trajectories)
         individual.levels_trajectories = type_trajectories_levels()
-        individual.time_tree = EnvironmentWrapper.TreeNode(nothing, nothing, Vector{Int}())
+        individual.time_tree = StatesGrouping.TreeNode(nothing, nothing, Vector{Int}())
     end
 end
 
@@ -134,7 +135,7 @@ function optimal_mixing_top_to_bottom_2_individuals(individual1::Individual, ind
                 new_individual._fitness = old_fitness
             end
 
-            if !EnvironmentWrapper.is_leaf(node)
+            if !StatesGrouping.is_leaf(node)
                 if i == length(tree_levels)
                     push!(tree_levels, [node.left, node.right])
                 else
@@ -204,7 +205,7 @@ function optimal_mixing_top_to_bottom!(individual::Individual, other_individuals
                 # save_decision_plot(individual)
             end
 
-            if !EnvironmentWrapper.is_leaf(node)
+            if !StatesGrouping.is_leaf(node)
                 if i == length(tree_levels)
                     push!(tree_levels, [node.left, node.right])
                 else
@@ -256,7 +257,7 @@ function optimal_mixing_bottom_to_top!(individual::Individual, other_individuals
     while i <= length(tree_levels)
         current_level = tree_levels[i]
         for node in current_level
-            if !EnvironmentWrapper.is_leaf(node)
+            if !StatesGrouping.is_leaf(node)
                 if i == length(tree_levels)
                     push!(tree_levels, [node.left, node.right])
                 else
@@ -423,7 +424,8 @@ function FIHC_top_to_bottom!(individual::Individual)
             # end
 
             individuals_copies = Vector{Individual}(undef, actions_number)
-            Threads.@threads for chosen_action in random_perm_actions
+            # Threads.@threads for chosen_action in random_perm_actions
+            for chosen_action in random_perm_actions
                 individual_tmp = copy_individual(individual)
                 individuals_copies[chosen_action] = individual_tmp
                 individual_tmp.genes[node.elements] .= chosen_action
@@ -443,7 +445,7 @@ function FIHC_top_to_bottom!(individual::Individual)
                 # save_decision_plot(individual)
             end
 
-            if !EnvironmentWrapper.is_leaf(node)
+            if !StatesGrouping.is_leaf(node)
                 if i == length(tree_levels)
                     push!(tree_levels, [node.left, node.right])
                 else
@@ -500,7 +502,7 @@ end
 #                 individual._fitness_actual = false
 #             end
 
-#             if !EnvironmentWrapper.is_leaf(node)
+#             if !StatesGrouping.is_leaf(node)
 #                 if i == length(tree_levels)
 #                     push!(tree_levels, [node.left, node.right])
 #                 else

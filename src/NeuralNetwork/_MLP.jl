@@ -1,15 +1,19 @@
 export MLP_NN
 
-struct MLP_NN{F} <: AbstractNeuralNetwork
-    layers::Flux.Chain
+struct MLP_NN{C<:Flux.Chain, F} <: AbstractNeuralNetwork
+    layers::C
     loss::F
 end
 
-function MLP_NN(layers::Vector{<:MLP_NN}) :: MLP_NN
+function MLP_NN(layers::Vector{MLP_NN}) :: MLP_NN
     layers_new = Flux.Chain([layer.layers for layer in layers]...)
     loss = layers[end].loss
 
     return MLP_NN(layers_new, loss)
+end
+
+function get_neural_network(name::Val{:MLP_NN})
+    return MLP_NN
 end
 
 """
@@ -41,13 +45,11 @@ function MLP_NN(;
         push!(layers, _get_activation_function(input_activation_function)[1])
     end
 
+    input_size_tmp = input_size
     # Hidden layers
     for i in 1:hidden_layers
-        if i == 1
-            push!(layers, Flux.Dense(input_size, hidden_neurons, activation))
-        else
-            push!(layers, Flux.Dense(hidden_neurons, hidden_neurons, activation))
-        end
+        push!(layers, Flux.Dense(input_size_tmp, hidden_neurons, activation))
+        input_size_tmp = hidden_neurons
 
         if dropout > 0.0
             push!(layers, Flux.Dropout(dropout))
@@ -56,9 +58,9 @@ function MLP_NN(;
     if typeof(last_activation_function) <: Symbol
         activation_last_tmp = _get_activation_function(last_activation_function)
         if activation_last_tmp[2]
-            push!(layers, Flux.Dense(hidden_neurons, output_size, activation_last_tmp[1]))
+            push!(layers, Flux.Dense(input_size_tmp, output_size, activation_last_tmp[1]))
         else
-            push!(layers, Flux.Dense(hidden_neurons, output_size))
+            push!(layers, Flux.Dense(input_size_tmp, output_size))
             push!(layers, activation_last_tmp[1])
         end
     elseif typeof(last_activation_function) <: Function

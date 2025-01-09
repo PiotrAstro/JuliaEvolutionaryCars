@@ -1,9 +1,9 @@
 export Combined_NN
 
 # ODN - Output Dimensions Number
-struct Combined_NN <: AbstractNeuralNetwork
-    layers::Flux.Chain
-    loss::Function
+struct Combined_NN{T<:Flux.Chain, F} <: AbstractNeuralNetwork
+    layers::T
+    loss::F
 end
 
 function Combined_NN(layers::Vector{<:AbstractNeuralNetwork}) :: Combined_NN
@@ -11,6 +11,12 @@ function Combined_NN(layers::Vector{<:AbstractNeuralNetwork}) :: Combined_NN
     loss = layers[end].loss
     return Combined_NN(layers_new, loss)
 end
+
+function get_neural_network(name::Val{:Combined_NN})
+    return Combined_NN
+    
+end
+
 function get_loss(nn::Combined_NN) :: Function
     return nn.loss
 end

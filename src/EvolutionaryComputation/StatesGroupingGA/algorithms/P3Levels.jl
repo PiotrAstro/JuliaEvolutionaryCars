@@ -71,12 +71,12 @@ end
 "Runs new individual, does FIHC, optimal mixing, climbing through levels and returns final individual"
 function run_new_individual!(p3::Population_Pyramid) :: Ind.Individual
     new_individual = Ind.Individual(p3.current_env_wrapper, p3.verbose)
+    Ind.FIHC_top_to_bottom!(new_individual)
     add_to_next_level = true
+    push!(p3.population[1].individuals, new_individual)
 
     i = 1
     while i <= length(p3.population)
-        Ind.FIHC_top_to_bottom!(new_individual)
-
         if p3.verbose
             Logging.@info Printf.@sprintf("\nGenes pre mixing: %s\n", Ind.get_same_genes_percent(new_individual, p3.population[i].individuals))
         end
@@ -89,6 +89,7 @@ function run_new_individual!(p3::Population_Pyramid) :: Ind.Individual
 
         old_fitness = Ind.get_fitness!(new_individual)
         Ind.optimal_mixing_bottom_to_top!(new_individual, p3.population[i].individuals)
+        Ind.FIHC_top_to_bottom!(new_individual)
 
         if p3.verbose
             Logging.@info Printf.@sprintf("\nGenes post mixing: %s\n", Ind.get_same_genes_percent(new_individual, p3.population[i].individuals))

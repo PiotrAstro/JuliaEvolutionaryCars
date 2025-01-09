@@ -2,6 +2,7 @@ module EnvironmentWrapper
 
 import ..NeuralNetwork
 import ..Environment
+import ..StatesGrouping
 
 import Statistics
 import Clustering
@@ -12,16 +13,11 @@ import JLD
 import Logging
 using StatsPlots
 
-export EnvironmentWrapperStruct, get_action_size, get_groups_number, get_fitness, copy, is_verbose, set_verbose!, translate, create_new_based_on, create_time_distance_tree, clean_memory!
+export EnvironmentWrapperStruct, get_action_size, get_groups_number, get_fitness, copy, is_verbose, set_verbose!, translate, create_new_based_on, create_time_distance_tree, get_genes
 
 # --------------------------------------------------------------------------------------------------
 # Structs
 
-struct TreeNode
-    left::Union{TreeNode, Nothing}
-    right::Union{TreeNode, Nothing}
-    elements::Vector{Int}
-end
 
 mutable struct EnvironmentWrapperStruct
     _envs::Vector{<:Environment.AbstractEnvironment}
@@ -29,13 +25,12 @@ mutable struct EnvironmentWrapperStruct
     _encoder::NeuralNetwork.AbstractNeuralNetwork
     _decoder::NeuralNetwork.AbstractNeuralNetwork
     _autoencoder::NeuralNetwork.AbstractNeuralNetwork
+    _game_decoder_struct
+    _game_decoder_kwargs::Dict
     _encoded_exemplars::Matrix{Float32}
     _raw_exemplars::Environment.AbstractStateSequence
-    _similarity_tree::TreeNode
+    _similarity_tree::StatesGrouping.TreeNode
     _max_states_considered::Int
-    _fuzzy_logic_of_n_closest::Int
-    _result_memory::Dict{Vector{Int}, Float64}
-    _result_memory_mutex::ReentrantLock
     _distance_metric::Symbol  # :euclidean or :cosine or :cityblock
     _exemplars_clustering::Symbol  # :genieclust or :pam or :kmedoids
     _hclust_distance::Symbol  # :ward or :single or :complete or :average
@@ -56,7 +51,6 @@ function EnvironmentWrapperStruct(
     initial_space_explorers_n::Int,
     max_states_considered::Int,
     n_clusters::Int,
-    fuzzy_logic_of_n_closest::Int,
     distance_metric::Symbol = :cosine,
     exemplars_clustering::Symbol = :genieclust,
     hclust_distance::Symbol = :ward,
@@ -74,10 +68,7 @@ function EnvironmentWrapperStruct(
     # initial state space exploration
     # random NNs creation
     NNs = [
-        NeuralNetwork.Combined_NN([
-            encoder,
-            (game_decoder_struct)(;game_decoder_kwargs...)
-        ]) for _ in 1:initial_space_explorers_n
+        get_full_NN(encoder, new_game_decoder(game_decoder_struct, game_decoder_kwargs)) for _ in 1:initial_space_explorers_n
     ]
     # states collection
     trajectories = _collect_trajectories(envs, NNs)
@@ -90,7 +81,7 @@ function EnvironmentWrapperStruct(
     end
 
     encoded_states = NeuralNetwork.predict(encoder, states_nn_input)
-    exemplars_ids, similarity_tree = _get_exemplars(encoded_states, n_clusters; distance_metric, exemplars_clustering, hclust_distance)
+    exemplars_ids, similarity_tree = StatesGrouping.get_exemplars(encoded_states, n_clusters; distance_metric, exemplars_clustering, hclust_distance)
     encoded_exemplars = encoded_states[:, exemplars_ids]
     states_exeplars = Environment.get_sequence_with_ids(states, exemplars_ids)
 
@@ -104,13 +95,12 @@ function EnvironmentWrapperStruct(
         encoder,
         decoder,
         autoencoder,
+        game_decoder_struct,
+        game_decoder_kwargs,
         encoded_exemplars,
         states_exeplars,
         similarity_tree,
         max_states_considered,
-        fuzzy_logic_of_n_closest,
-        Dict{Vector{Int}, Float64}(),
-        ReentrantLock(),
         distance_metric,
         exemplars_clustering,
         hclust_distance,
@@ -122,26 +112,18 @@ end
 """
 returns Tuple{Vector{Trajectory}, TreeNode}
 """
-function create_time_distance_tree(env_wrap::EnvironmentWrapperStruct, ind::Vector{Int})
-    trajectories = _collect_trajectories(env_wrap._envs, [get_full_NN(env_wrap, ind)])
+function create_time_distance_tree(env_wrap::EnvironmentWrapperStruct, game_decoder::NeuralNetwork.AbstractNeuralNetwork)
+    trajectories = _collect_trajectories(env_wrap._envs, [get_full_NN(env_wrap, game_decoder)])
     states_in_trajectories = [trajectory.states for trajectory in trajectories]
     encoded_states_by_trajectory = [NeuralNetwork.predict(env_wrap._encoder, Environment.get_nn_input(states_one_traj)) for states_one_traj in states_in_trajectories]
-    return trajectories, _create_time_distance_tree(encoded_states_by_trajectory, env_wrap._encoded_exemplars, env_wrap._hclust_time)
+    return trajectories, StatesGrouping.create_time_distance_tree(encoded_states_by_trajectory, env_wrap._encoded_exemplars, env_wrap._hclust_time)
 end
 
-function copy(env_wrap::EnvironmentWrapperStruct, copy_dict::Bool=true) :: EnvironmentWrapperStruct
+function copy(env_wrap::EnvironmentWrapperStruct) :: EnvironmentWrapperStruct
     envs_copy = [Environment.copy(env) for env in env_wrap._envs]
     autoencoder_copy = NeuralNetwork.copy(env_wrap._autoencoder)
     encoder_copy = autoencoder_copy.encoder
     decoder_copy = autoencoder_copy.decoder
-
-    if copy_dict
-        lock(env_wrap._result_memory_mutex)
-        result_memory_copy = Base.copy(env_wrap._result_memory)
-        unlock(env_wrap._result_memory_mutex)
-    else
-        result_memory_copy = Dict{Vector{Int}, Float64}()
-    end
 
     return EnvironmentWrapperStruct(
         envs_copy,
@@ -149,29 +131,18 @@ function copy(env_wrap::EnvironmentWrapperStruct, copy_dict::Bool=true) :: Envir
         encoder_copy,
         decoder_copy,
         autoencoder_copy,
+        env_wrap._game_decoder_struct,
+        env_wrap._game_decoder_kwargs,
         env_wrap._encoded_exemplars,
         env_wrap._raw_exemplars,
         env_wrap._similarity_tree,
         env_wrap._max_states_considered,
-        env_wrap._fuzzy_logic_of_n_closest,
-        result_memory_copy,
-        ReentrantLock(),
         env_wrap._distance_metric,
         env_wrap._exemplars_clustering,
         env_wrap._hclust_distance,
         env_wrap._hclust_time,
         env_wrap._verbose
     )
-end
-
-function is_leaf(tree::TreeNode) :: Bool
-    return isnothing(tree.left) && isnothing(tree.right)
-end
-
-function clean_memory!(env_wrap::EnvironmentWrapperStruct)
-    lock(env_wrap._result_memory_mutex)
-    env_wrap._result_memory = Dict{Vector{Int}, Float64}()
-    unlock(env_wrap._result_memory_mutex)
 end
 
 function get_action_size(env_wrap::EnvironmentWrapperStruct) :: Int
@@ -182,23 +153,21 @@ function get_groups_number(env_wrap::EnvironmentWrapperStruct) :: Int
     return size(env_wrap._encoded_exemplars, 2)
 end
 
+"""
+Learn game_decoder on env_wrap exemplars and goal_responses, evaluate and return fitness and game_decoder.
+returns Tuple{Float64, <:NeuralNetwork.AbstractNeuralNetwork}
+"""
+function get_fitness(env_wrap::EnvironmentWrapperStruct, game_decoder::NeuralNetwork.AbstractNeuralNetwork, goal_responses::Matrix{Float32})
+    game_decoder_copy = NeuralNetwork.copy(game_decoder)
+    NeuralNetwork.learn!(game_decoder_copy, env_wrap._encoded_exemplars, goal_responses; verbose=false)
+    return get_fitness(env_wrap, game_decoder_copy), game_decoder_copy
+end
 
-function get_fitness(env_wrap::EnvironmentWrapperStruct, genes::Vector{Int}) :: Float64
-    copied_genes = Base.deepcopy(genes)
+function get_fitness(env_wrap::EnvironmentWrapperStruct, game_decoder::NeuralNetwork.AbstractNeuralNetwork) :: Float64
+    full_NN = get_full_NN(env_wrap, game_decoder)
 
-    lock(env_wrap._result_memory_mutex)
-    result = get(env_wrap._result_memory, copied_genes, nothing)
-    unlock(env_wrap._result_memory_mutex)
-
-    if isnothing(result)
-        full_NN = get_full_NN(env_wrap, copied_genes)
-        envs_copies = [Environment.copy(env) for env in env_wrap._envs]
-        result = sum(Environment.get_trajectory_rewards!(envs_copies, full_NN))
-
-        lock(env_wrap._result_memory_mutex)
-        env_wrap._result_memory[copied_genes] = result
-        unlock(env_wrap._result_memory_mutex)
-    end
+    envs_copies = [Environment.copy(env) for env in env_wrap._envs]
+    result = sum(Environment.get_trajectory_rewards!(envs_copies, full_NN))
 
     return result
 end
@@ -231,7 +200,7 @@ function create_new_based_on(
     TSEQ = typeof(trajectories_and_percentages[1][2][1].states) # type of states sequences
     trajectories_and_percentages_casted = Vector{Tuple{Float64, Vector{Environment.Trajectory{TSEQ}}}}(trajectories_and_percentages)
 
-    new_env_wrapper = copy(env_wrap, false)
+    new_env_wrapper = copy(env_wrap)
 
     new_states = _combine_states_from_trajectories(trajectories_and_percentages_casted, new_env_wrapper._max_states_considered)
     new_states_nn_input = Environment.get_nn_input(new_states)
@@ -244,15 +213,13 @@ function create_new_based_on(
     new_encoded_states = NeuralNetwork.predict(new_env_wrapper._encoder, new_states_nn_input)
 
     # # get new exemplars, states and newly encoded states
-    new_exemplars_ids, new_similarity_tree = _get_exemplars(new_encoded_states, new_n_clusters; distance_metric=env_wrap._distance_metric, exemplars_clustering=env_wrap._exemplars_clustering, hclust_distance=env_wrap._hclust_distance)
+    new_exemplars_ids, new_similarity_tree = StatesGrouping.get_exemplars(new_encoded_states, new_n_clusters; distance_metric=env_wrap._distance_metric, exemplars_clustering=env_wrap._exemplars_clustering, hclust_distance=env_wrap._hclust_distance)
     new_exemplars = new_encoded_states[:, new_exemplars_ids]
     new_raw_exemplars = Environment.get_sequence_with_ids(new_states, new_exemplars_ids)
 
     new_env_wrapper._encoded_exemplars = new_exemplars
     new_env_wrapper._raw_exemplars = new_raw_exemplars
     new_env_wrapper._similarity_tree = new_similarity_tree
-    new_env_wrapper._result_memory = Dict{Vector{Int}, Float64}()
-    new_env_wrapper._result_memory_mutex = ReentrantLock()
     new_env_wrapper._n_clusters = new_n_clusters
 
     return new_env_wrapper
@@ -260,32 +227,38 @@ end
 
 function translate(
         from_env_wrap::EnvironmentWrapperStruct,
+        from_game_decoder::NeuralNetwork.AbstractNeuralNetwork,
         to_env_wrap::EnvironmentWrapperStruct,
-        from_genes::Vector{Int},  
-        to_genes_indices::Vector{Int},  # important! these are just indices of genes in to_env_wrap
-    ) :: Vector{Int}  # translated genes, only to_genes_indices are present
+        to_genes_indices::Vector{Int} = collect(1:to_env_wrap._n_clusters)  # by default translates all genes
+    ) :: Matrix{Float32}  # translated genes, only to_genes_indices are present
     # create NN
 
-    if from_env_wrap === to_env_wrap
-        return from_genes[to_genes_indices]
-    else
-        from_NN = get_full_NN(from_env_wrap, from_genes)
-        to_raw_exemplars = Environment.get_sequence_with_ids(to_env_wrap._raw_exemplars, to_genes_indices)
-        nn_output = NeuralNetwork.predict(from_NN, Environment.get_nn_input(to_raw_exemplars))
-        to_genes = argmax.(eachcol(nn_output))
-        return to_genes
-    end
+    from_full_NN = get_full_NN(from_env_wrap, from_game_decoder)
+    to_raw_exemplars = Environment.get_sequence_with_ids(to_env_wrap._raw_exemplars, to_genes_indices)
+    return NeuralNetwork.predict(from_full_NN, Environment.get_nn_input(to_raw_exemplars))
 end
 
-function get_full_NN(env_wrap::EnvironmentWrapperStruct, genes::Vector{Int}) :: NeuralNetwork.AbstractNeuralNetwork
-    return NeuralNetwork.DistanceBasedClassificator(
-        env_wrap._encoder,
-        env_wrap._encoded_exemplars,
-        genes,
-        get_action_size(env_wrap),
-        env_wrap._fuzzy_logic_of_n_closest,
-        env_wrap._distance_metric
-    )
+function get_genes(env_wrap::EnvironmentWrapperStruct, game_decoder::NeuralNetwork.AbstractNeuralNetwork) :: Matrix{Float32}
+    return NeuralNetwork.predict(game_decoder, env_wrap._encoded_exemplars)
+end
+
+function get_full_NN(env_wrap::EnvironmentWrapperStruct, game_decoder::NeuralNetwork.AbstractNeuralNetwork)
+    return get_full_NN(env_wrap._encoder, game_decoder)
+end
+
+function get_full_NN(encoder::NeuralNetwork.AbstractNeuralNetwork, game_decoder::NeuralNetwork.AbstractNeuralNetwork)
+    return NeuralNetwork.Combined_NN([
+        encoder,
+        game_decoder
+    ])
+end
+
+function new_game_decoder(env_wrap::EnvironmentWrapperStruct) :: NeuralNetwork.AbstractNeuralNetwork
+    return new_game_decoder(env_wrap._game_decoder_struct, env_wrap._game_decoder_kwargs)
+end
+
+function new_game_decoder(game_decoder_struct, game_decoder_kwargs) :: NeuralNetwork.AbstractNeuralNetwork
+    return game_decoder_struct(;game_decoder_kwargs...)
 end
 
 function is_verbose(env_wrap::EnvironmentWrapperStruct) :: Bool
@@ -330,33 +303,5 @@ function _combine_states_from_trajectories(trajectories_and_percentages::Vector{
 
     return states_combined
 end
-
-# function _translate_solutions(old_exemplars::Matrix{Float32}, new_exemplars::Matrix{Float32}, all_solutions::Vector{Vector{Int}}) :: Vector{Vector{Int}}
-#     # calculate simmilarity matrix
-#     distances_matrix = Distances.pairwise(Distances.CosineDist(), old_exemplars, new_exemplars)
-#     new_to_old = [argmin(one_col) for one_col in eachcol(distances_matrix)]
-
-#     # translate solutions
-#     new_solutions = Vector{Vector{Int}}(undef, length(all_solutions))
-#     # Threads.@threads for i in 1:length(all_solutions)
-#     for i in 1:length(all_solutions)
-#         solution = all_solutions[i]
-#         new_solution = [solution[old] for old in new_to_old]
-#         new_solutions[i] = new_solution
-#     end
-
-#     return new_solutions
-# end
-
-# function translate_solutions(env_wrap_old::EnvironmentWrapperStruct, env_wrap_new::EnvironmentWrapperStruct, all_solutions::Vector{Vector{Int}}) :: Vector{Vector{Int}}
-#     return _translate_solutions(env_wrap_old._encoded_exemplars, NeuralNetwork.predict(env_wrap_old._encoder, env_wrap_old._raw_exemplars), all_solutions)
-# end
-
-include("GenieClust.jl")
-import .GenieClust
-include("PAM.jl")
-import .PAM
-include("_EnvironmentWrapperClustering.jl")
-include("_EnvironmentWrapperTimeClustering.jl")
 
 end

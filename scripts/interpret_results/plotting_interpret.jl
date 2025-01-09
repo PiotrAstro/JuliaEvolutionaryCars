@@ -10,8 +10,8 @@ import Statistics
 # My params
 
 
-TEST_DIR = joinpath("log", "parameters_tests_2024-12-30_00-00-41")
-RESULTS_DIR = TEST_DIR  # joinpath(TEST_DIR, "results")
+TEST_DIR = joinpath("log", "parameters_tests_2025-01-04_19-26-01")
+RESULTS_DIR = joinpath(TEST_DIR, "results")
 ANALYSIS_DIR = joinpath(TEST_DIR, "analysis")
 
 TEST_POSTFIX = ".csv"  # will be removed from plot entries
@@ -25,7 +25,7 @@ LINE_METHOD = :mean
 # but you can also use tuple inside, then there is or, e.g.
 # TEST_INFIX_LIST = ["40", ("30", "50")]  ->  contains("40") && (contains("30") || contains("50"))
 # usually you should use it like this TEST_INFIX_LIST = ["(MmdWei=0.0)"] 
-TEST_INFIX_LIST = []
+TEST_INFIX_LIST = [("HclDis=complete", "HclDis=ward")]
 
 
 
@@ -90,7 +90,7 @@ function plot(
     line_function::Symbol
 )
     mkpath(ANALYSIS_DIR)
-    infix_test = "[" * join([isa(infix_el, Tuple) ? join(infix_el, " | ") : infix_el for infix_el in TEST_INFIX_LIST], " & ") * "]"
+    infix_test = "[" * join([isa(infix_el, Tuple) ? join(infix_el, " or ") : infix_el for infix_el in TEST_INFIX_LIST], " & ") * "]"
     plot_name = "function--$line_function  Col--$column  Prefix--$TEST_PREFIX  Infix--$infix_test"
     println("Plotting: $plot_name")
     plot_save_name = replace("_"*plot_name, " " => "_")
