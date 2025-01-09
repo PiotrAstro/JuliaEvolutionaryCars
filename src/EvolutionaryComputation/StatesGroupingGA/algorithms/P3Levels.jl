@@ -89,7 +89,7 @@ function run_new_individual!(p3::Population_Pyramid) :: Ind.Individual
 
         old_fitness = Ind.get_fitness!(new_individual)
         Ind.optimal_mixing_bottom_to_top!(new_individual, p3.population[i].individuals)
-        Ind.FIHC_top_to_bottom!(new_individual)
+        Ind.FIHC_top_to_bottom!(new_individual)  # it used to be different - should try to do it before new level consideration
 
         if p3.verbose
             Logging.@info Printf.@sprintf("\nGenes post mixing: %s\n", Ind.get_same_genes_percent(new_individual, p3.population[i].individuals))
