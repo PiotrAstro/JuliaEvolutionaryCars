@@ -127,20 +127,6 @@ CONSTANTS_DICT = Dict(
                 :mmd_weight => 0.0,  # IDK why, but in early tests clearly 0.0 was the best, so MMD wasnt used at all, there was a huge difference
                 :learning_rate => 0.001
             ),
-            :game_decoder_dict => Dict(  # used only in the first collection on states
-                :name => :MLP_NN,
-                :kwargs => Dict(
-                    :input_size => 16,  # 16
-                    :output_size => 9,
-                    :hidden_layers => 1,
-                    :hidden_neurons => 32,  # 64
-                    :dropout => 0.0,  # 0.5,
-                    :activation_function => :relu,  # :relu
-                    :input_activation_function => :none,  # :relu,
-                    :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
-                    :loss => Flux.kldivergence
-                )
-            ),
             :initial_space_explorers_n => 30,
             :max_states_considered => 10_000,
             :n_clusters => 40,  # 40 and 200 works very well, should try different values
@@ -148,6 +134,7 @@ CONSTANTS_DICT = Dict(
             :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock, after some initial tests it should definatelly be cosine!
             :hclust_distance => :ward,  # :ward or :single or :complete or :average
             :hclust_time => :ward,  # :ward or :single or :complete or :average
+            :m_value => 2,  # 2 is better than 1
             :exemplars_clustering => :pam  # :genie or :kmedoids or :pam
         )
     ),

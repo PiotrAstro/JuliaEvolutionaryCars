@@ -4,9 +4,6 @@ import DataFrames
 
 export run
 
-include("EvolutionaryComputation/AbstractOptimizer.jl")
-import .AbstractOptimizerModule
-
 include("NeuralNetwork/NeuralNetwork.jl")
 import .NeuralNetwork
 
@@ -16,14 +13,8 @@ import .Environment
 include("utils/utils.jl")
 using .Utils
 
-include("EvolutionaryComputation/EvolutionaryMutatePopulation/EvolutionaryMutatePopulation.jl")
-import .EvolutionaryMutatePopulaiton
-
-include("EvolutionaryComputation/StatesGroupingGA/StatesGroupingGA.jl")
-import .StatesGroupingGA
-
-include("EvolutionaryComputation/ContinuousStatesGroupingGA/ContinuousStatesGroupingP3.jl")
-import .ContinuousStatesGroupingP3
+include("EvolutionaryComputation/AbstractOptimizer.jl")
+import .AbstractOptimizerModule
 
 function run(optimizer::Symbol, CONSTANTS_DICT::Dict{Symbol}) :: DataFrames.DataFrame
     # Preprocessing data

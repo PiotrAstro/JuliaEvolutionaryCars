@@ -1,5 +1,9 @@
 module AbstractOptimizerModule
 
+import ..NeuralNetwork
+import ..Environment
+using ..Utils
+
 import DataFrames
 
 function get_optimizer(optimizer::Symbol)
@@ -24,6 +28,18 @@ function run!(
     ) :: DataFrames.DataFrame
     throw("not implemented")
 end
+
+include("EvolutionaryMutatePopulation/EvolutionaryMutatePopulation.jl")
+import .EvolutionaryMutatePopulaiton
+
+include("StatesGroupingGA/StatesGroupingGA.jl")
+import .StatesGroupingGA
+
+include("ContinuousStatesGroupingGA/ContinuousStatesGroupingP3.jl")
+import .ContinuousStatesGroupingP3
+
+include("ContinuousStatesGroupingGA/ContinuousStatesGroupingSimpleGA.jl")
+import .ContinuousStatesGroupingSimpleGA
 
 end # module AbstractOptimizerModule
  

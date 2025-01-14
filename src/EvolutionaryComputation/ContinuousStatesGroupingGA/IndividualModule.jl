@@ -19,7 +19,6 @@ global ID::Int = 0
 
 mutable struct Individual
     genes::Matrix{Float32}
-    game_decoder::NeuralNetwork.AbstractNeuralNetwork
     env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct
     time_tree::StatesGrouping.TreeNode
     levels_trajectories::Vector{Vector{<:Environment.Trajectory}}
@@ -30,16 +29,13 @@ mutable struct Individual
 end
 
 function Individual(env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct, verbose::Bool=false)
-
-    game_decoder = EnvironmentWrapper.new_game_decoder(env_wrapper)
-    genes = EnvironmentWrapper.get_genes(env_wrapper, game_decoder)
+    genes = EnvironmentWrapper.new_genes(env_wrapper)
     fitness = -Inf
     fitness_actual = false
-    trajectories, time_tree = EnvironmentWrapper.create_time_distance_tree(env_wrapper, game_decoder)
+    trajectories, time_tree = EnvironmentWrapper.create_time_distance_tree(env_wrapper, genes)
     global ID += 1
     return Individual(
         genes,
-        game_decoder,
         env_wrapper,
         time_tree,
         [trajectories],
@@ -79,7 +75,7 @@ end
 
 function get_fitness!(individual::Individual)::Float64
     if !individual._fitness_actual
-        individual._fitness, individual.game_decoder = EnvironmentWrapper.get_fitness(individual.env_wrapper, individual.game_decoder, individual.genes)
+        individual._fitness = EnvironmentWrapper.get_fitness(individual.env_wrapper, individual.genes)
         individual._fitness_actual = true
     end
 
@@ -89,7 +85,6 @@ end
 function copy_individual(individual::Individual)
     return Individual(
         copy(individual.genes),
-        NeuralNetwork.copy(individual.game_decoder),
         individual.env_wrapper,
         individual.time_tree,
         [trajectories for trajectories in individual.levels_trajectories],
@@ -110,18 +105,18 @@ end
 
 function change_genes_at_position!(individual::Individual, positions::Vector{Int}, action_index::Int)
     individual.genes[action_index, positions] .+= 1.0f0
-    individual.genes[:, positions] ./= sum(@view individual.genes[:, positions])
+    EnvironmentWrapper.normalize_genes!(individual.genes)
 end
 
 function visualize(individual::Individual, visualization_env::Environment.AbstractEnvironment, visualization_kwargs::Dict{Symbol,Any})
-    nn = EnvironmentWrapper.get_full_NN(individual.env_wrapper, individual.game_decoder)
+    nn = EnvironmentWrapper.get_full_NN(individual.env_wrapper, individual.genes)
     Environment.visualize!(visualization_env, nn; visualization_kwargs...)
 end
 
 function get_other_genes(individual::Individual, other_individual::Individual, to_genes_indices::Vector{Int})::Matrix{Float32}
     return EnvironmentWrapper.translate(
         other_individual.env_wrapper,
-        other_individual.game_decoder,
+        other_individual.genes,
         individual.env_wrapper,
         to_genes_indices
     )
@@ -178,7 +173,6 @@ function optimal_mixing_bottom_to_top!(individual::Individual, other_individuals
             max_copy = argmax(get_fitness!, individuals_copies)
             if get_fitness!(max_copy) > old_fitness
                 individual.genes = max_copy.genes
-                individual.game_decoder = max_copy.game_decoder
                 individual._fitness = max_copy._fitness
                 if individual._verbose
                     Logging.@info Printf.@sprintf("improvement from %.2f  to %.2f\ttree level %d\n", old_fitness, get_fitness!(max_copy), i)
@@ -197,7 +191,7 @@ function optimal_mixing_bottom_to_top!(individual::Individual, other_individuals
 end
 
 function new_level_cosideration!(individual::Individual)
-    trajectory, time_tree = EnvironmentWrapper.create_time_distance_tree(individual.env_wrapper, individual.game_decoder)
+    trajectory, time_tree = EnvironmentWrapper.create_time_distance_tree(individual.env_wrapper, individual.genes)
     individual.time_tree = time_tree
     push!(individual.levels_trajectories, trajectory)
 end
@@ -234,7 +228,6 @@ function FIHC_flat!(individual::Individual, indicies=collect(1:size(individual.g
         max_copy = argmax(get_fitness!, individuals_copies)
         if get_fitness!(max_copy) > previous_fitness
             individual.genes = max_copy.genes
-            individual.game_decoder = max_copy.game_decoder
             individual._fitness = max_copy._fitness
             if individual._verbose
                 Logging.@info Printf.@sprintf("improvement from %.2f  to %.2f\n", previous_fitness, get_fitness!(max_copy))
@@ -285,7 +278,6 @@ function FIHC_top_to_bottom!(individual::Individual)::Int
             max_copy = argmax(get_fitness!, individuals_copies)
             if get_fitness!(max_copy) > old_fitness
                 individual.genes = max_copy.genes
-                individual.game_decoder = max_copy.game_decoder
                 individual._fitness = max_copy._fitness
                 if individual._verbose
                     println("improvement from $old_fitness  to $(get_fitness!(max_copy))\ttree level $i")

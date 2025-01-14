@@ -11,6 +11,7 @@ import Plots
 import Dates
 import JLD
 import Logging
+import LinearAlgebra
 using StatsPlots
 
 export EnvironmentWrapperStruct, get_action_size, get_groups_number, get_fitness, copy, is_verbose, set_verbose!, translate, create_new_based_on, create_time_distance_tree, get_genes
@@ -25,8 +26,6 @@ mutable struct EnvironmentWrapperStruct
     _encoder::NeuralNetwork.AbstractNeuralNetwork
     _decoder::NeuralNetwork.AbstractNeuralNetwork
     _autoencoder::NeuralNetwork.AbstractNeuralNetwork
-    _game_decoder_struct
-    _game_decoder_kwargs::Dict
     _encoded_exemplars::Matrix{Float32}
     _raw_exemplars::Environment.AbstractStateSequence
     _similarity_tree::StatesGrouping.TreeNode
@@ -35,8 +34,11 @@ mutable struct EnvironmentWrapperStruct
     _exemplars_clustering::Symbol  # :genieclust or :pam or :kmedoids
     _hclust_distance::Symbol  # :ward or :single or :complete or :average
     _hclust_time::Symbol  # :ward or :single or :complete or :average
+    _m_value::Int
     _verbose::Bool
 end
+
+
 
 # --------------------------------------------------------------------------------------------------
 # Public functions
@@ -47,7 +49,6 @@ function EnvironmentWrapperStruct(
     encoder_dict::Dict{Symbol, Any},
     decoder_dict::Dict{Symbol, Any},
     autoencoder_dict::Dict{Symbol, <:Any},
-    game_decoder_dict::Dict{Symbol, Any},
     initial_space_explorers_n::Int,
     max_states_considered::Int,
     n_clusters::Int,
@@ -55,6 +56,7 @@ function EnvironmentWrapperStruct(
     exemplars_clustering::Symbol = :genieclust,
     hclust_distance::Symbol = :ward,
     hclust_time::Symbol = :ward,
+    m_value::Int = 1,
     verbose::Bool = false
 ) :: EnvironmentWrapperStruct
 
@@ -62,13 +64,11 @@ function EnvironmentWrapperStruct(
     decoder = NeuralNetwork.get_neural_network(decoder_dict[:name])(;decoder_dict[:kwargs]...)
     autoencoder = NeuralNetwork.Autoencoder(encoder, decoder; autoencoder_dict...)
 
-    game_decoder_struct = NeuralNetwork.get_neural_network(game_decoder_dict[:name])
-    game_decoder_kwargs = game_decoder_dict[:kwargs]
-
     # initial state space exploration
     # random NNs creation
+    action_n = Environment.get_action_size(envs[1])
     NNs = [
-        get_full_NN(encoder, new_game_decoder(game_decoder_struct, game_decoder_kwargs)) for _ in 1:initial_space_explorers_n
+        NeuralNetwork.Random_NN(action_n) for _ in 1:initial_space_explorers_n
     ]
     # states collection
     trajectories = _collect_trajectories(envs, NNs)
@@ -95,8 +95,6 @@ function EnvironmentWrapperStruct(
         encoder,
         decoder,
         autoencoder,
-        game_decoder_struct,
-        game_decoder_kwargs,
         encoded_exemplars,
         states_exeplars,
         similarity_tree,
@@ -105,6 +103,7 @@ function EnvironmentWrapperStruct(
         exemplars_clustering,
         hclust_distance,
         hclust_time,
+        m_value,
         verbose
     )
 end
@@ -112,11 +111,15 @@ end
 """
 returns Tuple{Vector{Trajectory}, TreeNode}
 """
-function create_time_distance_tree(env_wrap::EnvironmentWrapperStruct, game_decoder::NeuralNetwork.AbstractNeuralNetwork)
-    trajectories = _collect_trajectories(env_wrap._envs, [get_full_NN(env_wrap, game_decoder)])
+function create_time_distance_tree(env_wrap::EnvironmentWrapperStruct, translation::Matrix{Float32})
+    trajectories = _collect_trajectories(env_wrap._envs, [get_full_NN(env_wrap, translation)])
     states_in_trajectories = [trajectory.states for trajectory in trajectories]
     encoded_states_by_trajectory = [NeuralNetwork.predict(env_wrap._encoder, Environment.get_nn_input(states_one_traj)) for states_one_traj in states_in_trajectories]
     return trajectories, StatesGrouping.create_time_distance_tree(encoded_states_by_trajectory, env_wrap._encoded_exemplars, env_wrap._hclust_time)
+end
+
+function get_trajectories(env_wrap::EnvironmentWrapperStruct, translation::Matrix{Float32})
+    return _collect_trajectories(env_wrap._envs, [get_full_NN(env_wrap, translation)])
 end
 
 function copy(env_wrap::EnvironmentWrapperStruct) :: EnvironmentWrapperStruct
@@ -131,8 +134,6 @@ function copy(env_wrap::EnvironmentWrapperStruct) :: EnvironmentWrapperStruct
         encoder_copy,
         decoder_copy,
         autoencoder_copy,
-        env_wrap._game_decoder_struct,
-        env_wrap._game_decoder_kwargs,
         env_wrap._encoded_exemplars,
         env_wrap._raw_exemplars,
         env_wrap._similarity_tree,
@@ -141,8 +142,41 @@ function copy(env_wrap::EnvironmentWrapperStruct) :: EnvironmentWrapperStruct
         env_wrap._exemplars_clustering,
         env_wrap._hclust_distance,
         env_wrap._hclust_time,
+        env_wrap._m_value,
         env_wrap._verbose
     )
+end
+
+function new_genes(env_wrap::EnvironmentWrapperStruct) :: Matrix{Float32}
+    genes = randn(Float32, get_action_size(env_wrap), env_wrap._n_clusters)
+    normalize_genes_min_0!(genes)
+    return genes
+end
+
+"""
+It normalizes genes by making it non negative and sum to 0
+opposed to normalize_genes_min_0! if input is e.g. 0.2 0.4 0.4 it will stay the same
+"""
+function normalize_genes!(genes::Matrix{Float32})
+    for col in eachcol(genes)
+        min_value = minimum(col)
+        if min_value < 0
+            col .+= abs(min_value)
+        end
+        col ./= sum(col)
+    end
+end
+
+"""
+It normalizes genes by subtracting smallest value from each col and then subtracting by sum
+if input is e.g. 0.2 0.4 0.4 it will be normalized to 0 0.5 0.5
+"""
+function normalize_genes_min_0!(genes::Matrix{Float32})
+    for col in eachcol(genes)
+        min_value = minimum(col)
+        col .-= min_value
+        col ./= sum(col)
+    end
 end
 
 function get_action_size(env_wrap::EnvironmentWrapperStruct) :: Int
@@ -153,18 +187,8 @@ function get_groups_number(env_wrap::EnvironmentWrapperStruct) :: Int
     return size(env_wrap._encoded_exemplars, 2)
 end
 
-"""
-Learn game_decoder on env_wrap exemplars and goal_responses, evaluate and return fitness and game_decoder.
-returns Tuple{Float64, <:NeuralNetwork.AbstractNeuralNetwork}
-"""
-function get_fitness(env_wrap::EnvironmentWrapperStruct, game_decoder::NeuralNetwork.AbstractNeuralNetwork, goal_responses::Matrix{Float32})
-    game_decoder_copy = NeuralNetwork.copy(game_decoder)
-    NeuralNetwork.learn!(game_decoder_copy, env_wrap._encoded_exemplars, goal_responses; verbose=false)
-    return get_fitness(env_wrap, game_decoder_copy), game_decoder_copy
-end
-
-function get_fitness(env_wrap::EnvironmentWrapperStruct, game_decoder::NeuralNetwork.AbstractNeuralNetwork) :: Float64
-    full_NN = get_full_NN(env_wrap, game_decoder)
+function get_fitness(env_wrap::EnvironmentWrapperStruct, translation::Matrix{Float32}) :: Float64
+    full_NN = get_full_NN(env_wrap, translation)
 
     envs_copies = [Environment.copy(env) for env in env_wrap._envs]
     result = sum(Environment.get_trajectory_rewards!(envs_copies, full_NN))
@@ -227,38 +251,27 @@ end
 
 function translate(
         from_env_wrap::EnvironmentWrapperStruct,
-        from_game_decoder::NeuralNetwork.AbstractNeuralNetwork,
+        from_translation::Matrix{Float32},
         to_env_wrap::EnvironmentWrapperStruct,
         to_genes_indices::Vector{Int} = collect(1:to_env_wrap._n_clusters)  # by default translates all genes
     ) :: Matrix{Float32}  # translated genes, only to_genes_indices are present
     # create NN
 
-    from_full_NN = get_full_NN(from_env_wrap, from_game_decoder)
+    from_full_NN = get_full_NN(from_env_wrap, from_translation)
     to_raw_exemplars = Environment.get_sequence_with_ids(to_env_wrap._raw_exemplars, to_genes_indices)
     return NeuralNetwork.predict(from_full_NN, Environment.get_nn_input(to_raw_exemplars))
 end
 
-function get_genes(env_wrap::EnvironmentWrapperStruct, game_decoder::NeuralNetwork.AbstractNeuralNetwork) :: Matrix{Float32}
-    return NeuralNetwork.predict(game_decoder, env_wrap._encoded_exemplars)
-end
-
-function get_full_NN(env_wrap::EnvironmentWrapperStruct, game_decoder::NeuralNetwork.AbstractNeuralNetwork)
-    return get_full_NN(env_wrap._encoder, game_decoder)
-end
-
-function get_full_NN(encoder::NeuralNetwork.AbstractNeuralNetwork, game_decoder::NeuralNetwork.AbstractNeuralNetwork)
-    return NeuralNetwork.Combined_NN([
-        encoder,
-        game_decoder
-    ])
-end
-
-function new_game_decoder(env_wrap::EnvironmentWrapperStruct) :: NeuralNetwork.AbstractNeuralNetwork
-    return new_game_decoder(env_wrap._game_decoder_struct, env_wrap._game_decoder_kwargs)
-end
-
-function new_game_decoder(game_decoder_struct, game_decoder_kwargs) :: NeuralNetwork.AbstractNeuralNetwork
-    return game_decoder_struct(;game_decoder_kwargs...)
+function get_full_NN(env_wrap::EnvironmentWrapperStruct, translation::Matrix{Float32})
+    return NeuralNetwork.DistanceBasedClassificator(
+        env_wrap._encoder,
+        env_wrap._encoded_exemplars,
+        translation,
+        get_action_size(env_wrap),
+        -1,
+        env_wrap._distance_metric,
+        env_wrap._m_value
+    )
 end
 
 function is_verbose(env_wrap::EnvironmentWrapperStruct) :: Bool

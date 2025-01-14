@@ -10,7 +10,7 @@ import Statistics
 # My params
 
 
-TEST_DIR = joinpath("log", "parameters_tests_2025-01-04_19-26-01")
+TEST_DIR = joinpath("log", "parameters_tests_2025-01-09_23-17-50")
 RESULTS_DIR = joinpath(TEST_DIR, "results")
 ANALYSIS_DIR = joinpath(TEST_DIR, "analysis")
 
@@ -25,7 +25,7 @@ LINE_METHOD = :mean
 # but you can also use tuple inside, then there is or, e.g.
 # TEST_INFIX_LIST = ["40", ("30", "50")]  ->  contains("40") && (contains("30") || contains("50"))
 # usually you should use it like this TEST_INFIX_LIST = ["(MmdWei=0.0)"] 
-TEST_INFIX_LIST = [("HclDis=complete", "HclDis=ward")]
+TEST_INFIX_LIST = []
 
 
 

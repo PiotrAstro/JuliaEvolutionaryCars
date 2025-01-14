@@ -92,6 +92,7 @@ include("_MLP.jl")
 include("_Combined.jl")
 include("_DistanceBasedClassificator.jl")
 include("_Autoencoder.jl")
+include("_Random.jl")
 
 # -------------------------------------------------------
 # module functions:

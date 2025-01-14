@@ -122,18 +122,18 @@ end
 
 # using BenchmarkTools
 function predict(nn::DistanceBasedClassificator, X)::Matrix{Float32}
-    # encoded_x = predict(nn.encoder, X)
-    # distances = nn.distance_function!(nn.encoded_exemplars, encoded_x)
+    # # encoded_x = predict(nn.encoder, X)
+    # # distances = nn.distance_function!(nn.encoded_exemplars, encoded_x)
     # # display(nn.translation)
     # # sleep(2)
-    # display(distances)
-    # sleep(2)
-    # display(membership(nn, X))
-    # sleep(2)
-    # display(predict_n_closest(nn, distances))
-    # sleep(2)
-    # display(predict_all(nn, distances))
-    # sleep(2)
+    # # display(distances)
+    # # sleep(2)
+    # # display(membership(nn, X))
+    # # sleep(2)
+    # # display(predict_n_closest(nn, distances))
+    # # sleep(2)
+    # # display(predict_all(nn, distances))
+    # # sleep(2)
 
     # b = @benchmark predict(($nn).encoder, $X)
     # display(b)
@@ -145,23 +145,11 @@ function predict(nn::DistanceBasedClassificator, X)::Matrix{Float32}
 
     # distances = nn.distance_function!(nn.encoded_exemplars, predict(nn.encoder, X))
 
-    # # b = @benchmark begin
-    # #     nn = $nn
-    # #     encoded_x = predict(nn.encoder, $X)
-    # #     distances = nn.distance_function(nn.encoded_exemplars, encoded_x)
-    # #     fdsfds = predict_n_closest(nn, distances)
-    # # end
-    # b = @benchmark predict_n_closest($nn, $distances)
+    # b = @benchmark predict_all($nn, $distances)
     # display(b)
     # sleep(2)
 
-    # # b = @benchmark begin
-    # #     nn = $nn
-    # #     encoded_x = predict(nn.encoder, $X)
-    # #     distances = nn.distance_function(nn.encoded_exemplars, encoded_x)
-    # #     sevd = predict_all(nn, distances)
-    # # end
-    # b = @benchmark predict_all($nn, $distances)
+    # b = @benchmark predict_tmp_test($nn, $X)
     # display(b)
     # sleep(2)
 
@@ -172,6 +160,12 @@ function predict(nn::DistanceBasedClassificator, X)::Matrix{Float32}
     distances = nn.distance_function!(nn.encoded_exemplars, encoded_x)
     return nn.predict_function(nn, distances)
 end
+
+# function predict_tmp_test(nn::DistanceBasedClassificator, X)::Matrix{Float32}
+#     encoded_x = predict(nn.encoder, X)
+#     distances = nn.distance_function!(nn.encoded_exemplars, encoded_x)
+#     return nn.predict_function(nn, distances)
+# end
 
 function membership(nn::DistanceBasedClassificator{Val{MINT}}, X)::Matrix{Float32} where {MINT}
     encoded_x = predict(nn.encoder, X)
