@@ -70,32 +70,86 @@ How to set TESTED_VALUES:
 # Start of real settings
 # --------------------------------------------------------------------------------------------------
 
-
-
 USE_N_WORKERS = 26  # how many workers to use, main worker is worker 1 and is not included - it doesnt perform calculations
 BLAS_THREADS_PER_WORKER = 1
 JULIA_THREADS_PER_WORKER = 1
 
 # we will change these values globally for all tests
 CONSTANTS_DICT[:run_config] = Dict(
-    :max_generations => 200,  # 200
-    :max_evaluations => 1_000_000,
+    :max_generations => 10_000_000,  # 200
+    :max_evaluations => 20_000,
     :log => false,
     :visualize_each_n_epochs => 0,
 )
 
 # Number of run tests per each combination of tested values
-CASES_PER_TEST = 15
+CASES_PER_TEST = 50
 
 # Values that will be tested
 TESTED_VALUES = [
     (
-        :StatesGroupingGA,
+        :ContinuousStatesGroupingSimpleGA,
         Dict(
-            :StatesGroupingGA => Dict(
+            :ContinuousStatesGroupingSimpleGA => Dict(
                 :env_wrapper => Dict(
-                    :n_clusters => [40, 100],
+                    :n_clusters => [20, 40, 100],
                     :m_value => [1, 2]
+                ),
+                :fihc => Dict(
+                    :fihc_mode => [:matrix_rand],
+                    :norm_mode => [:d_sum, :min_0],
+                    :random_matrix_mode => [:rand, :randn],
+                    :factor => [0.1, 0.3, 0.5, 1.0],
+                ),
+            ),
+        ),
+    ),
+    (
+        :ContinuousStatesGroupingSimpleGA,
+        Dict(
+            :ContinuousStatesGroupingSimpleGA => Dict(
+                :env_wrapper => Dict(
+                    :n_clusters => [20, 40, 100],
+                    :m_value => [1, 2]
+                ),
+                :fihc => Dict(
+                    :fihc_mode => [:per_gene_rand],
+                    :norm_mode => [:d_sum, :min_0],
+                    :random_matrix_mode => [:rand, :randn],
+                    :factor => [0.1, 0.3, 0.5, 1.0],
+                    :genes_combination => [:hier, :flat],
+                ),
+            ),
+        ),
+    ),
+    (
+        :ContinuousStatesGroupingSimpleGA,
+        Dict(
+            :ContinuousStatesGroupingSimpleGA => Dict(
+                :env_wrapper => Dict(
+                    :n_clusters => [20, 40, 100],
+                    :m_value => [1, 2]
+                ),
+                :fihc => Dict(
+                    :fihc_mode => [:disc_fihc],
+                    :genes_combination => [:hier, :flat],
+                ),
+            ),
+        ),
+    ),
+    (
+        :ContinuousStatesGroupingSimpleGA,
+        Dict(
+            :ContinuousStatesGroupingSimpleGA => Dict(
+                :env_wrapper => Dict(
+                    :n_clusters => [20, 40, 100],
+                    :m_value => [1, 2]
+                ),
+                :fihc => Dict(
+                    :fihc_mode => [:fihc_cont],
+                    :norm_mode => [:d_sum, :min_0],
+                    :factor => [0.1, 0.3, 0.5, 1.0],
+                    :genes_combination => [:hier, :flat],
                 ),
             ),
         ),
@@ -108,7 +162,7 @@ LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_" * timestamp)
 # LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_2024-12-27_12-31-13")
 
 OUTPUT_LOG_FILE = "_output_$(timestamp).log"
-CONSTANTS_FILE_TO_COPY = joinpath(pwd(), "scripts", "constants.jl") # copy constants.jl to logs dir, so that I know what were the exact settings when I ran it
+SCRIPTS_DIR_TO_COPY = joinpath(pwd(), "scripts") # copy constants.jl to logs dir, so that I know what were the exact settings when I ran it
 SRC_DIR_TO_COPY = joinpath(pwd(), "src")  # copy src dir to logs dir, so that I know what was the code when I ran it
 
 
@@ -180,8 +234,8 @@ mkpath(LOGS_DIR_RESULTS)
 mkpath(LOGS_DIR_SRC)
 mkpath(LOGS_DIR_ANALYSIS)
 println("Logs will be saved in: $LOGS_DIR")
-cp(CONSTANTS_FILE_TO_COPY, joinpath(LOGS_DIR_SRC, "constants.jl"))
-println("Copied constants.jl to logs dir")
+cp(SCRIPTS_DIR_TO_COPY, joinpath(LOGS_DIR_SRC, "scripts"))
+println("Copied scripts to logs dir")
 cp(SRC_DIR_TO_COPY, joinpath(LOGS_DIR_SRC, "src"))
 println("Copied src dir to logs dir")
 

@@ -14,7 +14,7 @@ import Logging
 import LinearAlgebra
 using StatsPlots
 
-export EnvironmentWrapperStruct, get_action_size, get_groups_number, get_fitness, copy, is_verbose, set_verbose!, translate, create_new_based_on, create_time_distance_tree, get_genes
+export EnvironmentWrapperStruct, get_action_size, get_groups_number, get_fitness, copy, is_verbose, set_verbose!, translate, create_new_based_on, create_time_distance_tree, normalize_genes_min_0!
 
 # --------------------------------------------------------------------------------------------------
 # Structs
@@ -173,10 +173,14 @@ if input is e.g. 0.2 0.4 0.4 it will be normalized to 0 0.5 0.5
 """
 function normalize_genes_min_0!(genes::Matrix{Float32})
     for col in eachcol(genes)
-        min_value = minimum(col)
-        col .-= min_value
-        col ./= sum(col)
+        normalize_genes_min_0!(col)
     end
+end
+
+function normalize_genes_min_0!(gene::AbstractVector{Float32})
+    min_value = minimum(gene)
+    gene .-= min_value
+    gene ./= sum(gene)
 end
 
 function get_action_size(env_wrap::EnvironmentWrapperStruct) :: Int

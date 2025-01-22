@@ -106,3 +106,17 @@ end # module EvolutionaryCarsJulia
 # - docelowo można zrobić coś z zapożyczaniem reprezentantów
 # - można zrobić wtedy różne ilości klastrów - np. do fihca nbajpierw będziemy dodawali 1.0 do 20 klastrów, poem zrobimy sobie 40 klastrów i będziemy dodawali po 0.5, potem 80 klastrów i będziemy dodawali 0.25
 # trochę nadal problem co zrobić z time distance tree
+
+
+
+# ------------------------------------------------------------------------------------------------------
+# testy local searcha:
+# na łatwiejszym środowisku (bez przyspieszania)
+# oceniamy z przymatu liczby ewaluacji
+# tych ewalucacji może być np. max 10000
+# bardzo dużo prób, np. 40?
+# na   nclust = 20, 40, 80   -   mval raczej wystarczy 2, ale można spróbować 1
+# 1. Dodawanie matrixa randomowego   -   mutation factor (0.1, 0.2, 0.5)   -   norm /sum lub -min/sum   -   rand vs randn
+# 2. Dodawanie vectora randomowego do jednego genu   -   mutation factor (0.1, 0.2, 0.5)   -   płaski lub hierarchiczny   -   norm /sum lub -min/sum   -   rand vs randn
+# 3. Dyskretny local search,dokładnie jedna akcja w genie ma 1.0, jako FIHC  -  płaski lub hierarchiczny
+# 4. Dodadawanie wartości do konkretnego gena (prawdopodobnie jako fihc)   -   adding factor (0.1, 0.2, 0.5)   -   płaski lub hierarchiczny   -   norm /sum lub -min/sum

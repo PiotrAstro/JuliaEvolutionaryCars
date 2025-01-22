@@ -167,7 +167,7 @@ end
 #     return nn.predict_function(nn, distances)
 # end
 
-function membership(nn::DistanceBasedClassificator{Val{MINT}}, X)::Matrix{Float32} where {MINT}
+function membership(nn::DistanceBasedClassificator, X)::Matrix{Float32}
     encoded_x = predict(nn.encoder, X)
     return encoded_membership(nn, encoded_x)
 end
@@ -225,8 +225,18 @@ function normalize_unit(x::Matrix{Float32}) :: Matrix{Float32}
 end
 
 function normalize_unit!(x::Matrix{Float32})
-    for col in eachcol(x)
-        LinearAlgebra.normalize!(col)
+    # for col in eachcol(x)
+    #     LinearAlgebra.normalize!(col)
+    # end
+    for col_ind in axes(x, 2)
+        sum_squared = 0.0f0
+        @turbo for row_ind in axes(x, 1)
+            sum_squared += x[row_ind, col_ind] ^ 2
+        end
+        sum_squared = 1.0f0 / sqrt(sum_squared)
+        @turbo for row_ind in axes(x, 1)
+            x[row_ind, col_ind] *= sum_squared
+        end
     end
 end
 

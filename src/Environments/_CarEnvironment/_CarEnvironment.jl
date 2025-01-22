@@ -166,7 +166,7 @@ function react!(env::BasicCarEnvironment, action::AbstractVector{Float32}) :: Fl
     # for action space with 9 outputs, all possible combinations
     max_action = argmax(action)
     steering_action = (max_action - 1) % 3 + 1
-    speed_action = (max_action - 1) ÷ 3 + 1  # 3 # (max_action - 1) ÷ 3 + 1
+    speed_action = 3  # 3 # (max_action - 1) ÷ 3 + 1
 
     if steering_action == 2
         env.angle += env.angle_max_change
@@ -196,13 +196,13 @@ function react!(env::BasicCarEnvironment, action::AbstractVector{Float32}) :: Fl
 end
 
 function get_action_size(env::BasicCarEnvironment) :: Int
-    return 9  # 9 # 3 # 6
+    return 3  # 9 # 3 # 6
 end
 
 function get_state(env::BasicCarEnvironment) :: Vector{Float32}
     inputs = Vector{Float32}(undef, length(env.rays) + 1)
     for i in eachindex(env.rays)
-        ray_distance = Float32(_get_ray_distance(env, env.angle + env.rays[i])) / env.rays_distances_scale_factor
+        ray_distance = _get_ray_distance(env, env.angle + env.rays[i]) / env.rays_distances_scale_factor
         inputs[i] = ray_distance > env.ray_input_clip ? env.ray_input_clip : ray_distance
     end
     speed_input = env.speed / env.max_speed
