@@ -7,12 +7,13 @@ special_dicts_with_cases::Vector{Tuple{Symbol, <:Dict{Symbol}, <:Dict{Symbol}, I
 
 """
 function consider_done_cases!(special_dicts_with_cases::Vector, save_dir::String)
+    files_in_save_dir = readdir(save_dir)
     log_text = "Checking for existing test cases in $save_dir"
     i = 1
     while i <= length(special_dicts_with_cases)
         (optimiser, special_dict, _, case_index) = special_dicts_with_cases[i]
         save_n = save_name(optimiser, special_dict, case_index)
-        if isfile(joinpath(save_dir, save_n))
+        if save_n in files_in_save_dir
             log_text = log_text * "\ntest case existing, will not run: $save_n"
             deleteat!(special_dicts_with_cases, i)
         else
