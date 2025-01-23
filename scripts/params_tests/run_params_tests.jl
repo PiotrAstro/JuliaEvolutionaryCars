@@ -277,8 +277,9 @@ results_lists = ProgressMeter.@showprogress Distributed.pmap(eachindex(special_d
     result_list = Vector{Bool}(undef, length(cases))
     for (j, case) in enumerate(cases)
         try
-            optimizer, special_dict, config_copy, case = special_dicts_with_cases[i]
-            run_one_test(optimizer, special_dict, deepcopy(config_copy), case, LOGS_DIR_RESULTS, Distributed.myid())
+            config_copy_copy = deepcopy(config_copy)
+            special_dict_copy = deepcopy(special_dict)
+            run_one_test(optimizer, special_dict_copy, config_copy_copy, case, LOGS_DIR_RESULTS, Distributed.myid())
             result_list[j] = true
         catch e
             Logging.@error "workerid $(Distributed.myid()) failed with error: $e"
