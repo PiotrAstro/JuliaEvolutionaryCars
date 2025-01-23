@@ -70,9 +70,11 @@ How to set TESTED_VALUES:
 # Start of real settings
 # --------------------------------------------------------------------------------------------------
 
-USE_N_WORKERS = 26  # how many workers to use, main worker is worker 1 and is not included - it doesnt perform calculations
+USE_N_WORKERS = 23  # how many workers to use, main worker is worker 1 and is not included - it doesnt perform calculations
 BLAS_THREADS_PER_WORKER = 1
 JULIA_THREADS_PER_WORKER = 1
+RUN_ALL_CASES_ON_ONE_WORKER = true  # if true, all cases will be run on one worker, if false, cases will be distributed among workers
+# if my jobs are small than it should be true, if they are big, it should be false
 
 # we will change these values globally for all tests
 CONSTANTS_DICT[:run_config] = Dict(
@@ -251,30 +253,49 @@ show(io, MIME"text/plain"(), special_dicts)
 log_text *= "\n\nSpecial dicts settings:\n" * String(take!(io))
 Logging.@info log_text
 
-special_dicts_with_cases = [
-    (optimizer, special_dict, deepcopy(CONSTANTS_DICT), i)
-    for (optimizer, special_dict, i) in vec([(optimizer, special_dict, i) for (optimizer, special_dict) in special_dicts, i in 1:CASES_PER_TEST])
+special_dicts_no_cases = [
+    (optimizer, special_dict, deepcopy(CONSTANTS_DICT))
+    for (optimizer, special_dict) in vec([(optimizer, special_dict) for (optimizer, special_dict) in special_dicts])
 ]
+if RUN_ALL_CASES_ON_ONE_WORKER
+    special_dicts_with_cases = [
+        (optimizer, special_dict, config_copy, [i for i in 1:CASES_PER_TEST])
+        for (optimizer, special_dict, config_copy) in special_dicts_no_cases
+    ]
+else
+    special_dicts_with_cases = vec([
+        (optimizer, special_dict, config_copy, [case])
+        for (optimizer, special_dict, config_copy) in special_dicts_no_cases, case in 1:CASES_PER_TEST
+    ])
+end
 consider_done_cases!(special_dicts_with_cases, LOGS_DIR_RESULTS)
 
-results = ProgressMeter.@showprogress Distributed.pmap(eachindex(special_dicts_with_cases)) do i 
+Logging.@info "Starting computation"
+results_lists = ProgressMeter.@showprogress Distributed.pmap(eachindex(special_dicts_with_cases)) do i 
     Logging.global_logger(CustomLoggers.RemoteLogger())
-    try
-        optimizer, special_dict, config_copy, case = special_dicts_with_cases[i]
-        run_one_test(optimizer, special_dict, config_copy, case, LOGS_DIR_RESULTS, Distributed.myid())
-        return true
-    catch e
-        Logging.@error "workerid $(Distributed.myid()) failed with error: $e"
-        return false
+    optimizer, special_dict, config_copy, cases = special_dicts_with_cases[i]
+    result_list = Vector{Bool}(undef, length(cases))
+    for (j, case) in enumerate(cases)
+        try
+            optimizer, special_dict, config_copy, case = special_dicts_with_cases[i]
+            run_one_test(optimizer, special_dict, deepcopy(config_copy), case, LOGS_DIR_RESULTS, Distributed.myid())
+            result_list[j] = true
+        catch e
+            Logging.@error "workerid $(Distributed.myid()) failed with error: $e"
+            result_list[j] = false
+        end
     end
+    return result_list
 end
 
-
-
-texts = [
-    (result ? "success" : "failed") * "  ->  " * save_name(optimizer, special_dict, case)
-    for (result, (optimizer, special_dict, _, case)) in zip(results, special_dicts_with_cases)
-]
+texts = []
+for (results_list, (optimizer, special_dict, _, cases)) in zip(results_lists, special_dicts_with_cases)
+    for (result, case) in zip(results_list, cases)
+        texts.append(
+            (result ? "success" : "failed") * "  ->  " * save_name(optimizer, special_dict, case)
+        )
+    end
+end
 
 text_log = "Finished computation, result:\n" * join(texts, "\n")
 Logging.@info text_log

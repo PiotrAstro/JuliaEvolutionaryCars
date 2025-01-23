@@ -11,10 +11,20 @@ function consider_done_cases!(special_dicts_with_cases::Vector, save_dir::String
     log_text = "Checking for existing test cases in $save_dir"
     i = 1
     while i <= length(special_dicts_with_cases)
-        (optimiser, special_dict, _, case_index) = special_dicts_with_cases[i]
-        save_n = save_name(optimiser, special_dict, case_index)
-        if save_n in files_in_save_dir
-            log_text = log_text * "\ntest case existing, will not run: $save_n"
+        (optimiser, special_dict, _, case_indexes) = special_dicts_with_cases[i]
+        case_num = 1
+        while case_num <= length(case_indexes)
+            case_index = case_indexes[case_num]
+            save_n = save_name(optimiser, special_dict, case_index)
+            if save_n in files_in_save_dir
+                log_text = log_text * "\ntest case existing, will not run: $save_n"
+                deleteat!(case_indexes, case_num)
+            else
+                case_num += 1
+            end
+        end
+
+        if isempty(case_indexes)
             deleteat!(special_dicts_with_cases, i)
         else
             i += 1
