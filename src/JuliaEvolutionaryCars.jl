@@ -120,3 +120,7 @@ end # module EvolutionaryCarsJulia
 # 2. Dodawanie vectora randomowego do jednego genu   -   mutation factor (0.1, 0.2, 0.5)   -   płaski lub hierarchiczny   -   norm /sum lub -min/sum   -   rand vs randn
 # 3. Dyskretny local search,dokładnie jedna akcja w genie ma 1.0, jako FIHC  -  płaski lub hierarchiczny
 # 4. Dodadawanie wartości do konkretnego gena (prawdopodobnie jako fihc)   -   adding factor (0.1, 0.2, 0.5)   -   płaski lub hierarchiczny   -   norm /sum lub -min/sum
+
+
+# -------------------------------------------------------------------
+# w latent space wyznaczyć sobie grafy i algorytmy jakieś z tego, które usuwać które nie
