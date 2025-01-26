@@ -189,7 +189,7 @@ function predict_all_cont_mine(nn::TestNN{Val{M_INT}}, distances::Matrix{Float32
 end
 
 function test_final()
-    latent = 32
+    latent = 16
     exemplars_n = 40
     new_exemplars_n = 5
     exemplars = rand(Float32, latent, exemplars_n)

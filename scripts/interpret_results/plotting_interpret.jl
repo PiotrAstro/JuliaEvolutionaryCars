@@ -1,3 +1,4 @@
+module PlottingInterpret 
 
 import Plots
 using Plots.PlotMeasures
@@ -19,12 +20,13 @@ TEST_PREFIX = "logs_opt=StaGroGA_"  # will be removed from plot entries
 
 Y_LABEL = :best_fitness
 X_LABEL = :generation
-LINE_METHOD = :mean  # :all, :mean, :median, :max, :min
-SHOW_STD = false  # whether to show std ribbon, doesnt matter for :all
+LINE_METHOD = :median  # :all, :mean, :median, :max, :min
+SHOW_STD = true  # whether to show std ribbon, doesnt matter for :all
 
-GROUPS = []  # By default [], so no GROUPS
-GROUPS = ["NClu"]  # could be e.g. ["NClu", "MmdWei"] it will create groups for each combination of these, if entry doesnt have any of these, it will be a group on its own
-GROUPS_IN_LEGEND = :all  # :all - different colours in groups, :col1 - one colour in groups, :col1_ent1 - one colour in groups and one entry in legend
+# By default [], so no GROUPS
+# could be e.g. ["NClu", "MmdWei"] it will create groups for each combination of these, if entry doesnt have any of these, it will be a group on its own
+GROUPS = []  
+GROUPS_IN_LEGEND = :col1# :all - different colours in groups, :col1 - one colour in groups, :col1_ent1 - one colour in groups and one entry in legend
 
 # will stay in the plot entries, used for filtering
 # TEST_INFIX_LIST = ["40", ("30", "!50")]  ->  contains("40") && (contains("30") || !contains("50"))
@@ -52,11 +54,22 @@ DISTINT_COLOURS = [
     "#ffbb78",  # Light Orange
     "#c5b0d5"   # Light Purple
 ]
+LINES = [
+    :solid          # _______________
+    :dash           # --------------
+    :dot            # ................
+    :dashdot        # _._._._._._._
+    :dashdotdot     # _.._.._.._..
+]
 PLOT_SIZE = (1500, 1000)
-PLOT_MARGIN = 10mm
-PLOT_TOP_MARGIN = 15mm
+PLOT_MARGIN = (maximum(PLOT_SIZE) / 150)mm
+FONT_SIZE = 15
+LEGEND_FONT_SIZE = 9
+LEGEND_LINE_LENGTH = LEGEND_FONT_SIZE
 LINE_WIDTH = 3
 RIBBON_FILL_ALPHA = 0.1
+GROUP_DELIMITER = "-----------------------------------------------"
+GROUP_SUB_ENTRY_PREFIX = "|-- "
 
 function get_name_string(file_name::String) :: String
     remove_prefix = replace(file_name, TEST_PREFIX => "")
@@ -109,11 +122,16 @@ function plot_all(
         xlabel=String(x_label),
         ylabel=String(y_label),
         title=plot_name,
+        legendfontsize=LEGEND_FONT_SIZE,
+        tickfontsize=FONT_SIZE,
+        guidefontsize=FONT_SIZE,
+        titlefontsize=FONT_SIZE,
         size=PLOT_SIZE,
         margin=PLOT_MARGIN,
-        top_margin=PLOT_TOP_MARGIN,
     )
+    lines_ribbons_plotting = Dict()
     current_colour = 1
+    current_line = 1
 
     names = sort(collect(keys(reads)))
     groups = Dict{String, Vector{String}}()
@@ -140,19 +158,17 @@ function plot_all(
         end
 
         if was_there_previous_group
-            plot_label_only!(p, "-------------------------------------------", DISTINT_COLOURS[current_colour], false, false)
+            plot_label_only!(p, GROUP_DELIMITER, DISTINT_COLOURS[current_colour], LINES[current_line], false, false)
         end
 
         # plot group_name
         if is_in_group
-            plot_label_only!(p, group_name, DISTINT_COLOURS[current_colour], false, one_colour)
+            plot_label_only!(p, group_name, DISTINT_COLOURS[current_colour], LINES[current_line], false, one_entry)
             was_there_previous_group = true
         end
 
-        for name in groups[group_name]
-            if !one_colour 
-                current_colour = current_colour % length(DISTINT_COLOURS) + 1
-            end
+        sorted_names = sort(groups[group_name])
+        for name in sorted_names
             cases = reads[name]
             all_cases = [(df[!, x_label], df[!, y_label]) for df in cases]
             common_x, y_values = get_common_x_and_vals(all_cases)  # common_x is vector, y_values is matrix (columnwise are timesteps, rowwise are cases)
@@ -161,7 +177,7 @@ function plot_all(
 
             if line_function == :all
                 for row in eachrow(y_values)
-                    plot_line_ribbon_only!(p, common_x, row, DISTINT_COLOURS[current_colour])
+                    add_line_ribbon_only!(lines_ribbons_plotting, common_x, row, DISTINT_COLOURS[current_colour], LINES[current_line])
                 end
             else
                 if line_function == :mean
@@ -179,32 +195,95 @@ function plot_all(
                 else
                     throw("Unknown line function")
                 end
-                plot_line_ribbon_only!(p, common_x, values, DISTINT_COLOURS[current_colour], ribbon)
+                add_line_ribbon_only!(lines_ribbons_plotting, common_x, values, DISTINT_COLOURS[current_colour], LINES[current_line], ribbon)
             end
 
             if !one_entry
-                plot_label_only!(p, name, DISTINT_COLOURS[current_colour], is_in_group, !one_colour)
+                plot_label_only!(p, name, DISTINT_COLOURS[current_colour], LINES[current_line], is_in_group, true)
+            end
+
+            if one_colour
+                current_line = next_line_style(current_line)
+            else
+                current_colour, current_line = next_colour_and_line_style(current_colour, current_line)
             end
         end
 
         if one_colour 
-            current_colour = current_colour % length(DISTINT_COLOURS) + 1
+            current_colour, current_line = next_colour_and_line_style(current_colour, current_line)
+            current_line = 1
         end
     end
-
+    plot_lines_ribbons_only!(p, lines_ribbons_plotting)
     Plots.savefig(joinpath(ANALYSIS_DIR, "$plot_save_name.png"))
 end
 
-function plot_label_only!(p, label::String, colour, is_in_group::Bool, opacity=true)
-    label_changed = is_in_group ? "|--" * label : label
-    Plots.plot!(p, [], [], label=label_changed, color=colour, linewidth=LINE_WIDTH, opacity=(opacity ? 1.0 : 0.0))
+"""
+It will return next colour and next linestyle.
+"""
+function next_colour_and_line_style(current_colour, current_linestyle) :: Tuple{Int, Int}
+    current_colour = current_colour + 1
+    if current_colour > length(DISTINT_COLOURS)
+        current_colour = 1
+        current_linestyle = next_line_style(current_linestyle)
+    end
+    return current_colour, current_linestyle
 end
 
-function plot_line_ribbon_only!(p, x, y, colour, ribbon=[])
+"""
+It will return next linestyle.
+"""
+function next_line_style(current_linestyle) :: Int
+    return current_linestyle % length(LINES) + 1
+end
+
+function plot_label_only!(p, label::String, colour, linestyle, is_in_group::Bool, opacity=true)
+    label_changed = is_in_group ? GROUP_SUB_ENTRY_PREFIX * label : label
+    Plots.plot!(p, [], [], label=label_changed, color=colour, linestyle=linestyle, linewidth=LINE_WIDTH, opacity=(opacity ? 1.0 : 0.0))
+end
+
+"""
+It will plot line with ribbon.
+If ribbon is set to [], it will plot only line.
+"""
+function add_line_ribbon_only!(lines_ribbons_plotting::Dict, x, y, colour, linestyle, ribbon=[])
+    plots_args_kwargs = get!(lines_ribbons_plotting, :plots, Vector{Dict}())
+    push!(plots_args_kwargs, 
+        Dict(
+            :args => (x, y),
+            :kwargs => Dict(
+                :label => "",
+                :color => colour,
+                :linestyle => linestyle,
+                :linewidth => LINE_WIDTH,
+            )
+        ))
     if SHOW_STD && length(ribbon) > 0
-        Plots.plot!(p, x, y, label="", ribbon=ribbon, color=colour, fillalpha=RIBBON_FILL_ALPHA, linewidth=LINE_WIDTH)
-    else
-        Plots.plot!(p, x, y, label="", color=colour, linewidth=LINE_WIDTH)
+        ribbons_args_kwargs = get!(lines_ribbons_plotting, :ribbons, Vector{Dict}())
+        push!(ribbons_args_kwargs, 
+            Dict(
+                :args => (x, y),
+                :kwargs => Dict(
+                    :ribbon => ribbon,
+                    :label => "",
+                    :color => colour,
+                    :fillalpha => RIBBON_FILL_ALPHA,
+                    :linewidth => 0,
+                )
+            ))
+    end
+end
+
+"""
+Finally plot lines and ribbons in the right order.
+"""
+function plot_lines_ribbons_only!(p, lines_ribbons_plotting::Dict)
+    for ribbon_args_kwargs in lines_ribbons_plotting[:ribbons]
+        Plots.plot!(p, ribbon_args_kwargs[:args]...; ribbon_args_kwargs[:kwargs]...)
+    end
+
+    for plot_args_kwargs in lines_ribbons_plotting[:plots]
+        Plots.plot!(p, plot_args_kwargs[:args]...; plot_args_kwargs[:kwargs]...)
     end
 end
 
@@ -212,7 +291,7 @@ end
 It will construct good group name and add the name to the group.
 If there isnt aproppriate group, it will add it to the group with empty name ("").
 """
-function add_to_group!(groups::Dict, name::String, groups_names::Vector{String})
+function add_to_group!(groups::Dict, name::String, groups_names::Vector)
     group_name = ""
     for group in groups_names
         if contains(name, group)
@@ -333,6 +412,9 @@ function run()
     plot_all(reads, X_LABEL, Y_LABEL, LINE_METHOD)
 end
 
+end # module
+
 # ------------------------------------------------------------------------------------------------
 # run
-run()
+import .PlottingInterpret
+PlottingInterpret.run()

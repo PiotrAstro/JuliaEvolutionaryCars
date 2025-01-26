@@ -103,9 +103,17 @@ function copy(env::AbstractEnvironment)
     throw("unimplemented")
 end
 
-# Some general functions, not interface functions
 
-"Get the rewards of the trajectory of the environments using the neural network. Returns sum of rewards for each environment. Modifies state of environments - resets them before and leaves them used"
+
+
+# using BenchmarkTools
+# import Profile
+# import PProf
+
+# Some general functions, not interface functions
+"""
+Get the rewards of the trajectory of the environments using the neural network. Returns sum of rewards for each environment. Modifies state of environments - resets them before and leaves them used
+"""
 function get_trajectory_rewards!(
         envs::Vector{E},
         neural_network::NeuralNetwork.AbstractNeuralNetwork;
@@ -120,6 +128,20 @@ function get_trajectory_rewards!(
     end
 
     envs_alive = [(env, i) for (i, env) in enumerate(envs) if is_alive(env)]
+
+    # states = ASSEQ([get_state(env) for (env, _) in envs_alive])
+    # actions = NeuralNetwork.predict(neural_network, get_nn_input(states))
+    # b = @benchmark ($ASSEQ)([get_state(env) for (env, _) in ($envs_alive)])
+    # display(b)
+    # b = @benchmark NeuralNetwork.predict($neural_network, get_nn_input($states))
+    # display(b)
+    # Profile.clear()
+    # Profile.@profile for i in 1:100000
+    #     states = ASSEQ([get_state(env) for (env, _) in envs_alive])
+    #     actions = NeuralNetwork.predict(neural_network, get_nn_input(states))
+    # end
+    # PProf.pprof(;webport=2137)
+    # throw("fdsfdsvsdf")
 
     while length(envs_alive) > 0
         states = ASSEQ([get_state(env) for (env, _) in envs_alive])

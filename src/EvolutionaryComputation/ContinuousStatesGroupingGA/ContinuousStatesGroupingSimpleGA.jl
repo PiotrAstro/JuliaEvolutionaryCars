@@ -170,18 +170,6 @@ function ContinuousStatesGroupingSimpleGA_Algorithm(;
         env_wrapper...
     )
 
-    # --------------------------------------------------
-    # Test!!!
-    # new_ind = Individual(env_wrapper_struct)
-    # total_eval = 0
-    # for generation in 1:1000
-    #     total_eval += FIHC!(new_ind)
-    #     fitness_new = get_fitness!(new_ind)
-    #     println("Generation: $generation, total_eval: $total_eval, fitness: $fitness_new")
-    # end
-
-    # --------------------------------------------------
-
     individuals = [Individual(env_wrapper_struct) for _ in 1:individuals_n]
 
     Threads.@threads for ind in individuals
@@ -310,7 +298,9 @@ function run_test(csgs::ContinuousStatesGroupingSimpleGA_Algorithm; max_generati
     # norm_min0 = norm_genes(rand_matrix, :min_0)
     # display(norm_min0)
     # throw("dsdsvdsfvfdbjkfd")
-
+    if log
+        Logging.@info("running test")
+    end
     list_with_results = Vector{Tuple{Int, Int, Float64}}()
     push!(list_with_results, (0, total_eval, get_fitness_test!(new_ind)))
     for generation in 1:max_generations

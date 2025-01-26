@@ -199,6 +199,25 @@ function get_action_size(env::BasicCarEnvironment) :: Int
     return 3  # 9 # 3 # 6
 end
 
+# import Profile
+# using PProf
+# using BenchmarkTools
+# function get_state(env::BasicCarEnvironment) :: Vector{Float32}
+#     _get_state(env)
+
+#     # b = BenchmarkTools.@benchmark _get_state($env)
+#     # # b = BenchmarkTools.@benchmark _does_collide($env, $(env.x), $(env.y))
+#     # display(b)
+#     # throw("fvfddf")
+
+#     Profile.clear()
+#     Profile.@profile for i in 1:1000000
+#         _get_state(env)
+#     end
+#     pprof(;webport=2137)
+#     sleep(100)
+# end
+
 function get_state(env::BasicCarEnvironment) :: Vector{Float32}
     inputs = Vector{Float32}(undef, length(env.rays) + 1)
     for i in eachindex(env.rays)
@@ -244,25 +263,31 @@ function _does_collide_at_angle(env::BasicCarEnvironment, distance::Float64, ang
 end
 
 function _does_collide_at_position(env::BasicCarEnvironment, x::Float64, y::Float64) :: Bool
-    x_check = round(Int, x)
-    y_check = round(Int, y)
+    return _does_collide_at_position_faster(env, x + 0.5, y + 0.5)
+end
+
+function _does_collide_at_position_faster(env::BasicCarEnvironment, x::Float64, y::Float64) :: Bool
+    x_check = unsafe_trunc(Int, x)  # we assume that x and y are not inf or nan
+    y_check = unsafe_trunc(Int, y)
 
     if x_check < 1 || x_check > size(env.map, 2) || y_check < 1 || y_check > size(env.map, 1)
         return true
     end
-    return env.map[y_check, x_check]
+    return @inbounds env.map[y_check, x_check]
 end
 
 function _get_ray_distance(env::BasicCarEnvironment, angle::Float64) :: Float64
-    x = env.x
-    y = env.y
+    x = env.x + 0.5
+    y = env.y + 0.5
     distance = 0.0
+    cos_angle = cos(angle)
+    sin_angle = sin(angle)
     max_distance = env.ray_input_clip * env.rays_distances_scale_factor
     while distance < max_distance
-        x += cos(angle)
-        y -= sin(angle)
+        x += cos_angle
+        y -= sin_angle
         distance += 1.0
-        if _does_collide_at_position(env, x, y)
+        if _does_collide_at_position_faster(env, x, y)
             return distance
         end
     end

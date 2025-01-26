@@ -148,4 +148,8 @@ function tests()
     end
 end
 
-tests()
+# tests()
+a = rand(Float32, 100, 1000)
+b = rand(Float32, 100, 1000)
+@profview cosine_mine(a, b)
+@profview cosine_mine(a, b)
