@@ -69,7 +69,7 @@ mutable struct BasicCarEnvironment <: AbstractEnvironment{CarSequence}
 end
 
 
-function get_environment(environment::Val{T}) where T
+function get_environment(::Val{:BasicCarEnvironment})
     return BasicCarEnvironment
 end
 

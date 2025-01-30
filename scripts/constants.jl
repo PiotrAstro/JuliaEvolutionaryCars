@@ -141,7 +141,7 @@ CONSTANTS_DICT = Dict(
             :fihc_mode => :fihc_cont,
             :norm_mode => :d_sum,
             :factor => 0.5,
-            :genes_combination => :flat,
+            :genes_combination => :hier,
             :random_matrix_mode => :randn
         ),
     ),

@@ -305,7 +305,8 @@ function run_one_test(
         optimizer::Symbol,
         special_dict::Dict{Symbol, <:Any},
         dict_config_copied::Dict{Symbol, <:Any},
-        case_index::Int, save_dir,
+        case_index::Int,
+        save_dir,
         worker_id::Int
         )
     save_n = save_name(optimizer, special_dict, case_index)
@@ -319,6 +320,17 @@ function run_one_test(
     )
 
     # Save the results to a file
-    CSV.write(joinpath(save_dir, save_n), data_frame_result)
     Logging.@info "Worker $(worker_id) Finished with config:\n" * save_n
+    return Distributed.remotecall(call_main_save_results, 1, data_frame_result, save_dir, save_n, worker_id)
+end
+
+function call_main_save_results(df::DataFrames.DataFrame, save_dir::String, save_name::String, caller_id::Int)
+    try
+        CSV.write(joinpath(save_dir, save_name), df)
+        Logging.@info "Main worker finished saving results from pid: $(caller_id) to file: $save_name"
+        return true
+    catch e
+        Logging.@error "Main worker failed to save results from pid: $(caller_id) to file: $save_name"
+        return false
+    end
 end

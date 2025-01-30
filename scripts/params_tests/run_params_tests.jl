@@ -1,8 +1,13 @@
+module ParamsTests
+
 import Distributed
 import Dates
 timestamp = Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS")
 
 include("../constants.jl")
+include("cluster/cluster_config.jl")
+include("cluster/DistributedEnvironments.jl")
+import .DistributedEnvironments
 
 """
 How to set TESTED_VALUES:
@@ -70,9 +75,6 @@ How to set TESTED_VALUES:
 # Start of real settings
 # --------------------------------------------------------------------------------------------------
 
-USE_N_WORKERS = 23  # how many workers to use, main worker is worker 1 and is not included - it doesnt perform calculations
-BLAS_THREADS_PER_WORKER = 1
-JULIA_THREADS_PER_WORKER = 1
 RUN_ALL_CASES_ON_ONE_WORKER = true  # if true, all cases will be run on one worker, if false, cases will be distributed among workers
 # if my jobs are small than it should be true, if they are big, it should be false
 
@@ -86,6 +88,9 @@ CONSTANTS_DICT[:run_config] = Dict(
 
 # Number of run tests per each combination of tested values
 CASES_PER_TEST = 50
+
+LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_" * timestamp)  # running test from scratch
+# LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_2024-12-27_12-31-13")  # running test from some start_position - it will recognize already done cases
 
 # Values that will be tested
 TESTED_VALUES = [
@@ -106,104 +111,132 @@ TESTED_VALUES = [
             ),
         ),
     ),
-    (
-        :ContinuousStatesGroupingSimpleGA,
-        Dict(
-            :ContinuousStatesGroupingSimpleGA => Dict(
-                :env_wrapper => Dict(
-                    :n_clusters => [20, 40, 100],
-                    :m_value => [1, 2]
-                ),
-                :fihc => Dict(
-                    :fihc_mode => [:per_gene_rand],
-                    :norm_mode => [:d_sum, :min_0],
-                    :random_matrix_mode => [:rand, :randn],
-                    :factor => [0.1, 0.3, 0.5, 1.0],
-                    :genes_combination => [:hier, :flat],
-                ),
-            ),
-        ),
-    ),
-    (
-        :ContinuousStatesGroupingSimpleGA,
-        Dict(
-            :ContinuousStatesGroupingSimpleGA => Dict(
-                :env_wrapper => Dict(
-                    :n_clusters => [20, 40, 100],
-                    :m_value => [1, 2]
-                ),
-                :fihc => Dict(
-                    :fihc_mode => [:disc_fihc],
-                    :genes_combination => [:hier, :flat],
-                ),
-            ),
-        ),
-    ),
-    (
-        :ContinuousStatesGroupingSimpleGA,
-        Dict(
-            :ContinuousStatesGroupingSimpleGA => Dict(
-                :env_wrapper => Dict(
-                    :n_clusters => [20, 40, 100],
-                    :m_value => [1, 2]
-                ),
-                :fihc => Dict(
-                    :fihc_mode => [:fihc_cont],
-                    :norm_mode => [:d_sum, :min_0],
-                    :factor => [0.1, 0.3, 0.5, 1.0],
-                    :genes_combination => [:hier, :flat],
-                ),
-            ),
-        ),
-    ),
+    # (
+    #     :ContinuousStatesGroupingSimpleGA,
+    #     Dict(
+    #         :ContinuousStatesGroupingSimpleGA => Dict(
+    #             :env_wrapper => Dict(
+    #                 :n_clusters => [20, 40, 100],
+    #                 :m_value => [1, 2]
+    #             ),
+    #             :fihc => Dict(
+    #                 :fihc_mode => [:per_gene_rand],
+    #                 :norm_mode => [:d_sum, :min_0],
+    #                 :random_matrix_mode => [:rand, :randn],
+    #                 :factor => [0.1, 0.3, 0.5, 1.0],
+    #                 :genes_combination => [:hier, :flat],
+    #             ),
+    #         ),
+    #     ),
+    # ),
+    # (
+    #     :ContinuousStatesGroupingSimpleGA,
+    #     Dict(
+    #         :ContinuousStatesGroupingSimpleGA => Dict(
+    #             :env_wrapper => Dict(
+    #                 :n_clusters => [20, 40, 100],
+    #                 :m_value => [1, 2]
+    #             ),
+    #             :fihc => Dict(
+    #                 :fihc_mode => [:disc_fihc],
+    #                 :genes_combination => [:hier, :flat],
+    #             ),
+    #         ),
+    #     ),
+    # ),
+    # (
+    #     :ContinuousStatesGroupingSimpleGA,
+    #     Dict(
+    #         :ContinuousStatesGroupingSimpleGA => Dict(
+    #             :env_wrapper => Dict(
+    #                 :n_clusters => [20, 40, 100],
+    #                 :m_value => [1, 2]
+    #             ),
+    #             :fihc => Dict(
+    #                 :fihc_mode => [:fihc_cont],
+    #                 :norm_mode => [:d_sum, :min_0],
+    #                 :factor => [0.1, 0.3, 0.5, 1.0],
+    #                 :genes_combination => [:hier, :flat],
+    #             ),
+    #         ),
+    #     ),
+    # ),
 ]
-
-# running test from scratch
-LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_" * timestamp)
-# running test from some start_position
-# LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_2024-12-27_12-31-13")
-
-OUTPUT_LOG_FILE = "_output_$(timestamp).log"
-SCRIPTS_DIR_TO_COPY = joinpath(pwd(), "scripts") # copy constants.jl to logs dir, so that I know what were the exact settings when I ran it
-SRC_DIR_TO_COPY = joinpath(pwd(), "src")  # copy src dir to logs dir, so that I know what was the code when I ran it
-
-
-
-LOGS_DIR_RESULTS = joinpath(LOGS_DIR, "results")
-LOGS_DIR_SRC = joinpath(LOGS_DIR, "src")
-LOGS_DIR_ANALYSIS = joinpath(LOGS_DIR, "analysis")
-
 
 # --------------------------------------------------------------------------------------------------
 # End of real settings
 # --------------------------------------------------------------------------------------------------
 
+# Rather constant settings:
+OUTPUT_LOG_FILE = "_output_$(timestamp).log"
+SCRIPTS_DIR_TO_COPY = joinpath(pwd(), "scripts") # copy constants.jl to logs dir, so that I know what were the exact settings when I ran it
+SRC_DIR_TO_COPY = joinpath(pwd(), "src")  # copy src dir to logs dir, so that I know what was the code when I ran it
 
+LOGS_DIR_RESULTS = joinpath(LOGS_DIR, "results")
+LOGS_DIR_SRC = joinpath(LOGS_DIR, "src")
+LOGS_DIR_ANALYSIS = joinpath(LOGS_DIR, "analysis")
 
 # --------------------------------------------------------------------------------------------------
 # Run the tests
 """
 Set proper number of separate workers from main worker.
 """
-function set_proper_workers(workers_n, julia_threads)
+function set_proper_workers(cluster_config_main, cluster_config_hosts)
     if length(Distributed.procs()) > 1
-        for pid in Distributed.workers()
-            Distributed.rmprocs(pid)
-            println("Removed worker $pid")
-        end
+        workers_to_remove_ids = [pid for pid in Distributed.workers() if pid != 1]
+        Distributed.rmprocs(workers_to_remove_ids...)
+        println("Removed workers $workers_to_remove_ids")
     end
     
-    Distributed.addprocs(workers_n, exeflags=["--threads=$julia_threads"])
+    # adding main process
+    println("Adding main host -> $(cluster_config_main[:use_n_workers]) workers")
+    env = Dict(
+        "JULIA_NUM_THREADS" => "$(cluster_config_main[:julia_threads_per_worker])",
+        "JULIA_BLAS_THREADS" => "$(cluster_config_main[:blas_threads_per_worker])"
+    )
+    enable_threaded_blas = cluster_config_main[:blas_threads_per_worker] > 1
+    Distributed.addprocs(cluster_config_main[:use_n_workers], env=env, enable_threaded_blas=enable_threaded_blas, topology=:master_worker)
+    println("Added main host\n")
+    
+    for host in cluster_config_hosts
+        address = "$(host[:username])@$(host[:host_ip])"
+        println("Adding $address host -> $(host[:use_n_workers]) workers")
+        env = Dict(
+            "JULIA_NUM_THREADS" => "$(host[:julia_threads_per_worker])",
+            "JULIA_BLAS_THREADS" => "$(host[:blas_threads_per_worker])"
+        )
+        sshflags = `-i $(host[:private_key_path]) -p $(host[:port])`
+        enable_threaded_blas = host[:blas_threads_per_worker] > 1
+        Distributed.addprocs(
+            [(address, host[:use_n_workers])];
+            sshflags=sshflags,
+            env=env,
+            shell=host[:shell],
+            tunnel=false,
+            enable_threaded_blas=enable_threaded_blas,
+            topology=:master_worker,
+            dir=host[:dir],
+            exename=host[:exe_path],
+        )
+        println("Added $address host\n")
+    end
+    
     workers_pids = Distributed.workers()
-    println("Added workers: $workers_pids")
+    println("\n\nAdded workers: $workers_pids")
 end
-set_proper_workers(USE_N_WORKERS, JULIA_THREADS_PER_WORKER)
+
+DistributedEnvironments.initcluster(CLUSTER_CONFIG_MAIN, CLUSTER_CONFIG_HOSTS)
 
 Distributed.@everywhere begin
     # important things to improve performance on intel CPUs:
+    import Pkg
+    println(Pkg.project().name)
     using MKL
     using LinearAlgebra
-    BLAS.set_num_threads($BLAS_THREADS_PER_WORKER)
+    import Distributed
+    # take blas threads from env variable
+    blas_threads = get(ENV, "JULIA_BLAS_THREADS", 1)
+    BLAS.set_num_threads(blas_threads)
 
     import CSV
     import DataFrames
@@ -231,72 +264,79 @@ Distributed.@everywhere begin
     println(text)
 end
 
-mkpath(LOGS_DIR)
-mkpath(LOGS_DIR_RESULTS)
-mkpath(LOGS_DIR_SRC)
-mkpath(LOGS_DIR_ANALYSIS)
-println("Logs will be saved in: $LOGS_DIR")
-cp(SCRIPTS_DIR_TO_COPY, joinpath(LOGS_DIR_SRC, "scripts"), force=true)
-println("Copied scripts to logs dir")
-cp(SRC_DIR_TO_COPY, joinpath(LOGS_DIR_SRC, "src"), force=true)
-println("Copied src dir to logs dir")
+function run_params_tests()
+    mkpath(LOGS_DIR)
+    mkpath(LOGS_DIR_RESULTS)
+    mkpath(LOGS_DIR_SRC)
+    mkpath(LOGS_DIR_ANALYSIS)
+    println("Logs will be saved in: $LOGS_DIR")
+    cp(SCRIPTS_DIR_TO_COPY, joinpath(LOGS_DIR_SRC, "scripts"), force=true)
+    println("Copied scripts to logs dir")
+    cp(SRC_DIR_TO_COPY, joinpath(LOGS_DIR_SRC, "src"), force=true)
+    println("Copied src dir to logs dir")
 
-file_logger = CustomLoggers.SimpleFileLogger(joinpath(LOGS_DIR, OUTPUT_LOG_FILE), true)
-Logging.global_logger(file_logger)
+    file_logger = CustomLoggers.SimpleFileLogger(joinpath(LOGS_DIR, OUTPUT_LOG_FILE), true)
+    Logging.global_logger(file_logger)
 
-special_dicts = create_all_special_dicts(TESTED_VALUES)
+    special_dicts = create_all_special_dicts(TESTED_VALUES)
 
-io = IOBuffer()
-show(io, MIME"text/plain"(), TESTED_VALUES)
-log_text = "Tested values settings:\n" * String(take!(io))
-show(io, MIME"text/plain"(), special_dicts)
-log_text *= "\n\nSpecial dicts settings:\n" * String(take!(io))
-Logging.@info log_text
+    io = IOBuffer()
+    show(io, MIME"text/plain"(), TESTED_VALUES)
+    log_text = "Tested values settings:\n" * String(take!(io))
+    show(io, MIME"text/plain"(), special_dicts)
+    log_text *= "\n\nSpecial dicts settings:\n" * String(take!(io))
+    Logging.@info log_text
 
-special_dicts_no_cases = [
-    (optimizer, special_dict, deepcopy(CONSTANTS_DICT))
-    for (optimizer, special_dict) in vec([(optimizer, special_dict) for (optimizer, special_dict) in special_dicts])
-]
-if RUN_ALL_CASES_ON_ONE_WORKER
-    special_dicts_with_cases = [
-        (optimizer, special_dict, config_copy, [i for i in 1:CASES_PER_TEST])
-        for (optimizer, special_dict, config_copy) in special_dicts_no_cases
+    special_dicts_no_cases = [
+        (optimizer, special_dict, deepcopy(CONSTANTS_DICT))
+        for (optimizer, special_dict) in vec([(optimizer, special_dict) for (optimizer, special_dict) in special_dicts])
     ]
-else
-    special_dicts_with_cases = vec([
-        (optimizer, special_dict, config_copy, [case])
-        for (optimizer, special_dict, config_copy) in special_dicts_no_cases, case in 1:CASES_PER_TEST
-    ])
-end
-consider_done_cases!(special_dicts_with_cases, LOGS_DIR_RESULTS)
+    if RUN_ALL_CASES_ON_ONE_WORKER
+        special_dicts_with_cases = [
+            (optimizer, special_dict, config_copy, [i for i in 1:CASES_PER_TEST])
+            for (optimizer, special_dict, config_copy) in special_dicts_no_cases
+        ]
+    else
+        special_dicts_with_cases = vec([
+            (optimizer, special_dict, config_copy, [case])
+            for (optimizer, special_dict, config_copy) in special_dicts_no_cases, case in 1:CASES_PER_TEST
+        ])
+    end
+    consider_done_cases!(special_dicts_with_cases, LOGS_DIR_RESULTS)
 
-Logging.@info "Starting computation"
-results_lists = ProgressMeter.@showprogress Distributed.pmap(eachindex(special_dicts_with_cases)) do i 
-    Logging.global_logger(CustomLoggers.RemoteLogger())
-    optimizer, special_dict, config_copy, cases = special_dicts_with_cases[i]
-    result_list = Vector{Bool}(undef, length(cases))
-    for (j, case) in enumerate(cases)
-        try
-            config_copy_copy = deepcopy(config_copy)
-            special_dict_copy = deepcopy(special_dict)
-            run_one_test(optimizer, special_dict_copy, config_copy_copy, case, LOGS_DIR_RESULTS, Distributed.myid())
-            result_list[j] = true
-        catch e
-            Logging.@error "workerid $(Distributed.myid()) failed with error: $e"
-            result_list[j] = false
+    Logging.@info "Starting computation"
+    results_lists = ProgressMeter.@showprogress Distributed.pmap(eachindex(special_dicts_with_cases)) do i 
+        Logging.global_logger(CustomLoggers.RemoteLogger())
+        optimizer, special_dict, config_copy, cases = special_dicts_with_cases[i]
+        result_list = Vector{Bool}(undef, length(cases))
+        for (j, case) in enumerate(cases)
+            try
+                config_copy_copy = deepcopy(config_copy)
+                special_dict_copy = deepcopy(special_dict)
+                result_list[j] = run_one_test(optimizer, special_dict_copy, config_copy_copy, case, LOGS_DIR_RESULTS, Distributed.myid())
+            catch e
+                Logging.@error "workerid $(Distributed.myid()) failed with error: $e"
+                result_list[j] = false
+            end
+        end
+        return result_list
+    end
+
+    texts = []
+    for (results_list, (optimizer, special_dict, _, cases)) in zip(results_lists, special_dicts_with_cases)
+        for (result, case) in zip(results_list, cases)
+            push!(
+                texts,
+                (result ? "success" : "failed") * "  ->  " * save_name(optimizer, special_dict, case)
+            )
         end
     end
-    return result_list
+
+    text_log = "Finished computation, result:\n" * join(texts, "\n")
+    Logging.@info text_log
 end
 
-texts = []
-for (results_list, (optimizer, special_dict, _, cases)) in zip(results_lists, special_dicts_with_cases)
-    for (result, case) in zip(results_list, cases)
-        texts.append(
-            (result ? "success" : "failed") * "  ->  " * save_name(optimizer, special_dict, case)
-        )
-    end
-end
+end  # module ParamsTests
 
-text_log = "Finished computation, result:\n" * join(texts, "\n")
-Logging.@info text_log
+import .ParamsTests
+ParamsTests.run_params_tests()

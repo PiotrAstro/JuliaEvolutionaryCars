@@ -1,6 +1,7 @@
-
+*_cluster_config.jl*
 *.jl.*
 log/*
 *.code-workspace
-.vscode/
-!log/.gitignore
+.vscode
+!log/.gitkeep
+scripts/params_tests/cluster/cluster_config.jl
