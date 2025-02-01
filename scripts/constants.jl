@@ -7,10 +7,10 @@ car_image_path = raw"data\car.png"
 map_image_path_2 = raw"data\map.png"
 
 img = Gray.(load(map_image_path))
-map = Matrix{Bool}(Array(img) .> 0.5)
+map = BitArray(Array(img) .> 0.5)
 
 img2 = Gray.(load(map_image_path_2))
-map_2 = Matrix{Bool}(Array(img2) .> 0.5)
+map_2 = BitArray(Array(img2) .> 0.5)
 
 MAX_STEPS = 2000
 

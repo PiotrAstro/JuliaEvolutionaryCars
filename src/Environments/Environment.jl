@@ -153,9 +153,9 @@ function get_trajectory_rewards!(
             if !is_alive(env)
                 deleteat!(envs_alive, i)
                 actions = actions[:, 1:end .!= i]
-                i -= 1
+            else
+                i += 1
             end
-            i += 1
         end
     end
 
@@ -196,9 +196,9 @@ function get_trajectory_data!(
                 deleteat!(envs_alive, i)
                 states = remove_nth_state(states, i)
                 actions = actions[:, 1:end .!= i]
-                i -= 1
+            else
+                i += 1
             end
-            i += 1
         end
     end
     return [Trajectory(ASSEQ(states), hcat(actions...), rewards) for (rewards, states, actions) in trajectory_data]

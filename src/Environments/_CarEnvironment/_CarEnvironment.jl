@@ -38,8 +38,8 @@ end
 # ------------------------------------------------------------------------------------------------
 
 "Car dimmensions are half of the width and half of the height."
-mutable struct BasicCarEnvironment <: AbstractEnvironment{CarSequence}
-    const map::Matrix{Bool}
+mutable struct BasicCarEnvironment{MB<:AbstractArray{Bool, 2}} <: AbstractEnvironment{CarSequence}
+    const map::MB
     const start_position::Tuple{Float64, Float64}
     const start_angle::Float64
     #const max_steps::Int
@@ -81,7 +81,7 @@ All angles are in degrees, later they are converted to radians for calculations.
 Car dimmensions should be full width and full height. They are converted to half width and half height in the constructor.
 """
 function BasicCarEnvironment(;
-    map::Matrix{Bool},
+    map::MB,
     start_position::Tuple{Float64, Float64},
     start_angle::Float64,
     max_steps::Int,
@@ -95,7 +95,7 @@ function BasicCarEnvironment(;
     rays_distances_scale_factor::Float64,
     ray_input_clip::Float64,
     collision_reward::Float64
-) :: BasicCarEnvironment
+) :: BasicCarEnvironment where MB<:AbstractArray{Bool, 2}
     angle_max_change = deg2rad(angle_max_change)
     start_angle = deg2rad(start_angle)
     rays_rad = deg2rad.(rays)
@@ -259,7 +259,7 @@ function _does_collide_at_angle(env::BasicCarEnvironment, distance::Float64, ang
     if x_check < 1 || x_check > size(env.map, 2) || y_check < 1 || y_check > size(env.map, 1)
         return true
     end
-    return env.map[y_check, x_check]
+    return @inbounds env.map[y_check, x_check]
 end
 
 function _does_collide_at_position(env::BasicCarEnvironment, x::Float64, y::Float64) :: Bool

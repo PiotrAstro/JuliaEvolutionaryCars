@@ -1,4 +1,13 @@
+module TestsUtils
 
+import ..JuliaEvolutionaryCars
+import ..CustomLoggers
+
+import Logging
+import DataFrames
+import CSV
+import Logging
+import Distributed
 
 """
 It will remove all cases that are already done from the special_dicts_with_cases in a given directory, it is done so that when something interupts calculations, we are able to rerun the script and it will not run the same cases again.
@@ -201,7 +210,21 @@ function create_all_special_dicts(tested_dicts_list::Vector{<:Tuple{Symbol, <:Di
     return all_special_dicts
 end
 
+function create_all_special_dicts_with_cases(special_dicts, constants_dict, cases_number::Int, run_all_on_one_machine::Bool)
+    if run_all_on_one_machine
+        special_dicts_with_cases = [
+            (optimizer, special_dict, deepcopy(constants_dict), [i for i in 1:cases_number])
+            for (optimizer, special_dict) in special_dicts
+        ]
+    else
+        special_dicts_with_cases = vec([
+            (optimizer, special_dict, deepcopy(constants_dict), [case])
+            for (optimizer, special_dict) in special_dicts, case in 1:cases_number
+        ])
+    end
 
+    return special_dicts_with_cases
+end
 
 """
 Changes values in destination_dict to values from source_dict.
@@ -301,12 +324,11 @@ special_dict = Dict{Symbol, <:Any}(
 
 dict_config_copied - it should be copied before!
 """
-function run_one_test(
+function run_one_test!(
         optimizer::Symbol,
         special_dict::Dict{Symbol, <:Any},
         dict_config_copied::Dict{Symbol, <:Any},
         case_index::Int,
-        save_dir,
         worker_id::Int
         )
     save_n = save_name(optimizer, special_dict, case_index)
@@ -321,16 +343,43 @@ function run_one_test(
 
     # Save the results to a file
     Logging.@info "Worker $(worker_id) Finished with config:\n" * save_n
-    return Distributed.remotecall(call_main_save_results, 1, data_frame_result, save_dir, save_n, worker_id)
+    return Distributed.remotecall(call_main_save_results, 1, data_frame_result, save_n, worker_id)
 end
 
-function call_main_save_results(df::DataFrames.DataFrame, save_dir::String, save_name::String, caller_id::Int)
-    try
-        CSV.write(joinpath(save_dir, save_name), df)
-        Logging.@info "Main worker finished saving results from pid: $(caller_id) to file: $save_name"
-        return true
-    catch e
-        Logging.@error "Main worker failed to save results from pid: $(caller_id) to file: $save_name"
-        return false
+function remote_run_one_test(one_special_dict_with_cases) :: Vector{Bool}
+    Logging.global_logger(CustomLoggers.RemoteLogger())
+    optimizer, special_dict, config_copy, cases = one_special_dict_with_cases
+    result_list = Vector{Bool}(undef, length(cases))
+    for (j, case) in enumerate(cases)
+        try
+            config_copy_copy = deepcopy(config_copy)
+            special_dict_copy = deepcopy(special_dict)
+            result_list[j] = run_one_test!(optimizer, special_dict_copy, config_copy_copy, case, Distributed.myid())
+        catch e
+            Logging.@error "workerid $(Distributed.myid()) failed with error: $e"
+            result_list[j] = false
+        end
+    end
+    return result_list
+end
+
+macro call_function(logs_dir)
+    quote
+        import DataFrames
+        import CSV
+
+        function call_main_save_results(df::DataFrames.DataFrame, save_name::String, caller_id::Int)
+            save_dir = $(logs_dir)
+            try
+                CSV.write(joinpath(save_dir, save_name), df)
+                Logging.@info "Main worker finished saving results from pid: $(caller_id) to file: $save_name"
+                return true
+            catch e
+                Logging.@error "Main worker failed to save results from pid: $(caller_id) to file: $save_name"
+                return false
+            end
+        end
     end
 end
+
+end # module
