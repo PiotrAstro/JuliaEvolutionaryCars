@@ -4,7 +4,7 @@ module DistributedEnvironments
 import Pkg
 using Distributed, MacroTools
 
-export @eachmachine, @eachworker, @initcluster, cluster_status!
+export @eachmachine, @eachworker, @initcluster, cluster_status!, remove_workers!
 
 macro initcluster(cluster_main, cluster_hosts, tmp_dir_name, copy_env_and_code)
     return _initcluster(cluster_main, cluster_hosts, tmp_dir_name, copy_env_and_code)
@@ -23,11 +23,7 @@ function _initcluster(cluster_config_main_macro_input, cluster_config_hosts_main
         copy_env_and_code = $(esc(copy_env_and_code_main_macro_input))
         tmp_dir_name = $(esc(tmp_dir_name_macro_input))
 
-        if length(Distributed.procs()) > 1
-            workers_to_remove_ids = [pid for pid in Distributed.workers() if pid != 1]
-            Distributed.rmprocs(workers_to_remove_ids...)
-            println("Removed workers $workers_to_remove_ids")
-        end
+        remove_workers!()
 
         cluster_status!(cluster_config_hosts)
         for host in cluster_config_hosts
@@ -50,12 +46,12 @@ function _initcluster(cluster_config_main_macro_input, cluster_config_hosts_main
                 for host in cluster_config_hosts
                     printstyled("Copying project to $(host[:host_address]) : $(host[:dir_project])\n", bold=true, color=:magenta)
                     if host[:shell] == :wincmd
-                        run(`ssh -i $(host[:private_key_path]) -p $(host[:port]) $(host[:host_address]) "(if exist $(host[:dir_project]) (rd /q /s $(host[:dir_project]))) & mkdir $(host[:dir_project])"`)
+                        run(`ssh -i $(host[:private_key_path]) $(host[:host_address]) "(if exist $(host[:dir_project]) (rd /q /s $(host[:dir_project]))) & mkdir $(host[:dir_project])"`)
                         println("Created dir and removed old if existed $(host[:dir_project]), copying project...")
                         dir_project_slash = host[:dir_project] * "\\"
-                        run(`scp -i $(host[:private_key_path]) -P $(host[:port]) $project_archive $(host[:host_address]):$dir_project_slash`)
+                        run(`scp -i $(host[:private_key_path]) $project_archive $(host[:host_address]):$dir_project_slash`)
                         println("Copied project, extracting...")
-                        run(`ssh -i $(host[:private_key_path]) -p $(host[:port]) $(host[:host_address]) "tar -xzf $dir_project_slash$project_archive -C $(host[:dir_project])"`)
+                        run(`ssh -i $(host[:private_key_path]) $(host[:host_address]) "tar -xzf $dir_project_slash$project_archive -C $(host[:dir_project])"`)
                         println("Extracted project")
                     else
                         throw("other shells than :wincmd are currently not implemented, implement them yourself!")
@@ -113,6 +109,16 @@ function _initcluster(cluster_config_main_macro_input, cluster_config_hosts_main
     end
 end
 
+function remove_workers!()
+    if length(Distributed.procs()) > 1
+        workers_to_remove_ids = [pid for pid in Distributed.workers() if pid != 1]
+        Distributed.rmprocs(workers_to_remove_ids...)
+        println("Removed workers $workers_to_remove_ids")
+    else
+        println("No workers to remove")
+    end
+end 
+
 """
     @eachmachine expr
 
@@ -149,7 +155,7 @@ end
 function _addprocs_one_host(host::Dict, workers_n=-1) # if workers_n = -1, it will take workers_n from host
     Distributed.addprocs(
         [(host[:host_address], workers_n == -1 ? host[:use_n_workers] : workers_n)],
-        sshflags = `-i $(host[:private_key_path]) -p $(host[:port])`,
+        sshflags = `-i $(host[:private_key_path])`,
         env = [
             "JULIA_BLAS_THREADS" => "$(host[:blas_threads_per_worker])"
         ],
@@ -181,7 +187,7 @@ function cluster_status!(cluster::Vector{<:Dict})
     for node in cluster
         printstyled("Checking machine $(node[:host_address]):\n", bold=true, color=:magenta)
         try
-            output = read(`ssh -i $(node[:private_key_path]) -p $(node[:port]) $(node[:host_address]) julia -v`, String)
+            output = read(`ssh -i $(node[:private_key_path]) $(node[:host_address]) julia -v`, String)
             println("Host available, julia version: "*output)
         catch e
             connection_error = vcat(connection_error, (node, e))

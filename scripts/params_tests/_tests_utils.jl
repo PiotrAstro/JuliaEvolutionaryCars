@@ -1,13 +1,3 @@
-module TestsUtils
-
-import ..JuliaEvolutionaryCars
-import ..CustomLoggers
-
-import Logging
-import DataFrames
-import CSV
-import Logging
-import Distributed
 
 """
 It will remove all cases that are already done from the special_dicts_with_cases in a given directory, it is done so that when something interupts calculations, we are able to rerun the script and it will not run the same cases again.
@@ -15,31 +5,21 @@ special dicts should be:
 special_dicts_with_cases::Vector{Tuple{Symbol, <:Dict{Symbol}, <:Dict{Symbol}, Int}}
 
 """
-function consider_done_cases!(special_dicts_with_cases::Vector, save_dir::String)
+function consider_done_cases(special_dicts_with_cases::Vector, save_dir::String) 
     files_in_save_dir = readdir(save_dir)
     log_text = "Checking for existing test cases in $save_dir"
-    i = 1
-    while i <= length(special_dicts_with_cases)
-        (optimiser, special_dict, _, case_indexes) = special_dicts_with_cases[i]
-        case_num = 1
-        while case_num <= length(case_indexes)
-            case_index = case_indexes[case_num]
-            save_n = save_name(optimiser, special_dict, case_index)
-            if save_n in files_in_save_dir
-                log_text = log_text * "\ntest case existing, will not run: $save_n"
-                deleteat!(case_indexes, case_num)
-            else
-                case_num += 1
-            end
-        end
-
-        if isempty(case_indexes)
-            deleteat!(special_dicts_with_cases, i)
-        else
-            i += 1
+    will_run = trues(length(special_dicts_with_cases))
+    for (i, (optimiser, special_dict, case_index)) in enumerate(special_dicts_with_cases)
+        (optimiser, special_dict, case_indexes) = special_dicts_with_cases[i]
+        save_n = save_name(optimiser, special_dict, case_index)
+        if save_n in files_in_save_dir
+            log_text = log_text * "\ntest case existing, will not run: $save_n"
+            will_run[i] = false
         end
     end
     Logging.@info log_text
+
+    return special_dicts_with_cases[will_run]
 end
 
 
@@ -210,19 +190,11 @@ function create_all_special_dicts(tested_dicts_list::Vector{<:Tuple{Symbol, <:Di
     return all_special_dicts
 end
 
-function create_all_special_dicts_with_cases(special_dicts, constants_dict, cases_number::Int, run_all_on_one_machine::Bool)
-    if run_all_on_one_machine
-        special_dicts_with_cases = [
-            (optimizer, special_dict, deepcopy(constants_dict), [i for i in 1:cases_number])
-            for (optimizer, special_dict) in special_dicts
-        ]
-    else
-        special_dicts_with_cases = vec([
-            (optimizer, special_dict, deepcopy(constants_dict), [case])
-            for (optimizer, special_dict) in special_dicts, case in 1:cases_number
-        ])
-    end
-
+function create_all_special_dicts_with_cases(special_dicts, cases_number::Int)
+    special_dicts_with_cases = vec([
+        (optimizer, special_dict, case)
+        for (optimizer, special_dict) in special_dicts, case in 1:cases_number
+    ])
     return special_dicts_with_cases
 end
 
@@ -329,8 +301,8 @@ function run_one_test!(
         special_dict::Dict{Symbol, <:Any},
         dict_config_copied::Dict{Symbol, <:Any},
         case_index::Int,
-        worker_id::Int
-        )
+        worker_id::Int,
+    )
     save_n = save_name(optimizer, special_dict, case_index)
     Logging.@info "Worker $(worker_id) Running test with config:\n" * save_n
 
@@ -341,45 +313,109 @@ function run_one_test!(
         dict_config_copied
     )
 
+    buf = IOBuffer()
+    CSV.write(buf, data_frame_result)
+    csv_string = String(take!(buf))
+
     # Save the results to a file
-    Logging.@info "Worker $(worker_id) Finished with config:\n" * save_n
-    return Distributed.remotecall(call_main_save_results, 1, data_frame_result, save_n, worker_id)
+    message = "Worker $(worker_id) Finished with config:\n" * save_n
+    return save_n, csv_string, message
 end
 
-function remote_run_one_test(one_special_dict_with_cases) :: Vector{Bool}
+function remote_run(one_special_dict_with_case, constants_dict::Dict, task_id::Int, remote_channel::Distributed.RemoteChannel)
     Logging.global_logger(CustomLoggers.RemoteLogger())
-    optimizer, special_dict, config_copy, cases = one_special_dict_with_cases
-    result_list = Vector{Bool}(undef, length(cases))
-    for (j, case) in enumerate(cases)
+    optimizer, special_dict, case = one_special_dict_with_case
+    config_copy = deepcopy(constants_dict)
+
+    try
+        save_n, remote_string, message = run_one_test!(optimizer, special_dict, config_copy, case, Distributed.myid())
+        remote_result = RemoteResult(remote_string, save_n, :success, message, Distributed.myid(), task_id)
+        Logging.@info "workerid $(Distributed.myid()) finished with success, sending results to main worker..."
+        put!(remote_channel, remote_result)
+    catch e
+        message = "workerid $(Distributed.myid()) failed with error: $e"
+        remote_result = RemoteResult("", save_name(optimizer, special_dict, case), :error, message, Distributed.myid(), task_id)
+        Logging.@error message * " sending result to main worker..."
+        put!(remote_channel, remote_result)
+    end
+end
+
+struct RemoteResult
+    csv_string::String
+    save_name::String
+    message_symbol::Symbol
+    message::String
+    worker_id::Int
+    task_id::Int
+end
+
+struct FinalResultLog
+    save_name::String
+    success::Bool
+    message::String
+end
+
+# I should try not sendind df, and only smaller data, maybe this is the reason?
+# function call_main_save_results(df::DataFrames.DataFrame, save_main_host_dir::String, save_name::String, caller_id::Int)
+function main_save_results(remote_result::RemoteResult, save_main_host_dir::String) :: FinalResultLog
+    
+    if remote_result.message_symbol == :error
+        Logging.@error "Main worker received error from worker $(remote_result.worker_id): $(remote_result.message)"
+        return FinalResultLog(remote_result.save_name, false, remote_result.message)
+    elseif remote_result.message_symbol == :success
         try
-            config_copy_copy = deepcopy(config_copy)
-            special_dict_copy = deepcopy(special_dict)
-            result_list[j] = run_one_test!(optimizer, special_dict_copy, config_copy_copy, case, Distributed.myid())
-        catch e
-            Logging.@error "workerid $(Distributed.myid()) failed with error: $e"
-            result_list[j] = false
-        end
-    end
-    return result_list
-end
-
-macro call_function(logs_dir)
-    quote
-        import DataFrames
-        import CSV
-
-        function call_main_save_results(df::DataFrames.DataFrame, save_name::String, caller_id::Int)
-            save_dir = $(logs_dir)
-            try
-                CSV.write(joinpath(save_dir, save_name), df)
-                Logging.@info "Main worker finished saving results from pid: $(caller_id) to file: $save_name"
-                return true
-            catch e
-                Logging.@error "Main worker failed to save results from pid: $(caller_id) to file: $save_name"
-                return false
+            save_path = joinpath(save_main_host_dir, remote_result.save_name)
+            open(save_path, "w") do io
+                write(io, remote_result.csv_string)
             end
+            Logging.@info "Main worker finished saving results from pid: $(remote_result.worker_id) to file: $(remote_result.save_name)"
+            return FinalResultLog(remote_result.save_name, true, remote_result.message)
+        catch e
+            message = "Main worker failed to save results from pid: $(remote_result.worker_id) to file: $(remote_result.save_name)\n$e"
+            Logging.@error message
+            return FinalResultLog(remote_result.save_name, false, message)
         end
+    else 
+        message = "Main worker received unknown message from worker: $(remote_result.worker_id)"
+        Logging.@error message
+        return FinalResultLog(remote_result.save_name, false, message)
     end
 end
 
-end # module
+
+function construct_text_from_final_results(final_results::Vector{FinalResultLog}) :: String
+    texts = []
+    for final_result in final_results
+        push!(texts, (final_result.success ? "success" : "failed") * "  ->  " * final_result.save_name * (final_result.success ? "" : "  ->  " * final_result.message))
+    end
+
+    text_log = "Result:\n" * join(texts, "\n")
+    return text_log
+end
+
+function run_channel_controller!(
+        remote_channel::Distributed.RemoteChannel,
+        result_info::Vector{FinalResultLog},
+        progress_meter::ProgressMeter.Progress,
+        save_main_host_dir::String,
+        save_result_path::String,
+    )
+
+    while true
+        remote_result = take!(remote_channel)
+        if remote_result.message_symbol == :stop
+            break
+        end
+        final_result = main_save_results(remote_result, save_main_host_dir)
+        result_info[remote_result.task_id] = final_result
+
+        try
+            ProgressMeter.next!(progress_meter)
+            open(save_result_path, "w") do io
+                write(io, construct_text_from_final_results(result_info))
+            end
+        catch e
+            Logging.@error "Main worker error (just handling additional staff, not computation error): $save_result_path\n$e"
+        end
+    end
+end
