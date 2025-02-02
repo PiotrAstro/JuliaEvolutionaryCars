@@ -265,7 +265,9 @@ progress_meter = ProgressMeter.Progress(length(special_dicts_with_cases))
 channel_controller_task = @async run_channel_controller!(remote_channel, result_info, progress_meter, LOGS_DIR_RESULTS, cases_results_path)
 
 Distributed.@everywhere CONSTANTS_DICT_LOCAL_ON_WORKER = deepcopy($CONSTANTS_DICT)
-results_bin = Distributed.pmap(enumerate(special_dicts_with_cases); retry_delays = zeros(3)) do entry
+rand_perm_special_dicts_with_cases = Random.shuffle(collect(enumerate(special_dicts_with_cases)))  # they will process in random order
+# results_trash itself is not used, hence the name
+results_trash = Distributed.pmap(rand_perm_special_dicts_with_cases; retry_delays = zeros(3)) do entry
     task_id, one_special_dict_with_case = entry
     remote_run(one_special_dict_with_case, CONSTANTS_DICT_LOCAL_ON_WORKER, task_id, remote_channel)  # this constants dict is deepcopied inside that function
 end
