@@ -396,7 +396,6 @@ end
 function run_channel_controller!(
         remote_channel::Distributed.RemoteChannel,
         result_info::Vector{FinalResultLog},
-        progress_meter::ProgressMeter.Progress,
         save_main_host_dir::String,
         save_result_path::String,
     )
@@ -410,7 +409,6 @@ function run_channel_controller!(
         result_info[remote_result.task_id] = final_result
 
         try
-            ProgressMeter.next!(progress_meter)
             open(save_result_path, "w") do io
                 write(io, construct_text_from_final_results(result_info))
             end
