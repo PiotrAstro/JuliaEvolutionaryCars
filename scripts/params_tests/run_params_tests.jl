@@ -1,13 +1,12 @@
 # IMPORTANT !!!
 # I should make clean start every time - I should run script always from a new repl
-
 if isdefined(Main, :CAN_RUN_ONLY_ONCE)
     throw("This script can be run only once, please restart julia session (REPL)")
 else
     CAN_RUN_ONLY_ONCE = true
 end
 
-# I shoudn't put this code in a module, it is easier to have it in main, than both remote and local code have the same path to functions etc.
+# I shoudn't put this code in a module, it is easier to have it in main, then both remote and local code have the same path to functions etc.
 import Distributed
 import Dates
 timestamp = Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS")

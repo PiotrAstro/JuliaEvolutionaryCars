@@ -162,7 +162,8 @@ function _addprocs_one_host(host::Dict, workers_n=-1) # if workers_n = -1, it wi
         shell = host[:shell],
         tunnel = host[:tunnel],
         dir = host[:dir_project],
-        exeflags = ["--project=@.", "--threads=$(host[:julia_threads_per_worker])"],
+        # --project=@. is to use the project and manifest in the current directory
+        exeflags = ["--project=@.", "--threads=$(host[:julia_threads_per_worker])"], 
         exename = "julia",
         enable_threaded_blas = host[:blas_threads_per_worker] > 1,
         topology = :master_worker,
