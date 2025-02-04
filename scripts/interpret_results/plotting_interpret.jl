@@ -11,22 +11,23 @@ import Statistics
 # My params
 
 
-TEST_DIR = joinpath("log", "parameters_tests_2025-01-09_23-17-50")
+TEST_DIR = joinpath("log", "parameters_tests_2025-01-23_15-43-18")
 RESULTS_DIR = joinpath(TEST_DIR, "results")
 ANALYSIS_DIR = joinpath(TEST_DIR, "analysis")
 
 TEST_POSTFIX = ".csv"  # will be removed from plot entries
-TEST_PREFIX = "logs_opt=StaGroGA_"  # will be removed from plot entries
+# TEST_PREFIX = "logs_opt=ConStaGroSimGA_"  # will be removed from plot entries
+TEST_PREFIX = "logs_"
 
 Y_LABEL = :best_fitness
-X_LABEL = :generation
+X_LABEL = :total_evaluations
 LINE_METHOD = :median  # :all, :mean, :median, :max, :min
-SHOW_STD = true  # whether to show std ribbon, doesnt matter for :all
+SHOW_STD = false  # whether to show std ribbon, doesnt matter for :all
 
 # By default [], so no GROUPS
 # could be e.g. ["NClu", "MmdWei"] it will create groups for each combination of these, if entry doesnt have any of these, it will be a group on its own
-GROUPS = []  
-GROUPS_IN_LEGEND = :col1  # :all - different colours in groups, :col1 - one colour in groups, :col1_ent1 - one colour in groups and one entry in legend
+GROUPS = ["FihMod="]  
+GROUPS_IN_LEGEND = :col1_ent1  # :all - different colours in groups, :col1 - one colour in groups, :col1_ent1 - one colour in groups and one entry in legend
 
 # will stay in the plot entries, used for filtering
 # TEST_INFIX_LIST = ["40", ("30", "!50")]  ->  contains("40") && (contains("30") || !contains("50"))
@@ -61,7 +62,7 @@ LINES = [
     :dashdot        # _._._._._._._
     :dashdotdot     # _.._.._.._..
 ]
-PLOT_SIZE = (1500, 1000)
+PLOT_SIZE = (6000, 3000)
 PLOT_MARGIN = (maximum(PLOT_SIZE) / 150)mm
 FONT_SIZE = 15
 LEGEND_FONT_SIZE = 9
@@ -114,6 +115,7 @@ function plot_all(
     if groups_text != "[]"  # if there are groups
         plot_name *= "  Groups--$groups_text-$GROUPS_IN_LEGEND"
     end
+    plot_name *= "  Rib--" * (SHOW_STD ? "T" : "F")
     println("Plotting: $plot_name")
     plot_save_name = replace(plot_name, " " => "_")
 
@@ -201,8 +203,10 @@ function plot_all(
             if !one_entry
                 plot_label_only!(p, name, DISTINT_COLOURS[current_colour], LINES[current_line], is_in_group, true)
             end
-
-            if one_colour
+            
+            if one_entry
+                current_line = 1
+            elseif one_colour
                 current_line = next_line_style(current_line)
             else
                 current_colour, current_line = next_colour_and_line_style(current_colour, current_line)
@@ -278,12 +282,18 @@ end
 Finally plot lines and ribbons in the right order.
 """
 function plot_lines_ribbons_only!(p, lines_ribbons_plotting::Dict)
-    for ribbon_args_kwargs in lines_ribbons_plotting[:ribbons]
-        Plots.plot!(p, ribbon_args_kwargs[:args]...; ribbon_args_kwargs[:kwargs]...)
+    if haskey(lines_ribbons_plotting, :ribbons)
+        for ribbon_args_kwargs in lines_ribbons_plotting[:ribbons]
+            Plots.plot!(p, ribbon_args_kwargs[:args]...; ribbon_args_kwargs[:kwargs]...)
+        end
     end
 
-    for plot_args_kwargs in lines_ribbons_plotting[:plots]
-        Plots.plot!(p, plot_args_kwargs[:args]...; plot_args_kwargs[:kwargs]...)
+    if haskey(lines_ribbons_plotting, :plots)
+        for plot_args_kwargs in lines_ribbons_plotting[:plots]
+            Plots.plot!(p, plot_args_kwargs[:args]...; plot_args_kwargs[:kwargs]...)
+        end
+    else
+        throw("There are no plots to plot")
     end
 end
 

@@ -321,7 +321,7 @@ function run_test(csgs::ContinuousStatesGroupingSimpleGA_Algorithm; max_generati
 end
 
 function get_fitness_test!(ind::Individual) :: Float64
-    return 0.0  # Test!
+    # return 0.0  # Test!
     if ind._fitness < 480.0
         get_fitness!(ind)
     else
