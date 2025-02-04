@@ -173,11 +173,9 @@ TESTED_VALUES = [
 # Rather constant settings:
 OUTPUT_LOG_FILE = "_output_$(timestamp).log"
 CASES_RESULTS_FILE = "_cases_results_$(timestamp).log"
-SCRIPTS_DIR_TO_COPY = joinpath(pwd(), "scripts") # copy constants.jl to logs dir, so that I know what were the exact settings when I ran it
-SRC_DIR_TO_COPY = joinpath(pwd(), "src")  # copy src dir to logs dir, so that I know what was the code when I ran it
 
 LOGS_DIR_RESULTS = joinpath(LOGS_DIR, "results")
-LOGS_DIR_SRC = joinpath(LOGS_DIR, "src")
+LOGS_DIR_PROJECT = joinpath(LOGS_DIR, "project_files")
 LOGS_DIR_ANALYSIS = joinpath(LOGS_DIR, "analysis")
 
 # --------------------------------------------------------------------------------------------------
@@ -230,19 +228,27 @@ Distributed.@everywhere begin
     end
 end
 
+# --------------------------------------------------------------------------------------------------
+# creating dirs, copying files, setting up loggers
 mkpath(LOGS_DIR)
 mkpath(LOGS_DIR_RESULTS)
-mkpath(LOGS_DIR_SRC)
+if isdir(LOGS_DIR_PROJECT)
+    rm(LOGS_DIR_PROJECT; recursive=true, force=true)
+end
+mkpath(LOGS_DIR_PROJECT)
 mkpath(LOGS_DIR_ANALYSIS)
 println("Logs will be saved in: $LOGS_DIR")
-cp(SCRIPTS_DIR_TO_COPY, joinpath(LOGS_DIR_SRC, "scripts"), force=true)
-println("Copied scripts dir to logs dir")
-cp(SRC_DIR_TO_COPY, joinpath(LOGS_DIR_SRC, "src"), force=true)
-println("Copied src dir to logs dir")
+archive_name = "logs_$(timestamp).tar.gz"
+DistributedEnvironments.create_project_archive(archive_name)
+DistributedEnvironments.extract_project_archive(archive_name, LOGS_DIR_PROJECT)
+rm(archive_name)
+println("Copied project to logs dir")
 
 file_logger = CustomLoggers.SimpleFileLogger(joinpath(LOGS_DIR, OUTPUT_LOG_FILE), true)
 Logging.global_logger(file_logger)
 
+# --------------------------------------------------------------------------------------------------
+# logging, fguring out what computations we will do, which are already done
 special_dicts = create_all_special_dicts(TESTED_VALUES)
 
 io = IOBuffer()
@@ -255,14 +261,14 @@ Logging.@info log_text
 special_dicts_with_cases = create_all_special_dicts_with_cases(special_dicts, CASES_PER_TEST)
 special_dicts_with_cases = consider_done_cases(special_dicts_with_cases, LOGS_DIR_RESULTS)
 
+# --------------------------------------------------------------------------------------------------
+# starting computations, creating remote channel for collecting results, starting channel controller
 Logging.@info "Starting computation"
 remote_channel = Distributed.RemoteChannel(() -> Channel{RemoteResult}(RESULT_CHANNEL_BUFFER_SIZE))
 result_info = [FinalResultLog(save_name(entry...), false, "Not yet computed") for entry in special_dicts_with_cases]
 
 cases_results_path = joinpath(LOGS_DIR, CASES_RESULTS_FILE)
-
 channel_controller_task = @async run_channel_controller!(remote_channel, result_info, LOGS_DIR_RESULTS, cases_results_path)
-
 rand_perm_special_dicts_with_cases = Random.shuffle(collect(enumerate(special_dicts_with_cases)))  # they will process in random order
 
 Distributed.@everywhere CONSTANTS_DICT_LOCAL_ON_WORKER = deepcopy($CONSTANTS_DICT)
@@ -272,6 +278,8 @@ results_trash = ProgressMeter.@showprogress Distributed.pmap(rand_perm_special_d
     remote_run(one_special_dict_with_case, CONSTANTS_DICT_LOCAL_ON_WORKER, task_id, remote_channel)  # this constants dict is deepcopied inside that function
 end
 
+# --------------------------------------------------------------------------------------------------
+# finishing computations, gently stopping everything
 put!(remote_channel, RemoteResult("", "", :stop, "Finished", 1, -1))
 wait(channel_controller_task)
 

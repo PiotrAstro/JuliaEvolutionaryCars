@@ -399,7 +399,7 @@ function run_channel_controller!(
         save_main_host_dir::String,
         save_result_path::String,
     )
-
+    save_cases_result_info(result_info, save_result_path)
     while true
         remote_result = take!(remote_channel)
         if remote_result.message_symbol == :stop
@@ -407,13 +407,16 @@ function run_channel_controller!(
         end
         final_result = main_save_results(remote_result, save_main_host_dir)
         result_info[remote_result.task_id] = final_result
+        save_cases_result_info(result_info, save_result_path)
+    end
+end
 
-        try
-            open(save_result_path, "w") do io
-                write(io, construct_text_from_final_results(result_info))
-            end
-        catch e
-            Logging.@error "Main worker error (just handling additional staff, not computation error): $save_result_path\n$e"
+function save_cases_result_info(result_info::Vector{FinalResultLog}, save_result_path::String)
+    try
+        open(save_result_path, "w") do io
+            write(io, construct_text_from_final_results(result_info))
         end
+    catch e
+        Logging.@error "Main worker error (just handling additional staff, not an error in computation): $save_result_path\n$e"
     end
 end

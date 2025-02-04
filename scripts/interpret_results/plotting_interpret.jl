@@ -26,7 +26,7 @@ SHOW_STD = true  # whether to show std ribbon, doesnt matter for :all
 # By default [], so no GROUPS
 # could be e.g. ["NClu", "MmdWei"] it will create groups for each combination of these, if entry doesnt have any of these, it will be a group on its own
 GROUPS = []  
-GROUPS_IN_LEGEND = :col1# :all - different colours in groups, :col1 - one colour in groups, :col1_ent1 - one colour in groups and one entry in legend
+GROUPS_IN_LEGEND = :col1  # :all - different colours in groups, :col1 - one colour in groups, :col1_ent1 - one colour in groups and one entry in legend
 
 # will stay in the plot entries, used for filtering
 # TEST_INFIX_LIST = ["40", ("30", "!50")]  ->  contains("40") && (contains("30") || !contains("50"))

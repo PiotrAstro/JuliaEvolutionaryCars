@@ -16,7 +16,12 @@ It will automatically set up workers.
 It will copy code and project info and precompile them, if copy_env_and_code is set to true.
 Otherwise it will not do it, it will just go to the right place and activate env, without instantiiate it, it should only be used if one already copied everything and it is all set up.
 """
-function _initcluster(cluster_config_main_macro_input, cluster_config_hosts_main_macro_input, tmp_dir_name_macro_input, copy_env_and_code_main_macro_input)
+function _initcluster(
+    cluster_config_main_macro_input,
+    cluster_config_hosts_main_macro_input,
+    tmp_dir_name_macro_input,
+    copy_env_and_code_main_macro_input,
+)
     quote
         cluster_config_main = $(esc(cluster_config_main_macro_input))
         cluster_config_hosts = $(esc(cluster_config_hosts_main_macro_input))
@@ -32,16 +37,8 @@ function _initcluster(cluster_config_main_macro_input, cluster_config_hosts_main
 
         if copy_env_and_code
             println("Copying project to all machines")
-            project_archive = "_tmp_project.tar.gz"
-
-            git_absolute_dir = strip(read(`git rev-parse --show-toplevel`, String))
-            cd(git_absolute_dir) do
-                files = readlines(`git ls-files -c -m -o --exclude-standard`)
-                unique!(files)
-                existing_files = filter(file -> isfile(file) && file != project_archive, files)
-                run(`tar -czf $project_archive $(existing_files)`)
-            end
-
+            project_archive = "_tmp_julia_comp_$(tmp_dir_name).tar.gz"
+            create_project_archive(project_archive)
             try
                 for host in cluster_config_hosts
                     printstyled("Copying project to $(host[:host_address]) : $(host[:dir_project])\n", bold=true, color=:magenta)
@@ -179,7 +176,7 @@ get_unique_machine_ips() = unique(map(id -> Distributed.get_bind_addr(id), procs
 
 Run a status check on each machine in the list and throws an error if any of them is unreachable.
 """
-function cluster_status!(cluster::Vector{<:Dict})
+function cluster_status!(cluster::Vector)
     printstyled("\n\n\nChecking machine main:\n", bold=true, color=:magenta)
     output = read(`julia -v`, String)
     println("Main host julia version: "*output)
@@ -207,5 +204,21 @@ function cluster_status!(cluster::Vector{<:Dict})
 
     printstyled("\nAll machines are reachable\n\n", bold=true, color=:green)
 end
+
+function create_project_archive(archive_path::String)
+    project_archive = archive_path
+    git_absolute_dir = strip(read(`git rev-parse --show-toplevel`, String))
+    cd(git_absolute_dir) do
+        files = readlines(`git ls-files -c -m -o --exclude-standard`)
+        unique!(files)
+        existing_files = filter(file -> isfile(file) && file != project_archive, files)
+        run(`tar -czf $project_archive $(existing_files)`)
+    end
+end
+
+function extract_project_archive(archive_path::String, extract_dir::String)
+    run(`tar -xzf $archive_path -C $extract_dir`)
+end
+
 
 end
