@@ -322,11 +322,12 @@ end
 
 function get_fitness_test!(ind::Individual) :: Float64
     # return 0.0  # Test!
-    if ind._fitness < 480.0
-        get_fitness!(ind)
-    else
-        return ind._fitness
-    end
+    # if ind._fitness < 480.0
+    #     get_fitness!(ind)
+    # else
+    #     return ind._fitness
+    # end
+    return get_fitness!(ind)
 end
 
 function FIHC_test!(ind::Individual;
@@ -390,7 +391,7 @@ function FIHC_test!(ind::Individual;
                     old_genes = Base.copy(ind.genes)
                     new_genes = Base.copy(ind.genes)
                     new_genes[:, node] .= 0.0
-                    new_genes[action, node] = 1.0
+                    new_genes[action, node] .= 1.0
                     ind._fitness_actual = false
                     ind.genes = new_genes
 

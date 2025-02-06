@@ -21,19 +21,19 @@ TEST_PREFIX = "logs_"
 
 Y_LABEL = :best_fitness
 X_LABEL = :total_evaluations
-LINE_METHOD = :median  # :all, :mean, :median, :max, :min
+LINE_METHOD = :mean  # :all, :mean, :median, :max, :min
 SHOW_STD = false  # whether to show std ribbon, doesnt matter for :all
 
 # By default [], so no GROUPS
 # could be e.g. ["NClu", "MmdWei"] it will create groups for each combination of these, if entry doesnt have any of these, it will be a group on its own
-GROUPS = ["FihMod="]  
-GROUPS_IN_LEGEND = :col1_ent1  # :all - different colours in groups, :col1 - one colour in groups, :col1_ent1 - one colour in groups and one entry in legend
+GROUPS = ["FihMod", "MmdWei", "RanMatMod", "GenCom", "NorMod"]  
+GROUPS_IN_LEGEND = :col1  # :all - different colours in groups, :col1 - one colour in groups, :col1_ent1 - one colour in groups and one entry in legend
 
 # will stay in the plot entries, used for filtering
 # TEST_INFIX_LIST = ["40", ("30", "!50")]  ->  contains("40") && (contains("30") || !contains("50"))
 # usually you should use it like this TEST_INFIX_LIST = ["(MmdWei=0.0)"] 
 # if you add ! as the first string index, it means not this one, e.g. TEST_INFIX_LIST = ["!40", "!50"] -> !contains("40") && !contains("50")
-TEST_INFIX_LIST = []
+TEST_INFIX_LIST = ["!matrix_rand", "NClu=100", "MVal=1"]
 
 
 # ------------------------------------------------------------------------------------------------
@@ -106,21 +106,21 @@ function plot_all(
     line_function::Symbol
 )
     mkpath(ANALYSIS_DIR)
-    infix_test = "[" * join([isa(infix_el, Tuple) ? join(infix_el, " or ") : infix_el for infix_el in TEST_INFIX_LIST], " & ") * "]"
-    groups_text = "[" * join(GROUPS, " & ") * "]"
-    plot_name = "function--$line_function  x--$x_label  y--$y_label  Prefix--$TEST_PREFIX"
+    infix_test = "[" * join([isa(infix_el, Tuple) ? join(infix_el, "or") : infix_el for infix_el in TEST_INFIX_LIST], "&") * "]"
+    groups_text = "[" * join(GROUPS, "&") * "]"
+    plot_name = "fun=$line_function x=$x_label y=$y_label Pre=$TEST_PREFIX"
     if infix_test != "[]"  # if there is infix
-        plot_name *= "  Infix--$infix_test"
+        plot_name *= " Inf=$infix_test"
     end
     if groups_text != "[]"  # if there are groups
-        plot_name *= "  Groups--$groups_text-$GROUPS_IN_LEGEND"
+        plot_name *= " Gro=$groups_text-$GROUPS_IN_LEGEND"
     end
-    plot_name *= "  Rib--" * (SHOW_STD ? "T" : "F")
+    plot_name *= " Rib-" * (SHOW_STD ? "T" : "F")
     println("Plotting: $plot_name")
     plot_save_name = replace(plot_name, " " => "_")
 
     p = Plots.plot(
-        legend=:topleft,
+        legend=:left,  # left, right, topleft, topright, bottomleft, bottomright, inside, bottom
         xlabel=String(x_label),
         ylabel=String(y_label),
         title=plot_name,
@@ -309,7 +309,7 @@ function add_to_group!(groups::Dict, name::String, groups_names::Vector)
             # get tmp group as things between group and end of string
             # do the job:
             tmp_group = find_group(name, group)
-            group_name_tmp = group[end] == "=" ? group[1:end-1] : group
+            group_name_tmp = group[end] == '=' ? group[1:end-1] : group
             
             if group_name != ""
                 group_name *= " "

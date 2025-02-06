@@ -90,7 +90,7 @@ CONSTANTS_DICT[:run_config] = Dict(
 )
 
 # Number of run tests per each combination of tested values
-CASES_PER_TEST = 1
+CASES_PER_TEST = 50
 
 LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_" * timestamp)  # running test from scratch
 # LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_2024-12-27_12-31-13")  # running test from some start_position - it will recognize already done cases
@@ -103,13 +103,13 @@ TESTED_VALUES = [
             :ContinuousStatesGroupingSimpleGA => Dict(
                 :env_wrapper => Dict(
                     :n_clusters => [20, 40, 100],
-                    :m_value => [1, 2]
                 ),
                 :fihc => Dict(
-                    :fihc_mode => [:matrix_rand],
+                    :fihc_mode => [:per_gene_rand],
                     :norm_mode => [:d_sum, :min_0],
-                    # :random_matrix_mode => [:rand, :randn],
-                    # :factor => [0.1, 0.3, 0.5, 1.0],
+                    :random_matrix_mode => [:rand, :randn],
+                    :factor => [0.1, 0.3, 0.5, 1.0],
+                    :genes_combination => [:hier],
                 ),
             ),
         ),
@@ -120,50 +120,30 @@ TESTED_VALUES = [
             :ContinuousStatesGroupingSimpleGA => Dict(
                 :env_wrapper => Dict(
                     :n_clusters => [20, 40, 100],
-                    :m_value => [1, 2]
                 ),
                 :fihc => Dict(
-                    :fihc_mode => [:per_gene_rand],
-                    :norm_mode => [:d_sum, :min_0],
-                    :random_matrix_mode => [:rand, :randn],
-                    :factor => [0.1, 0.3, 0.5, 1.0],
-                    :genes_combination => [:hier, :flat],
+                    :fihc_mode => [:disc_fihc],
+                    :genes_combination => [:hier],
                 ),
             ),
         ),
     ),
-    # (
-    #     :ContinuousStatesGroupingSimpleGA,
-    #     Dict(
-    #         :ContinuousStatesGroupingSimpleGA => Dict(
-    #             :env_wrapper => Dict(
-    #                 :n_clusters => [20, 40, 100],
-    #                 :m_value => [1, 2]
-    #             ),
-    #             :fihc => Dict(
-    #                 :fihc_mode => [:disc_fihc],
-    #                 :genes_combination => [:hier, :flat],
-    #             ),
-    #         ),
-    #     ),
-    # ),
-    # (
-    #     :ContinuousStatesGroupingSimpleGA,
-    #     Dict(
-    #         :ContinuousStatesGroupingSimpleGA => Dict(
-    #             :env_wrapper => Dict(
-    #                 :n_clusters => [20, 40, 100],
-    #                 :m_value => [1, 2]
-    #             ),
-    #             :fihc => Dict(
-    #                 :fihc_mode => [:fihc_cont],
-    #                 :norm_mode => [:d_sum, :min_0],
-    #                 :factor => [0.1, 0.3, 0.5, 1.0],
-    #                 :genes_combination => [:hier, :flat],
-    #             ),
-    #         ),
-    #     ),
-    # ),
+    (
+        :ContinuousStatesGroupingSimpleGA,
+        Dict(
+            :ContinuousStatesGroupingSimpleGA => Dict(
+                :env_wrapper => Dict(
+                    :n_clusters => [20, 40, 100],
+                ),
+                :fihc => Dict(
+                    :fihc_mode => [:fihc_cont],
+                    :norm_mode => [:d_sum, :min_0],
+                    :factor => [0.1, 0.3, 0.5, 1.0],
+                    :genes_combination => [:hier],
+                ),
+            ),
+        ),
+    ),
 ]
 
 # --------------------------------------------------------------------------------------------------
