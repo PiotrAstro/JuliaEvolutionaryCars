@@ -7,14 +7,14 @@ using ObjectOriented
 export Animal, Snake, my_snake_ckeck, ABC
 
 @oodef mutable struct Animal
-    name :: String
+    name::String
     function new(theName::String)
         @mk begin
             name = theName
         end
     end
 
-    function move(self, distanceInMeters::Number = 0)
+    function move(self, distanceInMeters::Number=0)
         println("$(self.name) moved $(distanceInMeters)")
     end
 end
@@ -89,7 +89,7 @@ function test()
     display(b)
 end
 
-function test2() 
+function test2()
     b = @benchmark Animals.Snake(21.9)
     display(b)
 

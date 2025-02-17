@@ -103,47 +103,47 @@ TESTED_VALUES = [
             :ContinuousStatesGroupingSimpleGA => Dict(
                 :env_wrapper => Dict(
                     :n_clusters => [20, 40, 100],
+                    :exemplars_clustering => [:genie, :pam, :kmedoids, :fcm_rand, :fcm_best, :fcm_best_rand]
                 ),
                 :fihc => Dict(
-                    :fihc_mode => [:per_gene_rand],
-                    :norm_mode => [:d_sum, :min_0],
-                    :random_matrix_mode => [:rand, :randn],
-                    :factor => [0.1, 0.3, 0.5, 1.0],
-                    :genes_combination => [:hier],
+                    :norm_mode => [:d_sum, :min_0, :around_0, :softmax_norm, :softmax],
+                    :random_matrix_mode => [:rand, :rand_n],
+                    :factor => [0.1, 0.3, 0.5, 1.0, 2.0],
                 ),
+                :initial_genes_mode => [:scale, :softmax],
             ),
         ),
     ),
-    (
-        :ContinuousStatesGroupingSimpleGA,
-        Dict(
-            :ContinuousStatesGroupingSimpleGA => Dict(
-                :env_wrapper => Dict(
-                    :n_clusters => [20, 40, 100],
-                ),
-                :fihc => Dict(
-                    :fihc_mode => [:disc_fihc],
-                    :genes_combination => [:hier],
-                ),
-            ),
-        ),
-    ),
-    (
-        :ContinuousStatesGroupingSimpleGA,
-        Dict(
-            :ContinuousStatesGroupingSimpleGA => Dict(
-                :env_wrapper => Dict(
-                    :n_clusters => [20, 40, 100],
-                ),
-                :fihc => Dict(
-                    :fihc_mode => [:fihc_cont],
-                    :norm_mode => [:d_sum, :min_0],
-                    :factor => [0.1, 0.3, 0.5, 1.0],
-                    :genes_combination => [:hier],
-                ),
-            ),
-        ),
-    ),
+    # (
+    #     :ContinuousStatesGroupingSimpleGA,
+    #     Dict(
+    #         :ContinuousStatesGroupingSimpleGA => Dict(
+    #             :env_wrapper => Dict(
+    #                 :n_clusters => [20, 40, 100],
+    #             ),
+    #             :fihc => Dict(
+    #                 :fihc_mode => [:disc_fihc],
+    #                 :genes_combination => [:hier],
+    #             ),
+    #         ),
+    #     ),
+    # ),
+    # (
+    #     :ContinuousStatesGroupingSimpleGA,
+    #     Dict(
+    #         :ContinuousStatesGroupingSimpleGA => Dict(
+    #             :env_wrapper => Dict(
+    #                 :n_clusters => [20, 40, 100],
+    #             ),
+    #             :fihc => Dict(
+    #                 :fihc_mode => [:fihc_cont],
+    #                 :norm_mode => [:d_sum, :min_0],
+    #                 :factor => [0.1, 0.3, 0.5, 1.0],
+    #                 :genes_combination => [:hier],
+    #             ),
+    #         ),
+    #     ),
+    # ),
 ]
 
 # --------------------------------------------------------------------------------------------------
@@ -249,7 +249,8 @@ result_info = [FinalResultLog(save_name(entry...), false, "Not yet computed") fo
 
 cases_results_path = joinpath(LOGS_DIR, CASES_RESULTS_FILE)
 channel_controller_task = @async run_channel_controller!(remote_channel, result_info, LOGS_DIR_RESULTS, cases_results_path)
-rand_perm_special_dicts_with_cases = Random.shuffle(collect(enumerate(special_dicts_with_cases)))  # they will process in random order
+# rand_perm_special_dicts_with_cases = Random.shuffle(collect(enumerate(special_dicts_with_cases)))  # they will process in random order
+rand_perm_special_dicts_with_cases = collect(enumerate(special_dicts_with_cases))  # actually currently it is sorted by case number, so I do not have to shuffle it
 
 Distributed.@everywhere CONSTANTS_DICT_LOCAL_ON_WORKER = deepcopy($CONSTANTS_DICT)
 # results_trash itself is not used, hence the name

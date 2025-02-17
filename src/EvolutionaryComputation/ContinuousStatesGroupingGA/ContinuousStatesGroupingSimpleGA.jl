@@ -5,6 +5,7 @@ import Logging
 import Printf
 import Random
 import Statistics
+import LinearAlgebra
 
 import ..NeuralNetwork
 import ..Environment
@@ -27,8 +28,8 @@ mutable struct Individual
     _verbose::Bool
 end
 
-function Individual(env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct, verbose=false)
-    genes = EnvironmentWrapper.new_genes(env_wrapper)
+function Individual(env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct, initial_genes_mode::Symbol=:scale, verbose=false)
+    genes = initial_genes(env_wrapper, initial_genes_mode)
     return Individual(
         genes,
         env_wrapper,
@@ -144,6 +145,7 @@ mutable struct ContinuousStatesGroupingSimpleGA_Algorithm <: AbstractOptimizerMo
     current_env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct
     total_evaluations::Int
     fihc::Dict
+    initial_genes_mode::Symbol
     verbose::Bool
 end
 
@@ -158,6 +160,7 @@ function ContinuousStatesGroupingSimpleGA_Algorithm(;
     environment::Symbol,
     env_wrapper::Dict{Symbol, <:Any},
     individuals_n::Int,
+    initial_genes_mode::Symbol,
     fihc::Dict
 )
     environment_type = Environment.get_environment(environment)
@@ -170,7 +173,7 @@ function ContinuousStatesGroupingSimpleGA_Algorithm(;
         env_wrapper...
     )
 
-    individuals = [Individual(env_wrapper_struct) for _ in 1:individuals_n]
+    individuals = [Individual(env_wrapper_struct, initial_genes_mode) for _ in 1:individuals_n]
 
     Threads.@threads for ind in individuals
         get_fitness!(ind)
@@ -187,6 +190,7 @@ function ContinuousStatesGroupingSimpleGA_Algorithm(;
         env_wrapper_struct,
         0,
         fihc,
+        initial_genes_mode,
         false
     )
 end
@@ -234,7 +238,7 @@ function AbstractOptimizerModule.run!(csgs::ContinuousStatesGroupingSimpleGA_Alg
 
         # put random individual at random place different from best individual
         random_ind = rand(collect(eachindex(csgs.population))[eachindex(csgs.population) .!= best_ind_arg])
-        csgs.population[random_ind] = Individual(csgs.current_env_wrapper, csgs.verbose)
+        csgs.population[random_ind] = Individual(csgs.current_env_wrapper, csgs.initial_genes_mode, csgs.verbose)
         get_fitness!(csgs.population[random_ind])
 
         end_time = time()
@@ -283,7 +287,7 @@ end
 # tests
 
 function run_test(csgs::ContinuousStatesGroupingSimpleGA_Algorithm; max_generations::Int, max_evaluations::Int, log::Bool, fihc_settings::Dict)
-    new_ind = Individual(csgs.current_env_wrapper)
+    new_ind = Individual(csgs.current_env_wrapper, csgs.initial_genes_mode, log)
     total_eval = 0
 
     # combinations_flat = get_genes_combination(new_ind.env_wrapper, :flat)
@@ -338,32 +342,33 @@ function FIHC_test!(ind::Individual;
     factor::Float64,
 ) :: Int
 
-    if fihc_mode == :matrix_rand
-        evals_num_now = EnvironmentWrapper.get_groups_number(ind.env_wrapper)  # I want to run few more so that I do not hav too many entries in logs
-        for _ in evals_num_now
-            old_fitness = get_fitness_test!(ind)
-            old_genes = Base.copy(ind.genes)
-            new_genes = ind.genes .+ generate_random_matrix(size(ind.genes, 1), size(ind.genes, 2), factor, random_matrix_mode)
-            ind._fitness_actual = false
-            ind.genes = norm_genes(new_genes, norm_mode)
+    # It doesnt work anyway, thus I do not want to keep updating it
+    # if fihc_mode == :matrix_rand
+    #     evals_num_now = EnvironmentWrapper.get_groups_number(ind.env_wrapper)  # I want to run few more so that I do not hav too many entries in logs
+    #     for _ in evals_num_now
+    #         old_fitness = get_fitness_test!(ind)
+    #         old_genes = Base.copy(ind.genes)
+    #         new_genes = ind.genes .+ generate_random_matrix(size(ind.genes, 1), size(ind.genes, 2), factor, random_matrix_mode)
+    #         ind._fitness_actual = false
+    #         ind.genes = norm_genes(new_genes, norm_mode)
             
-            if get_fitness_test!(ind) < old_fitness
-                ind.genes = old_genes
-                ind._fitness = old_fitness
-            end
-        end
-        return evals_num_now
+    #         if get_fitness_test!(ind) < old_fitness
+    #             ind.genes = old_genes
+    #             ind._fitness = old_fitness
+    #         end
+    #     end
+    #     return evals_num_now
+    # elseif fihc_mode == :per_gene_rand
 
-    elseif fihc_mode == :per_gene_rand
+    if fihc_mode == :per_gene_rand
         evals = 0
         for nodes_level in get_genes_combination(ind.env_wrapper, genes_combination)
             for node in nodes_level
                 old_fitness = get_fitness_test!(ind)
                 old_genes = Base.copy(ind.genes)
-                new_genes = Base.copy(ind.genes)
-                new_genes[:, node] .+= generate_random_matrix(size(ind.genes, 1), length(node), factor, random_matrix_mode)
+                random_values = generate_random_matrix(size(ind.genes, 1), length(node), factor, random_matrix_mode)
                 ind._fitness_actual = false
-                ind.genes = norm_genes(new_genes, norm_mode)
+                ind.genes = norm_genes(old_genes, random_values, node, norm_mode)
 
                 evals += 1
                 
@@ -414,10 +419,10 @@ function FIHC_test!(ind::Individual;
                 for action in 1:actions_n
                     old_fitness = get_fitness_test!(ind)
                     old_genes = Base.copy(ind.genes)
-                    new_genes = Base.copy(ind.genes)
-                    new_genes[action, node] .+= factor
+                    genes_changes = zeros(Float32, size(ind.genes, 1), length(node))
+                    genes_changes[action, :] .+= factor
                     ind._fitness_actual = false
-                    ind.genes = norm_genes(new_genes, norm_mode)
+                    ind.genes = norm_genes(old_genes, genes_changes, node, norm_mode)
 
                     evals += 1
                     
@@ -462,22 +467,81 @@ function get_genes_combination(env_wrapper::EnvironmentWrapper.EnvironmentWrappe
     end
 end
 
-function norm_genes(genes::Matrix{Float32}, mode::Symbol) :: Matrix{Float32}
-    new_genes = Base.copy(genes)
+function initial_genes(env_wrap::EnvironmentWrapper.EnvironmentWrapperStruct, mode::Symbol) :: Matrix{Float32}
+    new_genes = randn(Float32, EnvironmentWrapper.get_action_size(env_wrap), EnvironmentWrapper.get_groups_number(env_wrap))
+    if mode == :scale
+        EnvironmentWrapper.normalize_genes!(new_genes)
+    elseif mode == :softmax
+        softmax!(new_genes)
+    else
+        throw(ArgumentError("Unknown mode: $mode"))
+    end
+
+    return new_genes
+end
+
+function norm_genes(genes_origianal::Matrix{Float32}, genes_new::Matrix{Float32}, changed_genes::Vector{Int}, mode::Symbol) :: Matrix{Float32}
+    new_genes = Base.copy(genes_origianal)
     if mode == :d_sum
+        new_genes[:, changed_genes] += genes_new
         EnvironmentWrapper.normalize_genes!(new_genes)
     elseif mode == :min_0
+        new_genes[:, changed_genes] += genes_new
         EnvironmentWrapper.normalize_genes_min_0!(new_genes)
+    elseif mode == :around_0
+        # we transform genes to mean 0 std 0, than add randn and then normalize  -= minimum  and  / sum
+        genes_changed = genes_origianal[:, changed_genes]
+        znorm!(genes_changed)
+        genes_changed += genes_new
+        znorm!(genes_changed)
+        EnvironmentWrapper.normalize_genes_min_0!(genes_changed)
+        new_genes[:, changed_genes] = genes_changed
+    elseif mode == :softmax_norm
+        # we get original ifferences between values from previous softmax, than add randn and then normalize with softmax
+        genes_changed = genes_origianal[:, changed_genes]
+        softmax_inv!(genes_changed)
+        znorm!(genes_changed)
+        genes_changed += genes_new
+        znorm!(genes_changed)
+        softmax!(genes_changed)
+        new_genes[:, changed_genes] = genes_changed
+    elseif mode == :softmax
+        genes_changed = genes_origianal[:, changed_genes]
+        softmax_inv!(genes_changed)
+        genes_changed += genes_new
+        softmax!(genes_changed)
+        new_genes[:, changed_genes] = genes_changed
     else
         throw(ArgumentError("Unknown mode: $mode"))
     end
     return new_genes
 end
 
+function znorm!(genes::Matrix{Float32})
+    for col in eachcol(genes)
+        col .-= Statistics.mean(col)
+        col ./= (Statistics.std(col) + eps(Float32))
+    end
+end
+
+function softmax!(genes::Matrix{Float32})
+    for col in eachcol(genes)
+        col .-= minimum(col)
+        col .= exp.(col)
+        col ./= (sum(col) + eps(Float32))
+    end
+end
+
+function softmax_inv!(genes::Matrix{Float32})
+    for col in eachcol(genes)
+        col .= log.(col .+ eps(Float32))
+    end
+end
+
 function generate_random_matrix(latent_space::Int, n_clusters::Int, factor::Float64, mode::Symbol) :: Matrix{Float32}
     if mode == :rand
         return rand(Float32, latent_space, n_clusters) .* factor
-    elseif mode == :randn
+    elseif mode == :rand_n
         return randn(Float32, latent_space, n_clusters) .* factor
     else
         throw(ArgumentError("Unknown mode: $mode"))

@@ -1,4 +1,4 @@
-export DistanceBasedClassificator, membership, encoded_membership
+export DistanceBasedClassificator, membership, encoded_membership, get_states_number
 
 """
 DistanceBasedClassificator
@@ -13,6 +13,7 @@ struct DistanceBasedClassificator{M<:Val, N <: AbstractNeuralNetwork, F<:Functio
     fuzzy_logic_of_n_closest::Int
     distance_function!::F
     predict_function::F2
+    states_n::Int
 
     function DistanceBasedClassificator(
         encoder::N,
@@ -23,6 +24,7 @@ struct DistanceBasedClassificator{M<:Val, N <: AbstractNeuralNetwork, F<:Functio
         distance_metric::Symbol,
         m_value::Int = 1,  # m value for fuzzy membership function, it is (1 / distance[i]) ^ m_value, usually 2, I used 1
     ) where N
+        states_n = size(encoded_exemplars, 2)
         if distance_metric == :cosine
             encoded_exemplars = collect(normalize_unit(encoded_exemplars)')
             distance_function! = distance_cosine!
@@ -47,7 +49,7 @@ struct DistanceBasedClassificator{M<:Val, N <: AbstractNeuralNetwork, F<:Functio
         F2 = typeof(predict_function)
 
         # Call new with all type parameters specified
-        new{Val{m_value}, N, F, F2}(encoder, encoded_exemplars, translation, actions_number, fuzzy_logic_of_n_closest, distance_function!, predict_function)
+        new{Val{m_value}, N, F, F2}(encoder, encoded_exemplars, translation, actions_number, fuzzy_logic_of_n_closest, distance_function!, predict_function, states_n)
     end
 end
 
@@ -104,8 +106,7 @@ function predict_all(nn::DistanceBasedClassificator{Val{M_INT}}, distances::Matr
                 result_col[row] += nn.translation[row, exemplar_id] * member
             end
         end
-        @fastmath inv_sum = 1.0f0 / sum(result_col)
-        @fastmath result_col .*= inv_sum
+        @fastmath result_col .*= 1.0f0 / sum(result_col)
     end
     return result_matrix
 end
@@ -167,14 +168,22 @@ end
 #     return nn.predict_function(nn, distances)
 # end
 
-function membership(nn::DistanceBasedClassificator, X)::Matrix{Float32}
-    encoded_x = predict(nn.encoder, X)
-    return encoded_membership(nn, encoded_x)
+function get_states_number(nn::DistanceBasedClassificator)
+    return nn.states_n
 end
 
-function encoded_membership(nn::DistanceBasedClassificator{Val{MINT}}, encoded_x::Matrix{Float32})::Matrix{Float32} where {MINT}
+function membership(nn::DistanceBasedClassificator, X)::Matrix{Float32}
+    encoded_x = predict(nn.encoder, X)
+    return _encoded_membership(nn, encoded_x)
+end
+
+function encoded_membership(nn::DistanceBasedClassificator, encoded_x::Matrix{Float32})::Matrix{Float32}
     encoded_copy = Base.copy(encoded_x)
-    distances = nn.distance_function!(nn.encoded_exemplars, encoded_copy)
+    return _encoded_membership(nn, encoded_copy)
+end
+
+function _encoded_membership(nn::DistanceBasedClassificator{Val{MINT}}, encoded_x::Matrix{Float32})::Matrix{Float32} where {MINT}
+    distances = nn.distance_function!(nn.encoded_exemplars, encoded_x)
     membership_matrix = zeros(Float32, size(distances, 1), size(distances, 2))
     @inbounds @fastmath for (i, col) in enumerate(eachcol(membership_matrix))
         # Could be turbo? LoopVectorization.@turbo 

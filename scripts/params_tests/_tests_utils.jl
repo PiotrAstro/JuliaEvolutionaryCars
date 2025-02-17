@@ -231,7 +231,15 @@ function dict_to_name(dict_to_use::Dict{Symbol, <:Any})::String
         if isa(value, Dict)
             name *= shorten_name(string(key)) * "=" * dict_to_name(value)
         else
-            name *= shorten_name(string(key)) * "=" * string(value)
+            if isa(value, String)
+                str_val = shorten_name(value)
+            elseif isa(value, Symbol)
+                str_val = shorten_name(string(value))
+            else
+                str_val = string(value)
+            end
+
+            name *= shorten_name(string(key)) * "=" * str_val
         end
         name *= "_"
     end
@@ -278,7 +286,7 @@ end
 function save_name(optimizer::Symbol, dict_to_use::Dict{Symbol, <:Any}, case_index::Int; extension::String=".csv")::String
     case_index_string = lpad(string(case_index), 2, "0")
     optimizer_name = shorten_name(string(optimizer))
-    return "logs_opt=" * optimizer_name * "_" * dict_to_name(dict_to_use) * "__case" * case_index_string * extension
+    return "o=" * optimizer_name * "_" * dict_to_name(dict_to_use) * "__" * case_index_string * extension
 end
 
 """

@@ -24,9 +24,9 @@ function TestNN(encoded_exemplars::Matrix{Float32}, m::Int, tranlation, translat
     encoded_exemplars_normalized_transposed = collect(encoded_exemplars_normlized')
     return TestNN{Val{m}}(encoded_exemplars_normlized, encoded_exemplars_normalized_transposed, tranlation, translation_cont, n_actions)
 end
-global const Episol::Float32 = Float32(1e-6)
+const global Episol::Float32 = Float32(1e-6)
 
-function calculate_distance_normal(test_nn::TestNN{M}, new_exemplars) where M
+function calculate_distance_normal(test_nn::TestNN{M}, new_exemplars) where {M}
     # new_exemplars = normalize_unit(new_exemplars)
     normalize_unit!(new_exemplars)
     distances = test_nn.encoded_exemplars_normalized_transposed * new_exemplars
@@ -38,7 +38,7 @@ function calculate_distance_normal(test_nn::TestNN{M}, new_exemplars) where M
     return distances
 end
 
-function calculate_distance_mine(test_nn::TestNN{M}, new_exemplars) where M
+function calculate_distance_mine(test_nn::TestNN{M}, new_exemplars) where {M}
     # distances = Matrix{Float32}(undef, size(test_nn.encoded_exemplars_normlized, 2), size(new_exemplars, 2))
     # @fastmath for col in axes(new_exemplars, 2)
     #     scaling_factor = 0.0f0
@@ -75,7 +75,7 @@ function calculate_distance_mine(test_nn::TestNN{M}, new_exemplars) where M
     return distances
 end
 
-function normalize_unit(x::Matrix{Float32}) :: Matrix{Float32}
+function normalize_unit(x::Matrix{Float32})::Matrix{Float32}
     copied = Base.copy(x)
     normalize_unit!(copied)
     return copied
@@ -90,7 +90,7 @@ function normalize_unit!(x::Matrix{Float32})
     for col_ind in axes(x, 2)
         sum_squared = 0.0f0
         @turbo for row_ind in axes(x, 1)
-            sum_squared += x[row_ind, col_ind] ^ 2
+            sum_squared += x[row_ind, col_ind]^2
         end
         sum_squared = 1.0f0 / sqrt(sum_squared)
         @turbo for row_ind in axes(x, 1)
@@ -123,7 +123,7 @@ end
 function distance_euclidean(x::Vector{Float32}, y::Vector{Float32})::Float32
     summed = 0.0f0
     @inbounds @simd for i in eachindex(x)
-        summed += (x[i] - y[i]) ^ 2
+        summed += (x[i] - y[i])^2
     end
     return sqrt(summed)
 end
@@ -139,7 +139,7 @@ function predict_all(nn::TestNN{Val{M_INT}}, distances::Matrix{Float32})::Matrix
     result_matrix = zeros(Float32, nn.actions_number, size(distances, 2))
     @inbounds for (i, result_col) in enumerate(eachcol(result_matrix))
         @fastmath @simd for exemplar_id in eachindex(nn.translation)
-            result_col[nn.translation[exemplar_id]] += (1.0f0 / distances[exemplar_id, i]) ^ M_INT
+            result_col[nn.translation[exemplar_id]] += (1.0f0 / distances[exemplar_id, i])^M_INT
         end
         result_col ./= sum(result_col)
     end
@@ -151,7 +151,7 @@ function predict_all_mine(nn::TestNN{Val{M_INT}}, distances::Matrix{Float32})::M
     # LoopVectorization.@turbo 
     @inbounds @fastmath for exemplar_id in axes(nn.translation, 1)
         @simd for col in axes(distances, 2)
-            result_matrix[nn.translation[exemplar_id], col] += (1.0f0 / distances[exemplar_id, col]) ^ M_INT
+            result_matrix[nn.translation[exemplar_id], col] += (1.0f0 / distances[exemplar_id, col])^M_INT
         end
     end
     for result_col in eachcol(result_matrix)
@@ -164,7 +164,7 @@ function predict_all_cont(nn::TestNN{Val{M_INT}}, distances::Matrix{Float32})::M
     result_matrix = zeros(Float32, nn.actions_number, size(distances, 2))
     @inbounds for (i, result_col) in enumerate(eachcol(result_matrix))
         @fastmath @simd for exemplar_id in axes(nn.translation_cont, 2)
-            member = (1.0f0 / distances[exemplar_id, i]) ^ M_INT
+            member = (1.0f0 / distances[exemplar_id, i])^M_INT
             for row in 1:nn.actions_number
                 result_col[row] += nn.translation_cont[row, exemplar_id] * member
             end
@@ -178,7 +178,7 @@ function predict_all_cont_mine(nn::TestNN{Val{M_INT}}, distances::Matrix{Float32
     result_matrix = zeros(Float32, nn.actions_number, size(distances, 2))
     @inbounds for (i, result_col) in enumerate(eachcol(result_matrix))
         LoopVectorization.@turbo for exemplar_id in axes(nn.translation_cont, 2)
-            member = (1.0f0 / distances[exemplar_id, i]) ^ M_INT
+            member = (1.0f0 / distances[exemplar_id, i])^M_INT
             for row in 1:nn.actions_number
                 result_col[row] += nn.translation_cont[row, exemplar_id] * member
             end
@@ -210,7 +210,7 @@ function test_final()
 
     b = BenchmarkTools.@benchmark calculate_distance_mine($test_nn, $new_exemplars)
     display(b)
-    
+
 
     println("translations")
     mine_normal = predict_all(test_nn, distances)

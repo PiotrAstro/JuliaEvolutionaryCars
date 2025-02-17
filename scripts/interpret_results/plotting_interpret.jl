@@ -11,34 +11,34 @@ import Statistics
 # My params
 
 
-TEST_DIR = joinpath("log", "parameters_tests_2025-01-23_15-43-18")
+TEST_DIR = joinpath("log", "parameters_tests_2025-02-07_15-27-17")
 RESULTS_DIR = joinpath(TEST_DIR, "results")
 ANALYSIS_DIR = joinpath(TEST_DIR, "analysis")
 
 TEST_POSTFIX = ".csv"  # will be removed from plot entries
-# TEST_PREFIX = "logs_opt=ConStaGroSimGA_"  # will be removed from plot entries
-TEST_PREFIX = "logs_"
+TEST_PREFIX = "logs_opt=ConStaGroSimGA_"  # will be removed from plot entries
 
 Y_LABEL = :best_fitness
 X_LABEL = :total_evaluations
-LINE_METHOD = :mean  # :all, :mean, :median, :max, :min
+LINE_METHOD = :p90  # :all, :mean, :median, :max, :min, :p25, :p90 - p is for percentiles 
 SHOW_STD = false  # whether to show std ribbon, doesnt matter for :all
 
 # By default [], so no GROUPS
 # could be e.g. ["NClu", "MmdWei"] it will create groups for each combination of these, if entry doesnt have any of these, it will be a group on its own
-GROUPS = ["FihMod", "MmdWei", "RanMatMod", "GenCom", "NorMod"]  
+GROUPS = ["FihMod", "RanMatMod", "NorMod"]  
 GROUPS_IN_LEGEND = :col1  # :all - different colours in groups, :col1 - one colour in groups, :col1_ent1 - one colour in groups and one entry in legend
 
 # will stay in the plot entries, used for filtering
 # TEST_INFIX_LIST = ["40", ("30", "!50")]  ->  contains("40") && (contains("30") || !contains("50"))
 # usually you should use it like this TEST_INFIX_LIST = ["(MmdWei=0.0)"] 
 # if you add ! as the first string index, it means not this one, e.g. TEST_INFIX_LIST = ["!40", "!50"] -> !contains("40") && !contains("50")
-TEST_INFIX_LIST = ["!matrix_rand", "NClu=100", "MVal=1"]
+TEST_INFIX_LIST = ["!NClu=10", "!NClu=100", "!NClu=40"]
 
 
 # ------------------------------------------------------------------------------------------------
 # Utils
 DISTINT_COLOURS = [
+    # Your original colors
     "#1f77b4",  # Blue
     "#ff7f0e",  # Orange
     "#2ca02c",  # Green
@@ -53,7 +53,19 @@ DISTINT_COLOURS = [
     "#98df8a",  # Light Green
     "#aec7e8",  # Light Blue
     "#ffbb78",  # Light Orange
-    "#c5b0d5"   # Light Purple
+    "#c5b0d5",  # Light Purple
+    
+    # New distinct additions
+    "#006400",  # Dark Green
+    "#800080",  # Deep Purple
+    "#FFD700",  # Gold
+    "#FF1493",  # Deep Pink
+    "#483D8B",  # Dark Slate Blue
+    "#8B0000",  # Dark Red
+    "#008B8B",  # Dark Cyan
+    "#DC143C",  # Crimson
+    "#556B2F",  # Dark Olive Green
+    "#DAA520"   # Goldenrod
 ]
 LINES = [
     :solid          # _______________
@@ -63,6 +75,7 @@ LINES = [
     :dashdotdot     # _.._.._.._..
 ]
 PLOT_SIZE = (6000, 3000)
+LEGEND_POSITION = :bottom  # left, right, topleft, topright, bottomleft, bottomright, inside, bottom, outertopleft, outertopright, outerbottomleft, outerbottomright
 PLOT_MARGIN = (maximum(PLOT_SIZE) / 150)mm
 FONT_SIZE = 15
 LEGEND_FONT_SIZE = 9
@@ -74,7 +87,7 @@ GROUP_SUB_ENTRY_PREFIX = "|-- "
 
 function get_name_string(file_name::String) :: String
     remove_prefix = replace(file_name, TEST_PREFIX => "")
-    remove_case_extension = split(remove_prefix, "__case")[1]
+    remove_case_extension = split(remove_prefix, "__")[1]
     if startswith(remove_case_extension, "(")
         remove_case_extension = remove_case_extension[2:end]
     end
@@ -115,12 +128,12 @@ function plot_all(
     if groups_text != "[]"  # if there are groups
         plot_name *= " Gro=$groups_text-$GROUPS_IN_LEGEND"
     end
-    plot_name *= " Rib-" * (SHOW_STD ? "T" : "F")
+    plot_name *= " rib=" * (SHOW_STD ? "T" : "F")
     println("Plotting: $plot_name")
     plot_save_name = replace(plot_name, " " => "_")
 
     p = Plots.plot(
-        legend=:left,  # left, right, topleft, topright, bottomleft, bottomright, inside, bottom
+        legend=LEGEND_POSITION,  # left, right, topleft, topright, bottomleft, bottomright, inside, bottom
         xlabel=String(x_label),
         ylabel=String(y_label),
         title=plot_name,
@@ -185,17 +198,25 @@ function plot_all(
                 if line_function == :mean
                     values = Statistics.mean.(eachcol(y_values))
                     ribbon = std_each_step
-                elseif line_function == :median
-                    values = Statistics.median.(eachcol(y_values))
-                    ribbon = std_each_step
-                elseif line_function == :max
-                    values = maximum.(eachcol(y_values))
-                    ribbon = (std_each_step, zeros(length(std_each_step))) # currently I plot just +std, idk if I should do +2*std
-                elseif line_function == :min
-                    ribbon = (zeros(length(std_each_step)), std_each_step) # currently I plot just +std, idk if I should do +2*std
-                    values = minimum.(eachcol(y_values))
                 else
-                    throw("Unknown line function")
+                    if line_function == :median
+                        quantile = 0.5
+                    elseif line_function == :max
+                        quantile = 1.0
+                    elseif line_function == :min
+                        quantile = 0.0
+                    elseif String(line_function)[1] == 'p'
+                        percentile = parse(Int, String(line_function)[2:end])
+                        if percentile < 0 || percentile > 100
+                            throw("Percentile should be between 0 and 100, currently is $percentile")
+                        end
+                        quantile = percentile / 100
+                    else
+                        throw("Unknown line function")
+                    end
+
+                    values = Statistics.quantile.(eachcol(y_values), quantile)
+                    ribbon = (quantile * std_each_step, (1 - quantile) * std_each_step)
                 end
                 add_line_ribbon_only!(lines_ribbons_plotting, common_x, values, DISTINT_COLOURS[current_colour], LINES[current_line], ribbon)
             end
@@ -354,7 +375,7 @@ It will work e.g. when we plot by evaluation number with different evaluation nu
 x_cases in all_cases are vectors of x values, y_cases are vectors of y values.
 x_cases should be sorted
 """
- function get_common_x_and_vals(all_cases)
+function get_common_x_and_vals(all_cases)
     # create set of all values in xes
     x_cases = [x for (x, _) in all_cases]
     y_cases = [y for (_, y) in all_cases]
@@ -379,7 +400,7 @@ x_cases should be sorted
         # fill vals
         for case_ind in eachindex(all_cases)
             vals[case_ind, step_id] = y_cases[case_ind][previous_ind[case_ind]]
-        end        
+        end
     end
 
     return sorted_x, vals

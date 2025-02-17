@@ -124,8 +124,9 @@ returns Tuple{Vector{Trajectory}, TreeNode}
 function create_time_distance_tree(env_wrap::EnvironmentWrapperStruct, ind::Vector{Int})
     trajectories = _collect_trajectories(env_wrap._envs, [get_full_NN(env_wrap, ind)])
     states_in_trajectories = [trajectory.states for trajectory in trajectories]
-    encoded_states_by_trajectory = [NeuralNetwork.predict(env_wrap._encoder, Environment.get_nn_input(states_one_traj)) for states_one_traj in states_in_trajectories]
-    return trajectories, StatesGrouping.create_time_distance_tree(encoded_states_by_trajectory, env_wrap._encoded_exemplars, env_wrap._hclust_time)
+    full_nn = get_full_NN(env_wrap, ind)
+    memberships_by_trajectory = [NeuralNetwork.membership(full_nn, Environment.get_nn_input(states_one_traj)) for states_one_traj in states_in_trajectories]
+    return trajectories, StatesGrouping.create_time_distance_tree_mine(memberships_by_trajectory, env_wrap._hclust_time)
 end
 
 function copy(env_wrap::EnvironmentWrapperStruct, copy_dict::Bool=true) :: EnvironmentWrapperStruct

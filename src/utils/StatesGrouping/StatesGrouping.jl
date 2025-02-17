@@ -3,11 +3,18 @@ module StatesGrouping
 import Distances
 import Clustering
 import Statistics
+import LoopVectorization
+import LinearAlgebra
 
 import ..GenieClust
 import ..PAM
+import ..FCM
 
-export get_exemplars, TreeNode, is_leaf, create_time_distance_tree
+export get_exemplars, TreeNode, is_leaf, create_time_distance_tree_mine, create_time_distance_tree_markov_fundamental
+
+# ------------------------------------------------------------------------------------------
+# TreeNode for hierarchical clustering
+# ------------------------------------------------------------------------------------------
 
 struct TreeNode
     left::Union{TreeNode, Nothing}
@@ -21,13 +28,46 @@ function is_leaf(tree::TreeNode) :: Bool
 end
 
 
+function _create_tree_hclust(merge_matrix::Matrix{Int}) :: TreeNode
+    points_n = size(merge_matrix, 1) + 1
+    leafs = Vector{TreeNode}(undef, points_n)
+    clusters = Vector{TreeNode}(undef, points_n - 1)
 
+    for i in 1:points_n
+        leafs[i] = TreeNode(nothing, nothing, [i])
+    end
+    last_index = 1
+
+    for i in 1:size(merge_matrix, 1)
+        left_index = merge_matrix[i, 1]
+        right_index = merge_matrix[i, 2]
+
+        left = left_index >= 0 ? clusters[left_index] : leafs[-left_index]
+        right = right_index >= 0 ? clusters[right_index] : leafs[-right_index]
+
+        clusters[last_index] = TreeNode(left, right, vcat(left.elements, right.elements))
+        last_index += 1
+    end
+    last_index -= 1
+
+    return clusters[last_index]
+end
+
+
+
+
+# ------------------------------------------------------------------------------------------
+# getting exemplars
+# ------------------------------------------------------------------------------------------
+import Plots
 function get_exemplars(
         encoded_states::Matrix{Float32},
         n_clusters::Int;
         distance_metric::Symbol, # :cosine or :euclidean or cityblock
         exemplars_clustering::Symbol, # :genie or :pam or :kmedoids
-        hclust_distance::Symbol # :complete or :average or :single or :ward, ignored for genie
+        hclust_distance::Symbol, # :complete or :average or :single or :ward, ignored for genie
+        mval::Int=2  # Fuzzy parameter, it is different that one in papers!
+
     ) :: Tuple{Vector{Int}, TreeNode}
     if distance_metric == :cosine
         distance_premetric = Distances.CosineDist()
@@ -39,15 +79,21 @@ function get_exemplars(
         throw(ArgumentError("Unknown distance metric: $distance_metric"))
     end
 
-    if exemplars_clustering == :genie
-        return exemplars_genie(encoded_states, n_clusters, distance_premetric)
-    elseif exemplars_clustering == :pam
-        return exemplars_pam(encoded_states, n_clusters, distance_premetric, hclust_distance)
-    elseif exemplars_clustering == :kmedoids
-        return exemplars_kmedoids(encoded_states, n_clusters, distance_premetric, hclust_distance)
-    else
-        throw(ArgumentError("Unknown exemplars_clustering: $exemplars_clustering"))
-    end
+    # if exemplars_clustering == :genie
+    #     return exemplars_genie(encoded_states, n_clusters, distance_premetric)
+    # elseif exemplars_clustering == :pam
+    #     return exemplars_pam(encoded_states, n_clusters, distance_premetric, hclust_distance)
+    # elseif exemplars_clustering == :kmedoids
+    #     return exemplars_kmedoids(encoded_states, n_clusters, distance_premetric, hclust_distance)
+    # elseif exemplars_clustering == :fcm_rand
+    #     return exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :rand)
+    # elseif exemplars_clustering == :fcm_best
+    #     return exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :best)
+    # elseif exemplars_clustering == :fcm_best_rand
+    #     return exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :best_rand)
+    # else
+    #     throw(ArgumentError("Unknown exemplars_clustering: $exemplars_clustering"))
+    # end
 
 
     # kmedoids = PyCall.pyimport("kmedoids")
@@ -56,17 +102,30 @@ function get_exemplars(
     #     distances = PyCall.PyObject(Distances.pairwise(distance_premetric, encoded_states)')
     #     exp_python = Vector{Int}(kmedoids.fasterpam(distances, n_clusters, max_iter=100, init="random", n_cpu=1).medoids)
     # end
-    # @time exp_genie, _ = exemplars_genie(encoded_states, n_clusters, distance_premetric)
-    # @time exp_pam, _ = exemplars_pam(encoded_states, n_clusters, distance_premetric)
-    # @time exp_kmedoids, _ = exemplars_kmedoids(encoded_states, n_clusters, distance_premetric)
+    println("\n\nGenie:")
+    @time exp_genie, _ = exemplars_genie(encoded_states, n_clusters, distance_premetric)
+    println("\n\nPAM:")
+    @time exp_pam, _ = exemplars_pam(encoded_states, n_clusters, distance_premetric, hclust_distance)
+    println("\n\nKmedoids:")
+    @time exp_kmedoids, _ = exemplars_kmedoids(encoded_states, n_clusters, distance_premetric, hclust_distance)
+    println("\n\nFCM rand:")
+    @time exp_fcm_rand, _ = exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :rand)
+    println("\n\nFCM best:")
+    @time exp_fcm_best, _ = exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :best)
+    println("\n\nFCM best rand:")
+    @time exp_fcm_best_rand, _ = exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :best_rand)
 
-    # println("n_clusters: $(n_clusters)\nn_states: $(size(encoded_states, 2))")
-    # Plots.scatter(encoded_states[1, :], encoded_states[2, :], label="States", size=(1500, 1500), markerstrokewidth = 0.1)
-    # Plots.scatter!(encoded_states[1, exp_genie], encoded_states[2, exp_genie], label="Exemplars_genie", markerstrokewidth = 0.1; color=:red)
-    # Plots.scatter!(encoded_states[1, exp_pam], encoded_states[2, exp_pam], label="Exemplars_pam", markerstrokewidth = 0.1, color=:pink)
-    # Plots.scatter!(encoded_states[1, exp_kmedoids], encoded_states[2, exp_kmedoids], label="Exemplars_kmedoids", markerstrokewidth = 0.1, color=:purple)
+    println("n_clusters: $(n_clusters)\nn_states: $(size(encoded_states, 2))")
+    Plots.scatter(encoded_states[1, :], encoded_states[2, :], label="States", size=(1500, 1500), markerstrokewidth = 0.1, color=:blue)
+    Plots.scatter!(encoded_states[1, exp_genie], encoded_states[2, exp_genie], label="Exemplars_genie", markerstrokewidth = 0.1; color=:red)
+    Plots.scatter!(encoded_states[1, exp_pam], encoded_states[2, exp_pam], label="Exemplars_pam", markerstrokewidth = 0.1, color=:pink)
+    Plots.scatter!(encoded_states[1, exp_kmedoids], encoded_states[2, exp_kmedoids], label="Exemplars_kmedoids", markerstrokewidth = 0.1, color=:purple)
     # Plots.scatter!(encoded_states[1, exp_python], encoded_states[2, exp_python], label="Exemplars_python", markerstrokewidth = 0.1, color=:orange)
-    # Plots.savefig("log/encoded_states_pam_genie_kmedoids.png")
+    Plots.scatter!(encoded_states[1, exp_fcm_rand], encoded_states[2, exp_fcm_rand], label="Exemplars_fcm_rand", markerstrokewidth = 0.1, color=:green)
+    Plots.scatter!(encoded_states[1, exp_fcm_best], encoded_states[2, exp_fcm_best], label="Exemplars_fcm_best", markerstrokewidth = 0.1, color=:yellow)
+    Plots.scatter!(encoded_states[1, exp_fcm_best_rand], encoded_states[2, exp_fcm_best_rand], label="Exemplars_fcm_best_rand", markerstrokewidth = 0.1, color=:brown)
+    Plots.savefig("log/encoded_states_pam_genie_kmedoids_fcm.png")
+    throw("I guess I would like to end here")
 end
 
 # ------------------------------------------------------------------------------------------
@@ -104,14 +163,33 @@ function exemplars_pam(
 end
 
 function exemplars_kmedoids(
-    encoded_states::Matrix{Float32},
-    n_clusters::Int,
-    distance_premetric::Distances.PreMetric,
-    hclust_distance::Symbol
-) :: Tuple{Vector{Int}, TreeNode}
+        encoded_states::Matrix{Float32},
+        n_clusters::Int,
+        distance_premetric::Distances.PreMetric,
+        hclust_distance::Symbol
+    ) :: Tuple{Vector{Int}, TreeNode}
 
     distances = Distances.pairwise(distance_premetric, encoded_states)
     exemplars = Clustering.kmedoids(distances, n_clusters).medoids
+    distances_of_exemplars = Distances.pairwise(distance_premetric, encoded_states[:, exemplars])
+
+    # create tree with normal hclust
+    clustering = Clustering.hclust(distances_of_exemplars, linkage=hclust_distance)
+    tree = _create_tree_hclust(clustering.merges)
+    return exemplars, tree
+end
+
+function exemplars_fcm(
+        encoded_states::Matrix{Float32},
+        n_clusters::Int,
+        distance_premetric::Distances.PreMetric,
+        hclust_distance::Symbol,
+        mval :: Int,
+        initialization_mode::Symbol
+    ) :: Tuple{Vector{Int}, TreeNode}
+
+    distances = Distances.pairwise(distance_premetric, encoded_states)
+    exemplars = FCM.fuzzy_kmedoids(distances, n_clusters, mval; initialization=initialization_mode)
     distances_of_exemplars = Distances.pairwise(distance_premetric, encoded_states[:, exemplars])
 
     # create tree with normal hclust
@@ -188,31 +266,105 @@ end
 
 
 
+
+
+
+
+
+
+
 # ------------------------------------------------------------------------------------------
 # time distance trees
+# ------------------------------------------------------------------------------------------
 
 
-
-
-
-
-
-function create_time_distance_tree(
-        encoded_states_trajectories::Vector{Matrix{Float32}},
-        encoded_exemplars,
+# ------------------------------------------------------------------------------------------
+# Markov fundamental based time distance tree
+# Read: https://lips.cs.princeton.edu/the-fundamental-matrix-of-a-finite-markov-chain/
+function create_time_distance_tree_markov_fundamental(
+        membership_states_trajectories::Vector{Matrix{Float32}},
         hclust_time::Symbol = :average  # :single, :complete, :average, :ward
     )
-    exemplars_n = size(encoded_exemplars, 2)
+    transition_matrix = _markov_transition_matrix(membership_states_trajectories)  # each row states for probability for going from row index state to column index state
+    states_n = size(transition_matrix, 2)
 
-    trajectories_time_distances_by_exemplar = [Vector{Matrix{Int}}() for _ in 1:length(encoded_states_trajectories)]
-    Threads.@threads for i in 1:length(encoded_states_trajectories)
+    # w = P*w
+    w_vec = LinearAlgebra.nullspace(transition_matrix' - LinearAlgebra.I)  # we transpose matrix, because julia works this way here
+    W_matrix = repeat(w_vec', states_n, 1)  # all rows of W_matrix are the same and equal to w_vec
+    N_fundamental_matrix = inv(LinearAlgebra.I - transition_matrix + W_matrix)  # N = (I - P + W)^-1
+
+    # mean first passage time matrix - m_ij = expected time to get to state j from state i
+    MFPT_matrix = Matrix{Float32}(undef, states_n, states_n)
+    for j in 1:states_n, i in 1:states_n
+        MFPT_matrix[i, j] = (N_fundamental_matrix[j, j] - N_fundamental_matrix[i, j]) / w_vec[j]
+    end
+
+    # calculating distance matrix for hclust - MFPT_matrix is not symmetric, we have to transform it to such
+    distances = Matrix{Float32}(undef, states_n, states_n)
+    for i in 1:states_n
+        for j in (i + 1):states_n
+            value = (MFPT_matrix[i, j] + MFPT_matrix[j, i]) / 2
+            distances[i, j] = value
+            distances[j, i] = value
+        end
+        distances[i, i] = 0.0f0
+    end
+
+    # now we will just cluster it
+    clustering = Clustering.hclust(distances, linkage=hclust_time)
+    tree = _create_tree_hclust(clustering.merges)
+    return tree
+end
+
+function _markov_transition_matrix(membership_states_trajectories::Vector{Matrix{Float32}})::Matrix{Float32}
+    states_n = size(membership_states_trajectories[1], 1)
+    transition_matrix = zeros(Float32, states_n, states_n)
+
+    for memberships in membership_states_trajectories
+        LoopVectorization.@turbo for step in 1:(size(memberships, 2) - 1)
+            for current_state in 1:states_n
+                for next_state in 1:states_n
+                    # here we use transposed matrix, to make it more cache friendly for Julia
+                    transition_matrix[next_state, current_state] += memberships[current_state, step] * memberships[next_state, step + 1]
+                end
+            end
+        end
+    end
+
+    for col in eachcol(transition_matrix)
+        col ./= sum(col)
+    end
+
+    transposed_matrix = collect(transition_matrix')
+    return transposed_matrix
+end
+
+
+
+
+
+
+
+
+
+# ------------------------------------------------------------------------------------------
+# my time distance tree
+
+function create_time_distance_tree_mine(
+        membership_states_trajectories::Vector{Matrix{Float32}},
+        hclust_time::Symbol = :average  # :single, :complete, :average, :ward
+    )
+    exemplars_n = size(membership_states_trajectories[1], 1)
+
+    trajectories_time_distances_by_exemplar = [Vector{Matrix{Int}}() for _ in 1:length(membership_states_trajectories)]
+    Threads.@threads for i in 1:length(membership_states_trajectories)
     # for i in 1:length(encoded_states_trajectories)
-        trajectories_time_distances_by_exemplar[i] = _create_time_distance_matrix(encoded_states_trajectories[i], encoded_exemplars)
+        trajectories_time_distances_by_exemplar[i] = _create_time_distance_matrix(membership_states_trajectories[i])
     end
 
     # vector of matrices
     time_distances_by_exemplar = [
-        (reduce(hcat, [trajectories_time_distances_by_exemplar[trajectory][exemplar_id] for trajectory in 1:length(encoded_states_trajectories)]))
+        (reduce(hcat, [trajectories_time_distances_by_exemplar[trajectory][exemplar_id] for trajectory in 1:length(membership_states_trajectories)]))
         for exemplar_id in 1:exemplars_n
     ]
 
@@ -244,37 +396,12 @@ function create_time_distance_tree(
     return tree
 end
 
-function _create_tree_hclust(merge_matrix::Matrix{Int}) :: TreeNode
-    points_n = size(merge_matrix, 1) + 1
-    leafs = Vector{TreeNode}(undef, points_n)
-    clusters = Vector{TreeNode}(undef, points_n - 1)
-
-    for i in 1:points_n
-        leafs[i] = TreeNode(nothing, nothing, [i])
-    end
-    last_index = 1
-
-    for i in 1:size(merge_matrix, 1)
-        left_index = merge_matrix[i, 1]
-        right_index = merge_matrix[i, 2]
-
-        left = left_index >= 0 ? clusters[left_index] : leafs[-left_index]
-        right = right_index >= 0 ? clusters[right_index] : leafs[-right_index]
-
-        clusters[last_index] = TreeNode(left, right, vcat(left.elements, right.elements))
-        last_index += 1
-    end
-    last_index -= 1
-
-    return clusters[last_index]
-end
-
-function _create_time_distance_matrix(encoded_states_trajectory::Matrix{Float32}, encoded_exemplars::Matrix{Float32})::Vector{Matrix{Int}}
-    exemplars_n = size(encoded_exemplars, 2)
-    trajectory_length = size(encoded_states_trajectory, 2)
+function _create_time_distance_matrix(memberships::Matrix{Float32})::Vector{Matrix{Int}}
+    exemplars_n = size(memberships, 1)
+    trajectory_length = size(memberships, 2)
 
     # Get indices of closest exemplars for each state in the trajectory
-    exemplars_indices_trajectory = _closest_exemplars_indices(encoded_states_trajectory, encoded_exemplars)
+    exemplars_indices_trajectory = _closest_exemplars_indices(memberships)
 
     # Build a list of occurrence times for each exemplar
     all_indices = [Int[] for _ in 1:exemplars_n]
@@ -322,9 +449,8 @@ function _create_time_distance_matrix(encoded_states_trajectory::Matrix{Float32}
     return time_distances_separated_for_exemplars
 end
 
-function _closest_exemplars_indices(encoded_states::Matrix{Float32}, exemplars::Matrix{Float32}) :: Vector{Int}
-    distances_matrix = Distances.pairwise(Distances.CosineDist(), exemplars, encoded_states)
-    closest_exemplars = [argmin(one_col) for one_col in eachcol(distances_matrix)]
+function _closest_exemplars_indices(memberships::Matrix{Float32}) :: Vector{Int}
+    closest_exemplars = [argmax(one_col) for one_col in eachcol(memberships)]
     return closest_exemplars
 end
 

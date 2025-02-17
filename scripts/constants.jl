@@ -128,7 +128,7 @@ CONSTANTS_DICT = Dict(
             ),
             :initial_space_explorers_n => 30,
             :max_states_considered => 10_000,
-            :n_clusters => 40,  # 40 and 200 works very well, should try different values
+            :n_clusters => 20,  # 40 and 200 works very well, should try different values
             :verbose => false,
             :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock, after some initial tests it should definatelly be cosine!
             :hclust_distance => :complete,  # :ward or :single or :complete or :average
@@ -138,13 +138,17 @@ CONSTANTS_DICT = Dict(
         ),
         :individuals_n => 30,
         :fihc => Dict(
-            :fihc_mode => :fihc_cont,
+            :fihc_mode => :per_gene_rand,
             :norm_mode => :d_sum,
             :factor => 0.5,
             :genes_combination => :hier,
-            :random_matrix_mode => :randn
+            :random_matrix_mode => :rand_n
         ),
+        :initial_genes_mode => :scale,  # :scale or :softmax
     ),
+
+
+
 
 
     :ContinuousStatesGroupingP3 => Dict(

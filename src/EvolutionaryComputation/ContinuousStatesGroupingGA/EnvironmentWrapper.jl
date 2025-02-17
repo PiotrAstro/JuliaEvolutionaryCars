@@ -35,6 +35,7 @@ mutable struct EnvironmentWrapperStruct
     _hclust_distance::Symbol  # :ward or :single or :complete or :average
     _hclust_time::Symbol  # :ward or :single or :complete or :average
     _m_value::Int
+    _create_time_distance_tree
     _verbose::Bool
 end
 
@@ -44,24 +45,30 @@ end
 # Public functions
 
 function EnvironmentWrapperStruct(
-    envs::Vector{<:Environment.AbstractEnvironment};
+        envs::Vector{<:Environment.AbstractEnvironment}; encoder_dict::Dict{Symbol,Any},
+        decoder_dict::Dict{Symbol,Any},
+        autoencoder_dict::Dict{Symbol,<:Any},
+        initial_space_explorers_n::Int,
+        max_states_considered::Int,
+        n_clusters::Int,
+        distance_metric::Symbol=:cosine,
+        exemplars_clustering::Symbol=:genieclust,
+        hclust_distance::Symbol=:ward,
+        hclust_time::Symbol=:ward,
+        time_distance_tree::Symbol=:mine,  # :mine or :markov
+        m_value::Int=1,
+        verbose::Bool=false
+    ) :: EnvironmentWrapperStruct
+    if time_distance_tree == :mine
+        create_time_distance_tree = StatesGrouping.create_time_distance_tree_mine
+    elseif time_distance_tree == :markov
+        create_time_distance_tree = StatesGrouping.create_time_distance_tree_markov_fundamental
+    else
+        throw(ArgumentError("time_distance_tree must be :mine or :markov"))
+    end
 
-    encoder_dict::Dict{Symbol, Any},
-    decoder_dict::Dict{Symbol, Any},
-    autoencoder_dict::Dict{Symbol, <:Any},
-    initial_space_explorers_n::Int,
-    max_states_considered::Int,
-    n_clusters::Int,
-    distance_metric::Symbol = :cosine,
-    exemplars_clustering::Symbol = :genieclust,
-    hclust_distance::Symbol = :ward,
-    hclust_time::Symbol = :ward,
-    m_value::Int = 1,
-    verbose::Bool = false
-) :: EnvironmentWrapperStruct
-
-    encoder = NeuralNetwork.get_neural_network(encoder_dict[:name])(;encoder_dict[:kwargs]...)
-    decoder = NeuralNetwork.get_neural_network(decoder_dict[:name])(;decoder_dict[:kwargs]...)
+    encoder = NeuralNetwork.get_neural_network(encoder_dict[:name])(; encoder_dict[:kwargs]...)
+    decoder = NeuralNetwork.get_neural_network(decoder_dict[:name])(; decoder_dict[:kwargs]...)
     autoencoder = NeuralNetwork.Autoencoder(encoder, decoder; autoencoder_dict...)
 
     # initial state space exploration
@@ -104,6 +111,7 @@ function EnvironmentWrapperStruct(
         hclust_distance,
         hclust_time,
         m_value,
+        create_time_distance_tree,
         verbose
     )
 end
@@ -114,15 +122,16 @@ returns Tuple{Vector{Trajectory}, TreeNode}
 function create_time_distance_tree(env_wrap::EnvironmentWrapperStruct, translation::Matrix{Float32})
     trajectories = _collect_trajectories(env_wrap._envs, [get_full_NN(env_wrap, translation)])
     states_in_trajectories = [trajectory.states for trajectory in trajectories]
-    encoded_states_by_trajectory = [NeuralNetwork.predict(env_wrap._encoder, Environment.get_nn_input(states_one_traj)) for states_one_traj in states_in_trajectories]
-    return trajectories, StatesGrouping.create_time_distance_tree(encoded_states_by_trajectory, env_wrap._encoded_exemplars, env_wrap._hclust_time)
+    full_nn = get_full_NN(env_wrap, translation)
+    memberships_by_trajectory = [NeuralNetwork.membership(full_nn, Environment.get_nn_input(states_one_traj)) for states_one_traj in states_in_trajectories]
+    return trajectories, env_wrap._create_time_distance_tree(memberships_by_trajectory, env_wrap._hclust_time)
 end
 
 function get_trajectories(env_wrap::EnvironmentWrapperStruct, translation::Matrix{Float32})
     return _collect_trajectories(env_wrap._envs, [get_full_NN(env_wrap, translation)])
 end
 
-function copy(env_wrap::EnvironmentWrapperStruct) :: EnvironmentWrapperStruct
+function copy(env_wrap::EnvironmentWrapperStruct)::EnvironmentWrapperStruct
     envs_copy = [Environment.copy(env) for env in env_wrap._envs]
     autoencoder_copy = NeuralNetwork.copy(env_wrap._autoencoder)
     encoder_copy = autoencoder_copy.encoder
@@ -143,15 +152,11 @@ function copy(env_wrap::EnvironmentWrapperStruct) :: EnvironmentWrapperStruct
         env_wrap._hclust_distance,
         env_wrap._hclust_time,
         env_wrap._m_value,
+        create_time_distance_tree,
         env_wrap._verbose
     )
 end
 
-function new_genes(env_wrap::EnvironmentWrapperStruct) :: Matrix{Float32}
-    genes = randn(Float32, get_action_size(env_wrap), env_wrap._n_clusters)
-    normalize_genes_min_0!(genes)
-    return genes
-end
 
 """
 It normalizes genes by making it non negative and sum to 0
@@ -183,11 +188,11 @@ function normalize_genes_min_0!(gene::AbstractVector{Float32})
     gene ./= sum(gene)
 end
 
-function get_action_size(env_wrap::EnvironmentWrapperStruct) :: Int
+function get_action_size(env_wrap::EnvironmentWrapperStruct)::Int
     return Environment.get_action_size(env_wrap._envs[1])
 end
 
-function get_groups_number(env_wrap::EnvironmentWrapperStruct) :: Int
+function get_groups_number(env_wrap::EnvironmentWrapperStruct)::Int
     return size(env_wrap._encoded_exemplars, 2)
 end
 
@@ -218,15 +223,15 @@ States in trajectories are equal - each states has the same chance of beeing pic
 In the future, one can adapt some values of env_wrapper e.g. n_clusters, max_states_considered, fuzzy_logic_of_n_closest etc.
 """
 function create_new_based_on(
-        env_wrap::EnvironmentWrapperStruct,
-        trajectories_and_percentages::Vector{<:Any};
-        new_n_clusters::Int=-1,
-    ) :: EnvironmentWrapperStruct
+    env_wrap::EnvironmentWrapperStruct,
+    trajectories_and_percentages::Vector{<:Any};
+    new_n_clusters::Int=-1,
+)::EnvironmentWrapperStruct
     if new_n_clusters == -1
         new_n_clusters = env_wrap._n_clusters
     end
     TSEQ = typeof(trajectories_and_percentages[1][2][1].states) # type of states sequences
-    trajectories_and_percentages_casted = Vector{Tuple{Float64, Vector{Environment.Trajectory{TSEQ}}}}(trajectories_and_percentages)
+    trajectories_and_percentages_casted = Vector{Tuple{Float64,Vector{Environment.Trajectory{TSEQ}}}}(trajectories_and_percentages)
 
     new_env_wrapper = copy(env_wrap)
 
@@ -254,11 +259,11 @@ function create_new_based_on(
 end
 
 function translate(
-        from_env_wrap::EnvironmentWrapperStruct,
-        from_translation::Matrix{Float32},
-        to_env_wrap::EnvironmentWrapperStruct,
-        to_genes_indices::Vector{Int} = collect(1:to_env_wrap._n_clusters)  # by default translates all genes
-    ) :: Matrix{Float32}  # translated genes, only to_genes_indices are present
+    from_env_wrap::EnvironmentWrapperStruct,
+    from_translation::Matrix{Float32},
+    to_env_wrap::EnvironmentWrapperStruct,
+    to_genes_indices::Vector{Int}=collect(1:to_env_wrap._n_clusters)  # by default translates all genes
+)::Matrix{Float32}  # translated genes, only to_genes_indices are present
     # create NN
 
     from_full_NN = get_full_NN(from_env_wrap, from_translation)
@@ -278,7 +283,7 @@ function get_full_NN(env_wrap::EnvironmentWrapperStruct, translation::Matrix{Flo
     )
 end
 
-function is_verbose(env_wrap::EnvironmentWrapperStruct) :: Bool
+function is_verbose(env_wrap::EnvironmentWrapperStruct)::Bool
     return env_wrap._verbose
 end
 
@@ -289,11 +294,11 @@ end
 # --------------------------------------------------------------------------------------------------
 # Private functions
 
-function _collect_trajectories(envs::Vector{E}, NNs::Vector{<:NeuralNetwork.AbstractNeuralNetwork}) :: Vector{Environment.Trajectory{SEQ}} where {SEQ<:Environment.AbstractStateSequence, E<:Environment.AbstractEnvironment{SEQ}}
+function _collect_trajectories(envs::Vector{E}, NNs::Vector{<:NeuralNetwork.AbstractNeuralNetwork})::Vector{Environment.Trajectory{SEQ}} where {SEQ<:Environment.AbstractStateSequence,E<:Environment.AbstractEnvironment{SEQ}}
     trajectories = Vector{Vector{Environment.Trajectory{SEQ}}}(undef, length(NNs))
 
     Threads.@threads for i in 1:length(NNs)
-    # for i in 1:length(NNs)
+        # for i in 1:length(NNs)
         envs_copy = [Environment.copy(env) for env in envs]
         nn = NNs[i]
         trajectories[i] = Environment.get_trajectory_data!(envs_copy, nn)
@@ -302,7 +307,7 @@ function _collect_trajectories(envs::Vector{E}, NNs::Vector{<:NeuralNetwork.Abst
     return trajectories_flat
 end
 
-function _combine_states_from_trajectories(trajectories_and_percentages::Vector{Tuple{Float64, Vector{Environment.Trajectory{SEQ}}}}, pick_states_n::Int) :: SEQ where {SEQ<:Environment.AbstractStateSequence}
+function _combine_states_from_trajectories(trajectories_and_percentages::Vector{Tuple{Float64,Vector{Environment.Trajectory{SEQ}}}}, pick_states_n::Int)::SEQ where {SEQ<:Environment.AbstractStateSequence}
     @assert sum([percentage for (percentage, _) in trajectories_and_percentages]) ≈ 1.0
     states_to_combine = Vector{SEQ}()
 

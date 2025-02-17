@@ -124,3 +124,26 @@ end # module EvolutionaryCarsJulia
 
 # -------------------------------------------------------------------
 # w latent space wyznaczyć sobie grafy i algorytmy jakieś z tego, które usuwać które nie
+
+
+
+
+
+
+
+
+
+
+
+# jeszcze szybki pomysł - w sumie to chyba reprezentant nie musi być reprezentantem - może lepiej żeby był punktem?
+# np. zamiast k-medoids jakiś fuzzy k-medoids, lub fuzy c-means?
+# może to? "An Efficient Fuzzy K-Medoids Method"
+# albo to zobaczyć co używa: https://ieeexplore.ieee.org/document/9706220
+# i to przeczytać: https://www.sciencedirect.com/science/article/abs/pii/S0165011420300014  ->  https://sci-hub.se/https://doi.org/10.1016/j.fss.2020.01.001
+
+# można też potestować to do np. hierarchicznej struktury przy poziomach fihca : Fuzzy Hierarchical Agglomerative Clustering (FHAC) 
+# ------------------------------------------------------------------------------------------------------
+# Time series clustering!!!!!
+# Zajebisty pomysł:
+# Create Fundamental Matrix
+# Jest już zaimplemenotwany, w continuous env_wrap wystarczy chyba podać odpowiedni symbol, ale trzeba dokładnie potestować
