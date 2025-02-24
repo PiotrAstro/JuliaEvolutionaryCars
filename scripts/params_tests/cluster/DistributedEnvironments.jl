@@ -4,7 +4,7 @@ module DistributedEnvironments
 import Pkg
 using Distributed, MacroTools
 
-export @eachmachine, @eachworker, @initcluster, cluster_status!, remove_workers!, pids_by_machines
+export @eachmachine, @eachworker, @initcluster, cluster_status!, remove_workers!
 
 macro initcluster(cluster_main, cluster_hosts, tmp_dir_name, copy_env_and_code)
     return _initcluster(cluster_main, cluster_hosts, tmp_dir_name, copy_env_and_code)
@@ -27,6 +27,8 @@ function _initcluster(
         cluster_config_hosts = $(esc(cluster_config_hosts_main_macro_input))
         copy_env_and_code = $(esc(copy_env_and_code_main_macro_input))
         tmp_dir_name = $(esc(tmp_dir_name_macro_input))
+
+        added_pids = []
 
         remove_workers!()
 
@@ -83,18 +85,18 @@ function _initcluster(
 
         try
             printstyled("Adding main host -> $(cluster_config_main[:use_n_workers]) workers\n", bold=true, color=:magenta)
-            Distributed.addprocs(
+            push!(added_pids, Distributed.addprocs(
                 cluster_config_main[:use_n_workers],
                 env=["JULIA_BLAS_THREADS" => "$(cluster_config_main[:blas_threads_per_worker])"],
                 exeflags="--threads=$(cluster_config_main[:julia_threads_per_worker])",
                 enable_threaded_blas=cluster_config_main[:blas_threads_per_worker] > 1,
                 topology=:master_worker
-            )
+            ))
             println("Added main host\n")
 
             for host in cluster_config_hosts
                 printstyled("Adding $(host[:host_address]) -> $(host[:use_n_workers]) workers\n", bold=true, color=:magenta)
-                _addprocs_one_host(host)
+                push!(added_pids, _addprocs_one_host(host))
                 println("Added $(host[:host_address])\n")
             end
 
@@ -103,6 +105,12 @@ function _initcluster(
             println("Failed adding some workers, you should check it manually and change / remove these hosts")
             throw(e)
         end
+
+        if workers()[1] != 1
+            push!(added_pids[1], 1)
+        end
+
+        added_pids
     end
 end
 
@@ -148,23 +156,6 @@ function _eachmachine(expr)
         @everywhere $machinepids $expr
     end
 end
-
-function pids_by_machines() :: Dict{String, Vector{Int}}
-    workerspids = [pid for pid in workers()]
-    if workerspids[1] != 1
-        push!(workerspids, 1)
-    end
-
-    workers_by_machine = Dict{String, Vector{Int}}()
-    for pid in workerspids
-        machine_id = Distributed.get_bind_addr(pid)
-        list = get!(workers_by_machine, machine_id, Vector{Int}())
-        push!(list, pid)
-    end
-
-    return workers_by_machine
-end
-
 
 function _addprocs_one_host(host::Dict, workers_n=-1) # if workers_n = -1, it will take workers_n from host
     Distributed.addprocs(
