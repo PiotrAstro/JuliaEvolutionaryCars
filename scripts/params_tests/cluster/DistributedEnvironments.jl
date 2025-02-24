@@ -4,7 +4,7 @@ module DistributedEnvironments
 import Pkg
 using Distributed, MacroTools
 
-export @eachmachine, @eachworker, @initcluster, cluster_status!, remove_workers!
+export @eachmachine, @eachworker, @initcluster, cluster_status!, remove_workers!, pids_by_machines
 
 macro initcluster(cluster_main, cluster_hosts, tmp_dir_name, copy_env_and_code)
     return _initcluster(cluster_main, cluster_hosts, tmp_dir_name, copy_env_and_code)
@@ -148,6 +148,23 @@ function _eachmachine(expr)
         @everywhere $machinepids $expr
     end
 end
+
+function pids_by_machines() :: Dict{String, Vector{Int}}
+    workerspids = [pid for pid in workers()]
+    if workerspids[1] != 1
+        push!(workerspids, 1)
+    end
+
+    workers_by_machine = Dict{String, Vector{Int}}()
+    for pid in workerspids
+        machine_id = Distributed.get_bind_addr(pid)
+        list = get!(workers_by_machine, machine_id, Vector{Int}())
+        push!(list, pid)
+    end
+
+    return workers_by_machine
+end
+
 
 function _addprocs_one_host(host::Dict, workers_n=-1) # if workers_n = -1, it will take workers_n from host
     Distributed.addprocs(

@@ -114,3 +114,12 @@ CLUSTER_CONFIG_HOSTS = [
 # then add these rules in admin powershell to let ssh through firewall:
 # New-NetFirewallRule -Name "SSH" -DisplayName "SSH" -Description "Allow SSH" -Direction Inbound -Protocol TCP -LocalPort 22 -Action Allow
 # New-NetFirewallRule -Name "SSH-Out" -DisplayName "SSH" -Description "Allow SSH" -Direction Outbound -Protocol TCP -LocalPort 22 -Action Allow
+
+# also I may have to add Julia to allowed apps through firewall (Julia establish its own connection separate from ssh)
+# I should go to "Panel sterowania\System i zabezpieczenia\Zapora Windows Defender\Dozwolone aplikacje"
+# then add real path to julia, e.g. C:\Users\admin\.julia\juliaup\julia-1.11.2+0.x64.w64.mingw32\bin\julia.exe
+
+# -----------------------------------------------------------------------
+# MKL
+# for MKL on windows I should install smth like:
+# https://aka.ms/vs/17/release/vc_redist.x64.exe

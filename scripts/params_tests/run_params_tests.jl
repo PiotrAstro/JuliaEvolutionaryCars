@@ -102,13 +102,13 @@ TESTED_VALUES = [
         Dict(
             :ContinuousStatesGroupingSimpleGA => Dict(
                 :env_wrapper => Dict(
-                    :n_clusters => [20, 40, 100],
+                    :n_clusters => [20, 40],
                     :exemplars_clustering => [:genie, :pam, :kmedoids, :k_means_medoids, :fcm_rand, :fcm_best, :fcm_best_rand]
                 ),
                 :fihc => Dict(
                     :norm_mode => [:d_sum, :min_0, :around_0, :softmax_norm, :softmax],
                     :random_matrix_mode => [:rand, :rand_n],
-                    :factor => [0.1, 0.3, 0.5, 1.0, 2.0],
+                    :factor => [0.1, 0.5, 1.0, 2.0],
                 ),
                 :initial_genes_mode => [:scale, :softmax],
             ),
@@ -162,49 +162,68 @@ LOGS_DIR_ANALYSIS = joinpath(LOGS_DIR, "analysis")
 # Run the tests
 
 DistributedEnvironments.@initcluster(CLUSTER_CONFIG_MAIN, CLUSTER_CONFIG_HOSTS, TMP_DIR_NAME, COPY_ENV_AND_CODE)
+pids_by_machines = DistributedEnvironments.pids_by_machines()
 
-RELATIVE_PATH_TO_THIS_DIR = splitpath(@__DIR__)[length(splitpath(dirname(Base.active_project())))+1:end]
+relative_path_tmp = splitpath(@__DIR__)[length(splitpath(dirname(Base.active_project())))+1:end]
+Distributed.@everywhere RELATIVE_PATH_TO_THIS_DIR = $relative_path_tmp
 
-Distributed.@everywhere begin
-    # important things to improve performance on intel CPUs:
-    using MKL
-    using LinearAlgebra
-    import Distributed
-    import Pkg
-    import Logging
-    import Dates
-    import Random
-    import ProgressMeter
-    import DataFrames
-    import CSV
+eachmachine_pids_in_parallel = 3
 
-    seed = time_ns() ⊻ UInt64(hash(Distributed.myid())) # xor between time nano seconds and hash of worker id
-    Random.seed!(seed)
+pids_batches = Vector{Vector{Int}}()
+just_pids = [value for value in values(pids_by_machines)]
+while length(just_pids) > 0
+    new_level = Vector{Int}()
+    for pids_id in eachindex(just_pids)
+        slice_point = min(eachmachine_pids_in_parallel, length(just_pids[pids_id]))
+        append!(new_level, just_pids[pids_id][1:slice_point])
+        just_pids[pids_id] = just_pids[pids_id][slice_point+1:end]
+    end
+    append!(pids_batches, new_level)
+    just_pids = filter(x -> length(x) > 0, just_pids)
+end
 
-    if Distributed.myid() == 1  # I could run one version for all, but I want to make linter happy with normal paths :)
-        include("../../src/JuliaEvolutionaryCars.jl")
-        import .JuliaEvolutionaryCars
-        include("../custom_loggers.jl")
-        import .CustomLoggers
-        include("_tests_utils.jl")
-    else
-        current_absolute_dir = joinpath(dirname(Base.active_project()), ($RELATIVE_PATH_TO_THIS_DIR)...)
-        blas_threads = parse(Int, ENV["JULIA_BLAS_THREADS"])
-        BLAS.set_num_threads(blas_threads)
-        include(joinpath(current_absolute_dir, "../../src/JuliaEvolutionaryCars.jl"))
-        import .JuliaEvolutionaryCars
-        include(joinpath(current_absolute_dir,"../custom_loggers.jl"))
-        import .CustomLoggers
-        include(joinpath(current_absolute_dir, "_tests_utils.jl"))
-        # number of julia threads for main one doesnt make any difference, since it is not used
-        text = (
-            "Worker $(Distributed.myid()) started at $(Dates.now()) with seed: $seed\n" *
-            "Project name: $(Pkg.project().name)\n" *
-            "BLAS kernel: $(BLAS.get_config())\n" *
-            "Number of BLAS threads: $(BLAS.get_num_threads())\n" *
-            "Number of Julia threads: $(Threads.nthreads())\n"
-        )
-        println(text)
+for pid_batch in pids_batches
+    Distributed.@everywhere pid_batch begin
+        # important things to improve performance on intel CPUs:
+        using MKL
+        using LinearAlgebra
+        import Distributed
+        import Pkg
+        import Logging
+        import Dates
+        import Random
+        import ProgressMeter
+        import DataFrames
+        import CSV
+
+        seed = time_ns() ⊻ UInt64(hash(Distributed.myid())) # xor between time nano seconds and hash of worker id
+        Random.seed!(seed)
+
+        if Distributed.myid() == 1  # I could run one version for all, but I want to make linter happy with normal paths :)
+            include("../../src/JuliaEvolutionaryCars.jl")
+            import .JuliaEvolutionaryCars
+            include("../custom_loggers.jl")
+            import .CustomLoggers
+            include("_tests_utils.jl")
+        else
+            current_absolute_dir = joinpath(dirname(Base.active_project()), (RELATIVE_PATH_TO_THIS_DIR)...)
+            blas_threads = parse(Int, ENV["JULIA_BLAS_THREADS"])
+            BLAS.set_num_threads(blas_threads)
+            include(joinpath(current_absolute_dir, "../../src/JuliaEvolutionaryCars.jl"))
+            import .JuliaEvolutionaryCars
+            include(joinpath(current_absolute_dir,"../custom_loggers.jl"))
+            import .CustomLoggers
+            include(joinpath(current_absolute_dir, "_tests_utils.jl"))
+            # number of julia threads for main one doesnt make any difference, since it is not used
+            text = (
+                "Worker $(Distributed.myid()) started at $(Dates.now()) with seed: $seed\n" *
+                "Project name: $(Pkg.project().name)\n" *
+                "BLAS kernel: $(BLAS.get_config())\n" *
+                "Number of BLAS threads: $(BLAS.get_num_threads())\n" *
+                "Number of Julia threads: $(Threads.nthreads())\n"
+            )
+            println(text)
+        end
     end
 end
 
