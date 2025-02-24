@@ -105,3 +105,12 @@ CLUSTER_CONFIG_HOSTS = [
 # open or create file C:\Users\username\.ssh\authorized_keys  if username is not in administrator group
 # open or create file C:\ProgramData\ssh\administrators_authorized_keys if username is in administrator group (it doesnt have to be admin, but to have admin rights)
 # paste to this file content of your_file_name.pub
+
+# -----------------------------------------------------------------------
+# SSH server
+# I should check for ssh server in settings -> system -> additional functions and add ssh server
+# Then go to "Usługi" and start ssh server
+
+# then add these rules in admin powershell to let ssh through firewall:
+# New-NetFirewallRule -Name "SSH" -DisplayName "SSH" -Description "Allow SSH" -Direction Inbound -Protocol TCP -LocalPort 22 -Action Allow
+# New-NetFirewallRule -Name "SSH-Out" -DisplayName "SSH" -Description "Allow SSH" -Direction Outbound -Protocol TCP -LocalPort 22 -Action Allow

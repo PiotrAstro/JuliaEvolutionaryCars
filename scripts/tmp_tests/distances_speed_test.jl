@@ -1,36 +1,48 @@
+module DistTestM
+
 using Distances
+import BenchmarkTools
 import LinearAlgebra
 using LinearAlgebra
 using LoopVectorization
 using Tullio
+import Test
 BLAS.set_num_threads(1)
 
 function cosine_theirs(states)
     Distances.pairwise(Distances.CosineDist(), states, states)
 end
 
-function cosine_mine(states1, states2)
-    # states = states1 .* inv.(sqrt.(sum(abs2, states1; dims=1)))
-    # states2 = states2 .* inv.(sqrt.(sum(abs2, states2; dims=1)))
-    # return 1.0f0 .- states2' * states
+function cosine_mine(states)
+    states_n = size(states, 2)
+    dim_n = size(states, 1)
+    # result = Matrix{Float32}(undef, states_n, states_n)
+    norms_inv = Vector{Float32}(undef, states_n)
 
-    # states1 .*= inv.(sqrt.(sum(abs2, states1; dims=1)))
-    result = Matrix{Float32}(undef, size(states1, 2), size(states2, 2))
-    @inbounds for i in 1:size(states1, 2)
-        s = 1.0f0
-        @inbounds @simd for j in 1:size(states1, 1)
-            s += states1[j, i] * states1[j, i]
+    @inbounds @fastmath for state1_point_id in 1:states_n
+        s = 0.0f0
+        LoopVectorization.@turbo for dim in 1:dim_n
+            s += states[dim, state1_point_id] ^ 2
         end
-        norm = 1f0 / sqrt(s)
-        @inbounds @simd for j in 1:size(states1, 1)
-            states1[j, i] *= norm
-        end
-
-        @inbounds @simd for j in 1:size(states2, 2)
-            @views result[i, j] = 1.0f0 - LinearAlgebra.dot(states1[:, i], states2[:, j])
-        end
+        norms_inv[state1_point_id] = inv(sqrt(s))
     end
-    return result # 1.0f0 .- states2 * states1
+
+    random_sum = 0.0f0
+    @inbounds @fastmath for point1_id in 1:states_n
+        for point2_id in (point1_id + 1):states_n
+            s = 0.0f0
+            LoopVectorization.@turbo for dim in 1:dim_n
+                s += states[dim, point1_id] * states[dim, point2_id]
+            end
+            result_tmp = 1.0f0 - s * norms_inv[point1_id] * norms_inv[point2_id]
+            random_sum += result_tmp
+            # result[point1_id, point2_id] = result_tmp
+            # result[point2_id, point1_id] = result_tmp
+        end
+        # result[point1_id, point1_id] = 0.0f0
+    end
+    return random_sum
+    # return result
 end
 
 function euclidean_theirs(states)
@@ -92,7 +104,7 @@ function vec_eucl_tullio(state1, state2)
 end
 
 function tests()
-    random_states = rand(Float32, 30, 10)
+    random_states = rand(Float32, 30, 10000)
     random_states2 = rand(Float32, 30, 1000)
     n = 1_0000
     # x = 0.0f0
@@ -111,45 +123,45 @@ function tests()
     #     x = Distances.Euclidean()(view_vector1, view_vector2)
     # end
 
+
+
+    # their = cosine_theirs(random_states)
+    # mine = cosine_mine(random_states)
+    # Test.@test their ≈ mine
+
     println("cosine")
-    @time for _ in 1:n
-        t = Distances.pairwise(Distances.CosineDist(), random_states, random_states2)
-    end
+    display(BenchmarkTools.@benchmark cosine_theirs($random_states))
 
     println("cosine_mine")
-    states_2_normalized = random_states2  # (random_states2 .* inv.(sqrt.(sum(abs2, random_states2; dims=1))))'
-    @time for _ in 1:n
-        t = cosine_mine(random_states, states_2_normalized)
-    end
+    display(BenchmarkTools.@benchmark cosine_mine($random_states))
 
-    println("euclidean")
-    @time for _ in 1:n
-        t = Distances.pairwise(Distances.Euclidean(), random_states, random_states2)
-    end
+    # println("euclidean")
+    # @time for _ in 1:n
+    #     t = Distances.pairwise(Distances.Euclidean(), random_states, random_states2)
+    # end
     
-    println("euclidean_sq")
-    @time for _ in 1:n
-        t = Distances.pairwise(Distances.SqEuclidean(), random_states, random_states2)
-    end
+    # println("euclidean_sq")
+    # @time for _ in 1:n
+    #     t = Distances.pairwise(Distances.SqEuclidean(), random_states, random_states2)
+    # end
 
-    println("euclidean_mine")
-    @time for _ in 1:n
-        t = euclidean_mine(random_states, random_states2)
-    end
+    # println("euclidean_mine")
+    # @time for _ in 1:n
+    #     t = euclidean_mine(random_states, random_states2)
+    # end
 
-    println("city_block")
-    @time for _ in 1:n
-        t = Distances.pairwise(Distances.Cityblock(), random_states, random_states2)
-    end
+    # println("city_block")
+    # @time for _ in 1:n
+    #     t = Distances.pairwise(Distances.Cityblock(), random_states, random_states2)
+    # end
 
-    println("city_block_mine")
-    @time for _ in 1:n
-        t = city_block_mine(random_states, random_states2)
-    end
+    # println("city_block_mine")
+    # @time for _ in 1:n
+    #     t = city_block_mine(random_states, random_states2)
+    # end
 end
 
-# tests()
-a = rand(Float32, 100, 1000)
-b = rand(Float32, 100, 1000)
-@profview cosine_mine(a, b)
-@profview cosine_mine(a, b)
+end # module
+
+import .DistTestM
+DistTestM.tests()

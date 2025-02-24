@@ -106,7 +106,7 @@ function predict_all(nn::DistanceBasedClassificator{Val{M_INT}}, distances::Matr
                 result_col[row] += nn.translation[row, exemplar_id] * member
             end
         end
-        @fastmath result_col .*= 1.0f0 / sum(result_col)
+        result_col .*= 1.0f0 / sum(result_col)
     end
     return result_matrix
 end
@@ -190,7 +190,7 @@ function _encoded_membership(nn::DistanceBasedClassificator{Val{MINT}}, encoded_
         @simd for row_ind in eachindex(col)
             col[row_ind] = (1.0f0 / distances[row_ind, i]) ^ MINT
         end
-        col ./= sum(col)
+        col .*= 1.0f0 / sum(col)
     end
     return membership_matrix
 end

@@ -149,7 +149,7 @@ function get_trajectory_rewards!(
         i = 1
         while i <= length(envs_alive)
             (env, j) = envs_alive[i]
-            rewards[j] += react!(env, @view actions[:, i])
+            rewards[j] += react!(env, view(actions, :, i))
             if !is_alive(env)
                 deleteat!(envs_alive, i)
                 actions = actions[:, 1:end .!= i]

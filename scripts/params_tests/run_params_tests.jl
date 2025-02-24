@@ -103,7 +103,7 @@ TESTED_VALUES = [
             :ContinuousStatesGroupingSimpleGA => Dict(
                 :env_wrapper => Dict(
                     :n_clusters => [20, 40, 100],
-                    :exemplars_clustering => [:genie, :pam, :kmedoids, :fcm_rand, :fcm_best, :fcm_best_rand]
+                    :exemplars_clustering => [:genie, :pam, :kmedoids, :k_means_medoids, :fcm_rand, :fcm_best, :fcm_best_rand]
                 ),
                 :fihc => Dict(
                     :norm_mode => [:d_sum, :min_0, :around_0, :softmax_norm, :softmax],

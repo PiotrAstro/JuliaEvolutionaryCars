@@ -7,7 +7,18 @@ import Random
 import LinearAlgebra
 
 export fuzzy_kmedoids
+"""
+Makes fuzzy k medoids clustering
 
+- distances - N x N matrix of some Float type
+- k - number of clusters
+- mval - m value, one used to fuzzyiness, it is different m than in the paper, 1 is most fuzzy, higher values are less fuzzy
+- max_iter - maximum number of iterations
+- initialization - initialization method, one of [:rand, :best, :best_rand]
+    :rand - random initialization
+    :best - best initialization, first medoid is the best point, other are chosen based on distance to closest medoid
+    :best_rand - best initialization, first medoid is random, other are chosen based on distance to closest medoid
+"""
 function fuzzy_kmedoids(distances::Matrix{F}, k::Int, mval::Int; max_iter::Int=200, initialization::Symbol=:rand) :: Vector{Int} where {F<:AbstractFloat}  # Indicies
     # Initialization
     points_n = size(distances, 1)
@@ -46,15 +57,15 @@ function _fuzzy_kmedoids_body(distances::Matrix{F}, k_medoids_n::Int, mval::Int,
         # getting u_ij ^ m form
 
         # here we calculate normal membership of every point to every medoid
-        for (medoid_id, medoid_col) in enumerate(eachcol(membership_special_final))
+        for medoid_id in axes(membership_special_final, 2)
             medoid_point_id = new_medoids[medoid_id]
             LoopVectorization.@turbo for point_id in 1:points_n
-                medoid_col[point_id] = one(F) / (distances[point_id, medoid_point_id] + epsilon) ^ mval
+                membership_special_final[point_id, medoid_id] = one(F) / (distances[point_id, medoid_point_id] + epsilon) ^ mval
             end
         end
         # We divide it by sum, so that membership sum to 1, membership of each point is rowwise
         for medoid_row in eachrow(membership_special_final)
-            medoid_row ./= sum(medoid_row)
+            medoid_row .*= inv(sum(medoid_row))
         end
         # Up to this point, we have calculated normal membership
         # We apply formula u_ij^m, from paper
@@ -65,10 +76,17 @@ function _fuzzy_kmedoids_body(distances::Matrix{F}, k_medoids_n::Int, mval::Int,
         # getting new medoids
         old_medoids .= new_medoids
 
-        # It turns out this formula can be represented as atrix multiplication
+        # It turns out this formula can be represented as matrix multiplication
         LinearAlgebra.mul!(objective_matrix, distances, membership_special_final)
-        for (medoid_id, objective_col) in enumerate(eachcol(objective_matrix))
-            new_medoids[medoid_id] = argmin(objective_col)
+        for medoid_id in axes(objective_matrix, 2)
+            valmin = objective_matrix[1, medoid_id]
+            arg_min = 1
+            LoopVectorization.@turbo for point_id in 2:points_n
+                tmp_change = objective_matrix[point_id, medoid_id] < valmin
+                valmin = ifelse(tmp_change, objective_matrix[point_id, medoid_id], valmin)
+                arg_min = ifelse(tmp_change, point_id, arg_min)
+            end
+            new_medoids[medoid_id] = arg_min
         end
     end
 
@@ -105,7 +123,7 @@ function _best_initialization(distances::Matrix{F}, k::Int, first_random::Bool) 
 
     # This implements q = arg max[1≤i≤n;i∉V] min[1≤k≤|V|] r(vk, xi)
     for medoid_id in 2:k
-        @inbounds @simd for point_id in 1:points_n
+        LoopVectorization.@turbo for point_id in 1:points_n
             distance_to_closest_medoid[point_id] = min(distance_to_closest_medoid[point_id], distances[point_id, medoid_point_id])
         end
         medoid_point_id = argmax(distance_to_closest_medoid)

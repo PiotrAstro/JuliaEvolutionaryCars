@@ -253,8 +253,8 @@ function _does_collide(env::BasicCarEnvironment, x, y) :: Bool
 end
 
 function _does_collide_at_angle(env::BasicCarEnvironment, distance::Float64, angle::Float64) :: Bool
-    x_check = round(Int, env.x + distance * cos(angle))
-    y_check = round(Int, env.y - distance * sin(angle))
+    x_check = unsafe_trunc(Int, env.x + distance * cos(angle) + 0.5)
+    y_check = unsafe_trunc(Int, env.y - distance * sin(angle) + 0.5)
 
     if x_check < 1 || x_check > size(env.map, 2) || y_check < 1 || y_check > size(env.map, 1)
         return true
