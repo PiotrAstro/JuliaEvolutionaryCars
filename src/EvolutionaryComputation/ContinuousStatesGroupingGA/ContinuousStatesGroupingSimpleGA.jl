@@ -336,10 +336,10 @@ end
 
 function FIHC_test!(ind::Individual;
     fihc_mode::Symbol,
-    genes_combination::Symbol,
     norm_mode::Symbol,
     random_matrix_mode::Symbol,
     factor::Float64,
+    hier_factor::Float64
 ) :: Int
 
     # It doesnt work anyway, thus I do not want to keep updating it
@@ -362,13 +362,71 @@ function FIHC_test!(ind::Individual;
 
     if fihc_mode == :per_gene_rand
         evals = 0
-        for nodes_level in get_genes_combination(ind.env_wrapper, genes_combination)
-            for node in nodes_level
+        for nodes_level in ind.env_wrapper._distance_membership_levels
+            for node in Random.shuffle(nodes_level)
                 old_fitness = get_fitness_test!(ind)
                 old_genes = Base.copy(ind.genes)
-                random_values = generate_random_matrix(size(ind.genes, 1), length(node), factor, random_matrix_mode)
+                random_values = generate_random_matrix(size(ind.genes, 1), size(ind.genes, 2), factor, random_matrix_mode)
+                for (rand_col, membership) in zip(eachcol(random_values), node)
+                    rand_col .*= membership
+                end
                 ind._fitness_actual = false
-                ind.genes = norm_genes(old_genes, random_values, node, norm_mode)
+                ind.genes = norm_genes(old_genes, random_values, norm_mode)
+
+                evals += 1
+                
+                if get_fitness_test!(ind) < old_fitness
+                    ind.genes = old_genes
+                    ind._fitness = old_fitness
+                end
+            end
+        end
+        return evals
+    
+    elseif fihc_mode == :hier_decrease
+        evals = 0
+        factor_tmp = factor
+        for nodes_level in ind.env_wrapper._distance_membership_levels
+            for node in Random.shuffle(nodes_level)
+                old_fitness = get_fitness_test!(ind)
+                old_genes = Base.copy(ind.genes)
+                random_values = generate_random_matrix(size(ind.genes, 1), size(ind.genes, 2), factor, random_matrix_mode)
+                for (rand_col, membership) in zip(eachcol(random_values), node)
+                    rand_col .*= membership
+                end
+                ind._fitness_actual = false
+                ind.genes = norm_genes(old_genes, random_values, norm_mode)
+
+                evals += 1
+                
+                if get_fitness_test!(ind) < old_fitness
+                    ind.genes = old_genes
+                    ind._fitness = old_fitness
+                end
+            end
+            factor_tmp *= hier_factor
+        end
+        return evals
+
+    elseif fihc_mode == :hier_increase
+        evals = 0
+        genes_combinations = ind.env_wrapper._distance_membership_levels
+        factors = Vector{Float64}(undef, length(genes_combinations))
+        factors[1] = factor
+        for i in 2:length(factors)
+            factors[i] = factors[i - 1] * hier_factor
+        end
+        factors = reverse(factors)
+        for (factor_tmp, nodes_level) in zip(factors, genes_combinations)
+            for node in Random.shuffle(nodes_level)
+                old_fitness = get_fitness_test!(ind)
+                old_genes = Base.copy(ind.genes)
+                random_values = generate_random_matrix(size(ind.genes, 1), size(ind.genes, 2), factor, random_matrix_mode)
+                for (rand_col, membership) in zip(eachcol(random_values), node)
+                    rand_col .*= membership
+                end
+                ind._fitness_actual = false
+                ind.genes = norm_genes(old_genes, random_values, norm_mode)
 
                 evals += 1
                 
@@ -380,90 +438,63 @@ function FIHC_test!(ind::Individual;
         end
         return evals
 
-    elseif fihc_mode == :disc_fihc
-        for col in eachcol(ind.genes)
-            argmax_col = argmax(col)
-            col .= 0.0
-            col[argmax_col] = 1.0
-        end
+    # elseif fihc_mode == :disc_fihc
+    #     for col in eachcol(ind.genes)
+    #         argmax_col = argmax(col)
+    #         col .= 0.0
+    #         col[argmax_col] = 1.0
+    #     end
 
-        evals = 0
-        actions_n = EnvironmentWrapper.get_action_size(ind.env_wrapper)
-        for nodes_level in get_genes_combination(ind.env_wrapper, genes_combination)
-            for node in nodes_level
-                for action in 1:actions_n
-                    old_fitness = get_fitness_test!(ind)
-                    old_genes = Base.copy(ind.genes)
-                    new_genes = Base.copy(ind.genes)
-                    new_genes[:, node] .= 0.0
-                    new_genes[action, node] .= 1.0
-                    ind._fitness_actual = false
-                    ind.genes = new_genes
+    #     evals = 0
+    #     actions_n = EnvironmentWrapper.get_action_size(ind.env_wrapper)
+    #     for nodes_level in ind.env_wrapper._distance_membership_levels
+    #         for node in Random.shuffle(nodes_level)
+    #             for action in 1:actions_n
+    #                 old_fitness = get_fitness_test!(ind)
+    #                 old_genes = Base.copy(ind.genes)
+    #                 new_genes = Base.copy(ind.genes)
+    #                 new_genes[:, node] .= 0.0
+    #                 new_genes[action, node] .= 1.0
+    #                 ind._fitness_actual = false
+    #                 ind.genes = new_genes
 
-                    evals += 1
+    #                 evals += 1
                     
-                    if get_fitness_test!(ind) < old_fitness
-                        ind.genes = old_genes
-                        ind._fitness = old_fitness
-                    end
-                end
-            end
-        end
-        return evals
+    #                 if get_fitness_test!(ind) < old_fitness
+    #                     ind.genes = old_genes
+    #                     ind._fitness = old_fitness
+    #                 end
+    #             end
+    #         end
+    #     end
+    #     return evals
 
-    elseif fihc_mode == :fihc_cont
-        evals = 0
-        actions_n = EnvironmentWrapper.get_action_size(ind.env_wrapper)
-        for nodes_level in get_genes_combination(ind.env_wrapper, genes_combination)
-            for node in nodes_level
-                for action in 1:actions_n
-                    old_fitness = get_fitness_test!(ind)
-                    old_genes = Base.copy(ind.genes)
-                    genes_changes = zeros(Float32, size(ind.genes, 1), length(node))
-                    genes_changes[action, :] .+= factor
-                    ind._fitness_actual = false
-                    ind.genes = norm_genes(old_genes, genes_changes, node, norm_mode)
+    # elseif fihc_mode == :fihc_cont
+    #     evals = 0
+    #     actions_n = EnvironmentWrapper.get_action_size(ind.env_wrapper)
+    #     for nodes_level in ind.env_wrapper._distance_membership_levels
+    #         for node in Random.shuffle(nodes_level)
+    #             for action in 1:actions_n
+    #                 old_fitness = get_fitness_test!(ind)
+    #                 old_genes = Base.copy(ind.genes)
+    #                 genes_changes = zeros(Float32, size(ind.genes, 1), length(node))
+    #                 genes_changes[action, :] .+= factor
+    #                 ind._fitness_actual = false
+    #                 ind.genes = norm_genes(old_genes, genes_changes, node, norm_mode)
 
-                    evals += 1
+    #                 evals += 1
                     
-                    if get_fitness_test!(ind) < old_fitness
-                        ind.genes = old_genes
-                        ind._fitness = old_fitness
-                    end
-                end
-            end
-        end
-        return evals
+    #                 if get_fitness_test!(ind) < old_fitness
+    #                     ind.genes = old_genes
+    #                     ind._fitness = old_fitness
+    #                 end
+    #             end
+    #         end
+    #     end
+    #     return evals
 
     else
         throw(ArgumentError("Unknown mode: $fihc_mode"))
-    end
-end
-
-function get_genes_combination(env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct, mode::Symbol) :: Vector{Vector{Vector{Int}}}
-    genes_n = EnvironmentWrapper.get_groups_number(env_wrapper)
-    if mode == :flat
-        return [[[i] for i in Random.randperm(genes_n)]]
-    elseif mode == :hier
-        tree = env_wrapper._similarity_tree
-        current_nodes = [tree.left, tree.right]
-        result = Vector{Vector{Vector{Int}}}()
-        while !isempty(current_nodes)
-            push!(result, [current_nodes[i].elements for i in Random.randperm(length(current_nodes))])
-            new_nodes = []
-            for node in current_nodes
-                if !isnothing(node.left)
-                    push!(new_nodes, node.left)
-                end
-                if !isnothing(node.right)
-                    push!(new_nodes, node.right)
-                end
-            end
-            current_nodes = new_nodes
-        end
-        return result
-    else
-        throw(ArgumentError("Unknown mode: $mode"))
     end
 end
 
@@ -480,37 +511,37 @@ function initial_genes(env_wrap::EnvironmentWrapper.EnvironmentWrapperStruct, mo
     return new_genes
 end
 
-function norm_genes(genes_origianal::Matrix{Float32}, genes_new::Matrix{Float32}, changed_genes::Vector{Int}, mode::Symbol) :: Matrix{Float32}
+function norm_genes(genes_origianal::Matrix{Float32}, genes_new::Matrix{Float32}, mode::Symbol) :: Matrix{Float32}
     new_genes = Base.copy(genes_origianal)
     if mode == :d_sum
-        new_genes[:, changed_genes] += genes_new
+        new_genes += genes_new
         EnvironmentWrapper.normalize_genes!(new_genes)
     elseif mode == :min_0
-        new_genes[:, changed_genes] += genes_new
+        new_genes += genes_new
         EnvironmentWrapper.normalize_genes_min_0!(new_genes)
-    elseif mode == :around_0
-        # we transform genes to mean 0 std 0, than add randn and then normalize  -= minimum  and  / sum
-        genes_changed = genes_origianal[:, changed_genes]
-        znorm!(genes_changed)
-        genes_changed += genes_new
-        znorm!(genes_changed)
-        EnvironmentWrapper.normalize_genes_min_0!(genes_changed)
-        new_genes[:, changed_genes] = genes_changed
-    elseif mode == :softmax_norm
-        # we get original ifferences between values from previous softmax, than add randn and then normalize with softmax
-        genes_changed = genes_origianal[:, changed_genes]
-        softmax_inv!(genes_changed)
-        znorm!(genes_changed)
-        genes_changed += genes_new
-        znorm!(genes_changed)
-        softmax!(genes_changed)
-        new_genes[:, changed_genes] = genes_changed
-    elseif mode == :softmax
-        genes_changed = genes_origianal[:, changed_genes]
-        softmax_inv!(genes_changed)
-        genes_changed += genes_new
-        softmax!(genes_changed)
-        new_genes[:, changed_genes] = genes_changed
+    # elseif mode == :around_0
+    #     # we transform genes to mean 0 std 0, than add randn and then normalize  -= minimum  and  / sum
+    #     genes_changed = genes_origianal[:, changed_genes]
+    #     znorm!(genes_changed)
+    #     genes_changed += genes_new
+    #     znorm!(genes_changed)
+    #     EnvironmentWrapper.normalize_genes_min_0!(genes_changed)
+    #     new_genes[:, changed_genes] = genes_changed
+    # elseif mode == :softmax_norm
+    #     # we get original ifferences between values from previous softmax, than add randn and then normalize with softmax
+    #     genes_changed = genes_origianal[:, changed_genes]
+    #     softmax_inv!(genes_changed)
+    #     znorm!(genes_changed)
+    #     genes_changed += genes_new
+    #     znorm!(genes_changed)
+    #     softmax!(genes_changed)
+    #     new_genes[:, changed_genes] = genes_changed
+    # elseif mode == :softmax
+    #     genes_changed = genes_origianal[:, changed_genes]
+    #     softmax_inv!(genes_changed)
+    #     genes_changed += genes_new
+    #     softmax!(genes_changed)
+    #     new_genes[:, changed_genes] = genes_changed
     else
         throw(ArgumentError("Unknown mode: $mode"))
     end
@@ -539,10 +570,16 @@ function softmax_inv!(genes::Matrix{Float32})
 end
 
 function generate_random_matrix(latent_space::Int, n_clusters::Int, factor::Float64, mode::Symbol) :: Matrix{Float32}
-    if mode == :rand
+    if mode == :rand_different
         return rand(Float32, latent_space, n_clusters) .* factor
-    elseif mode == :rand_n
+    elseif mode == :rand_n_different
         return randn(Float32, latent_space, n_clusters) .* factor
+    elseif mode == :rand_same
+        vector = rand(Float32, latent_space) .* factor
+        return repeat(vector, 1, n_clusters)
+    elseif mode == :rand_n_same
+        vector = randn(Float32, latent_space) .* factor
+        return repeat(vector, 1, n_clusters)
     else
         throw(ArgumentError("Unknown mode: $mode"))
     end

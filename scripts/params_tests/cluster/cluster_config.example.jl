@@ -97,12 +97,6 @@ CLUSTER_CONFIG_HOSTS = [
 # Generating keys for ssh, on client (your_file_name is private, your_file_name.pub is public):
 # ssh-keygen -t rsa -b 4096 -m PEM -f C:\Users\YourUsername\.ssh\your_file_name
 
-# On server Openssh server is usually installed, if not, I should install it e.g. through:
-# msstore options or something like that, or apps > additional features
-# or https://github.com/PowerShell/Win32-OpenSSH/releases  and choose win 64 msi
-# might have to run New-NetFirewallRule -Name sshd -DisplayName 'OpenSSH Server (sshd)' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22
-
-
 # Now on server I can use same key on all servers, I should do on each server:
 # open or create file C:\Users\username\.ssh\authorized_keys  if username is not in administrator group
 # open or create file C:\ProgramData\ssh\administrators_authorized_keys if username is in administrator group (it doesnt have to be admin, but to have admin rights)

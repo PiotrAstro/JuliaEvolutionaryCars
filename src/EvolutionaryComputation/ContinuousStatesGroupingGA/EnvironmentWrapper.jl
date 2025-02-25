@@ -12,6 +12,7 @@ import Dates
 import JLD
 import Logging
 import LinearAlgebra
+import Printf
 using StatsPlots
 
 export EnvironmentWrapperStruct, get_action_size, get_groups_number, get_fitness, copy, is_verbose, set_verbose!, translate, create_new_based_on, create_time_distance_tree, normalize_genes_min_0!
@@ -28,7 +29,8 @@ mutable struct EnvironmentWrapperStruct
     _autoencoder::NeuralNetwork.AbstractNeuralNetwork
     _encoded_exemplars::Matrix{Float32}
     _raw_exemplars::Environment.AbstractStateSequence
-    _similarity_tree::StatesGrouping.TreeNode
+    _distance_membership_levels::Vector{Vector{Vector{Float32}}}
+    _distance_membership_levels_method::Symbol
     _max_states_considered::Int
     _distance_metric::Symbol  # :euclidean or :cosine or :cityblock
     _exemplars_clustering::Symbol  # :genieclust or :pam or :kmedoids
@@ -53,6 +55,7 @@ function EnvironmentWrapperStruct(
         n_clusters::Int,
         distance_metric::Symbol=:cosine,
         exemplars_clustering::Symbol=:genieclust,
+        distance_membership_levels_method::Symbol=:hclust_complete,
         hclust_distance::Symbol=:ward,
         hclust_time::Symbol=:ward,
         time_distance_tree::Symbol=:mine,  # :mine or :markov
@@ -88,9 +91,46 @@ function EnvironmentWrapperStruct(
     end
 
     encoded_states = NeuralNetwork.predict(encoder, states_nn_input)
-    exemplars_ids, similarity_tree = StatesGrouping.get_exemplars(encoded_states, n_clusters; distance_metric, exemplars_clustering, hclust_distance)
+    exemplars_ids, _ = StatesGrouping.get_exemplars(encoded_states, n_clusters; distance_metric, exemplars_clustering, hclust_distance)
     encoded_exemplars = encoded_states[:, exemplars_ids]
+    distance_membership_levels = StatesGrouping.distance_membership_levels(
+        encoded_states,
+        encoded_exemplars; 
+        distance_metric=distance_metric,
+        method=distance_membership_levels_method,
+        mval=m_value
+    )
     states_exeplars = Environment.get_sequence_with_ids(states, exemplars_ids)
+
+    # ---------------------------------------------
+    # tmp stuff
+    # for method in [
+    #     :flat, :hclust_complete, :hclust_single,
+    #     :kmeans_exemplars_crisp, :kmeans_all_crisp, :pam_exemplars_crisp, :pam_all_crisp,
+    #     :kmeans_exemplars_fuzzy, :kmeans_all_fuzzy, :pam_exemplars_fuzzy, :pam_all_fuzzy
+    # ]
+    #     result = StatesGrouping.distance_membership_levels(
+    #         encoded_states,
+    #         encoded_exemplars; 
+    #         distance_metric=distance_metric,
+    #         method=method,
+    #         mval=m_value
+    #     )
+    #     text = ""
+    #     for res_lev in result
+    #         text *= "\n[\n"
+    #         for node in res_lev
+    #             text *= "\t[" * join([Printf.@sprintf("%.2f", memb) for memb in node], "  ") * "]\n"
+    #         end
+    #         text *= "]\n"
+    #     end
+    #     # save it to file
+    #     open("z__$method.txt", "w") do f
+    #         write(f, text)
+    #     end
+    # end
+    # throw("dfrvdv")
+    # ---------------------------------------------
 
     if verbose
         Logging.@info "Exemplars tree created"
@@ -104,7 +144,8 @@ function EnvironmentWrapperStruct(
         autoencoder,
         encoded_exemplars,
         states_exeplars,
-        similarity_tree,
+        distance_membership_levels,
+        distance_membership_levels_method,
         max_states_considered,
         distance_metric,
         exemplars_clustering,
@@ -145,7 +186,8 @@ function copy(env_wrap::EnvironmentWrapperStruct)::EnvironmentWrapperStruct
         autoencoder_copy,
         env_wrap._encoded_exemplars,
         env_wrap._raw_exemplars,
-        env_wrap._similarity_tree,
+        env_wrap._distance_membership_levels,
+        env_wrap._distance_membership_levels_method,
         env_wrap._max_states_considered,
         env_wrap._distance_metric,
         env_wrap._exemplars_clustering,
@@ -246,13 +288,20 @@ function create_new_based_on(
     new_encoded_states = NeuralNetwork.predict(new_env_wrapper._encoder, new_states_nn_input)
 
     # # get new exemplars, states and newly encoded states
-    new_exemplars_ids, new_similarity_tree = StatesGrouping.get_exemplars(new_encoded_states, new_n_clusters; distance_metric=env_wrap._distance_metric, exemplars_clustering=env_wrap._exemplars_clustering, hclust_distance=env_wrap._hclust_distance)
+    new_exemplars_ids, _ = StatesGrouping.get_exemplars(new_encoded_states, new_n_clusters; distance_metric=env_wrap._distance_metric, exemplars_clustering=env_wrap._exemplars_clustering, hclust_distance=env_wrap._hclust_distance)
     new_exemplars = new_encoded_states[:, new_exemplars_ids]
+    new_distance_membership_levels = StatesGrouping.distance_membership_levels(
+        new_encoded_states,
+        new_exemplars; 
+        distance_metric=env_wrap._distance_metric,
+        method=env_wrap._distance_membership_levels_method,
+        mval=env_wrap._m_value
+    )
     new_raw_exemplars = Environment.get_sequence_with_ids(new_states, new_exemplars_ids)
 
     new_env_wrapper._encoded_exemplars = new_exemplars
     new_env_wrapper._raw_exemplars = new_raw_exemplars
-    new_env_wrapper._similarity_tree = new_similarity_tree
+    new_env_wrapper._distance_membership_levels = new_distance_membership_levels
     new_env_wrapper._n_clusters = new_n_clusters
 
     return new_env_wrapper

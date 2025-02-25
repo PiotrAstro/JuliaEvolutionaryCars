@@ -11,12 +11,12 @@ import Statistics
 # My params
 
 
-TEST_DIR = joinpath("log", "parameters_tests_2025-02-07_15-27-17")
+TEST_DIR = joinpath("log", "parameters_tests_2025-02-17_15-17-17")
 RESULTS_DIR = joinpath(TEST_DIR, "results")
 ANALYSIS_DIR = joinpath(TEST_DIR, "analysis")
 
 TEST_POSTFIX = ".csv"  # will be removed from plot entries
-TEST_PREFIX = "logs_opt=ConStaGroSimGA_"  # will be removed from plot entries
+TEST_PREFIX = "o=ConStaGroSimGA_"  # will be removed from plot entries
 
 Y_LABEL = :best_fitness
 X_LABEL = :total_evaluations
@@ -25,14 +25,14 @@ SHOW_STD = false  # whether to show std ribbon, doesnt matter for :all
 
 # By default [], so no GROUPS
 # could be e.g. ["NClu", "MmdWei"] it will create groups for each combination of these, if entry doesnt have any of these, it will be a group on its own
-GROUPS = ["FihMod", "RanMatMod", "NorMod"]  
+GROUPS = ["NorMod", "RanMatMod"]
 GROUPS_IN_LEGEND = :col1  # :all - different colours in groups, :col1 - one colour in groups, :col1_ent1 - one colour in groups and one entry in legend
 
 # will stay in the plot entries, used for filtering
 # TEST_INFIX_LIST = ["40", ("30", "!50")]  ->  contains("40") && (contains("30") || !contains("50"))
 # usually you should use it like this TEST_INFIX_LIST = ["(MmdWei=0.0)"] 
 # if you add ! as the first string index, it means not this one, e.g. TEST_INFIX_LIST = ["!40", "!50"] -> !contains("40") && !contains("50")
-TEST_INFIX_LIST = ["!NClu=10", "!NClu=100", "!NClu=40"]
+TEST_INFIX_LIST = ["Pam", "Sca", "NClu=40", ("DSum", "Min0")]
 
 
 # ------------------------------------------------------------------------------------------------
@@ -119,7 +119,7 @@ function plot_all(
     line_function::Symbol
 )
     mkpath(ANALYSIS_DIR)
-    infix_test = "[" * join([isa(infix_el, Tuple) ? join(infix_el, "or") : infix_el for infix_el in TEST_INFIX_LIST], "&") * "]"
+    infix_test = "[" * join([isa(infix_el, Tuple) ? "("*join(infix_el, ";")*")" : infix_el for infix_el in TEST_INFIX_LIST], "&") * "]"
     groups_text = "[" * join(GROUPS, "&") * "]"
     plot_name = "fun=$line_function x=$x_label y=$y_label Pre=$TEST_PREFIX"
     if infix_test != "[]"  # if there is infix

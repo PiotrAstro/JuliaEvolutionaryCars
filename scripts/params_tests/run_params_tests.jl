@@ -103,14 +103,16 @@ TESTED_VALUES = [
             :ContinuousStatesGroupingSimpleGA => Dict(
                 :env_wrapper => Dict(
                     :n_clusters => [20, 40],
-                    :exemplars_clustering => [:genie, :pam, :kmedoids, :k_means_medoids, :fcm_rand, :fcm_best, :fcm_best_rand]
+                    :distance_membership_levels_method => [:flat, :hclust_complete, :hclust_average, :hclust_single,
+                        :kmeans_exemplars_crisp, :kmeans_all_crisp, :pam_exemplars_crisp, :pam_all_crisp,
+                        :kmeans_exemplars_fuzzy, :kmeans_all_fuzzy, :pam_exemplars_fuzzy, :pam_all_fuzzy],
                 ),
                 :fihc => Dict(
-                    :norm_mode => [:d_sum, :min_0, :around_0, :softmax_norm, :softmax],
-                    :random_matrix_mode => [:rand, :rand_n],
-                    :factor => [0.1, 0.5, 1.0, 2.0],
+                    :fihc_mode => [:per_gene_rand],
+                    :norm_mode => [:d_sum, :min_0],
+                    :random_matrix_mode => [:rand_different, :rand_n_different, :rand_same, :rand_n_same],
+                    :factor => [0.5, 1.0, 2.0],
                 ),
-                :initial_genes_mode => [:scale, :softmax],
             ),
         ),
     ),
@@ -119,27 +121,15 @@ TESTED_VALUES = [
     #     Dict(
     #         :ContinuousStatesGroupingSimpleGA => Dict(
     #             :env_wrapper => Dict(
-    #                 :n_clusters => [20, 40, 100],
+    #                 :n_clusters => [20, 40],
+    #                 :distance_membership_levels_method => [:flat, :hclust_complete, :hclust_single, :kmeans_exemplars_fuzzy, :pam_exemplars_fuzzy],
     #             ),
     #             :fihc => Dict(
-    #                 :fihc_mode => [:disc_fihc],
-    #                 :genes_combination => [:hier],
-    #             ),
-    #         ),
-    #     ),
-    # ),
-    # (
-    #     :ContinuousStatesGroupingSimpleGA,
-    #     Dict(
-    #         :ContinuousStatesGroupingSimpleGA => Dict(
-    #             :env_wrapper => Dict(
-    #                 :n_clusters => [20, 40, 100],
-    #             ),
-    #             :fihc => Dict(
-    #                 :fihc_mode => [:fihc_cont],
+    #                 :fihc_mode => [:hier_decrease, :hier_increase],
+    #                 :hier_factor => [0.5, 0.7, 0.9],
     #                 :norm_mode => [:d_sum, :min_0],
-    #                 :factor => [0.1, 0.3, 0.5, 1.0],
-    #                 :genes_combination => [:hier],
+    #                 :random_matrix_mode => [:rand_different, :rand_n_different, :rand_same, :rand_n_same],
+    #                 :factor => [0.5, 1.0, 2.0],
     #             ),
     #         ),
     #     ),
@@ -161,23 +151,22 @@ LOGS_DIR_ANALYSIS = joinpath(LOGS_DIR, "analysis")
 # --------------------------------------------------------------------------------------------------
 # Run the tests
 
-added_pids_by_host = DistributedEnvironments.@initcluster(CLUSTER_CONFIG_MAIN, CLUSTER_CONFIG_HOSTS, TMP_DIR_NAME, COPY_ENV_AND_CODE)
-pids_by_machines = DistributedEnvironments.pids_by_machines()
+pids_by_host = DistributedEnvironments.@initcluster(CLUSTER_CONFIG_MAIN, CLUSTER_CONFIG_HOSTS, TMP_DIR_NAME, COPY_ENV_AND_CODE)
 
 relative_path_tmp = splitpath(@__DIR__)[length(splitpath(dirname(Base.active_project())))+1:end]
 Distributed.@everywhere RELATIVE_PATH_TO_THIS_DIR = $relative_path_tmp
 
-
-for (host, added_pids) in zip([CLUSTER_CONFIG_MAIN, CLUSTER_CONFIG_HOSTS...], added_pids_by_host)
+for (host, pids) in zip([CLUSTER_CONFIG_MAIN, CLUSTER_CONFIG_HOSTS...], pids_by_host)
     channel = Distributed.RemoteChannel(() -> Channel{Int}(host[:load_code_n_parallel]))
-    Distributed.@everywhere added_pids begin
+    Distributed.@everywhere pids begin
         INITIALIZATION_CHANNEL = $channel
     end
 end
 
 Distributed.@everywhere begin
+    put!(INITIALIZATION_CHANNEL, Distributed.myid())
+    println("Worker $(Distributed.myid()) started instantiating")
     # important things to improve performance on intel CPUs:
-    push!(INITIALIZATION_CHANNEL, Distributed.myid())
     using MKL
     using LinearAlgebra
     import Distributed
@@ -260,7 +249,7 @@ remote_channel = Distributed.RemoteChannel(() -> Channel{RemoteResult}(RESULT_CH
 result_info = [FinalResultLog(save_name(entry...), false, "Not yet computed") for entry in special_dicts_with_cases]
 
 cases_results_path = joinpath(LOGS_DIR, CASES_RESULTS_FILE)
-channel_controller_task = @async run_channel_controller!(remote_channel, result_info, LOGS_DIR_RESULTS, cases_results_path)
+channel_controller_task = Threads.@spawn run_channel_controller!(remote_channel, result_info, LOGS_DIR_RESULTS, cases_results_path)
 # rand_perm_special_dicts_with_cases = Random.shuffle(collect(enumerate(special_dicts_with_cases)))  # they will process in random order
 rand_perm_special_dicts_with_cases = collect(enumerate(special_dicts_with_cases))  # actually currently it is sorted by case number, so I do not have to shuffle it
 

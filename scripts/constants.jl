@@ -134,15 +134,16 @@ CONSTANTS_DICT = Dict(
             :hclust_distance => :complete,  # :ward or :single or :complete or :average
             :hclust_time => :complete,  # :ward or :single or :complete or :average
             :m_value => 2,  # 2 is better than 1
-            :exemplars_clustering => :pam  # :genie or :kmedoids or :pam
+            :exemplars_clustering => :pam,  # :genie or :kmedoids or :pam
+            :distance_membership_levels_method => :hclust_complete,
         ),
         :individuals_n => 30,
         :fihc => Dict(
             :fihc_mode => :per_gene_rand,
             :norm_mode => :d_sum,
             :factor => 0.5,
-            :genes_combination => :hier,
-            :random_matrix_mode => :rand_n
+            :hier_factor => 0.5,
+            :random_matrix_mode => :rand_same
         ),
         :initial_genes_mode => :scale,  # :scale or :softmax
     ),
