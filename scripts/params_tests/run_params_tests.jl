@@ -104,40 +104,38 @@ TESTED_VALUES = [
         Dict(
             :ContinuousStatesGroupingSimpleGA => Dict(
                 :env_wrapper => Dict(
-                    :autoencoder_dict => Dict(
-                        :mmd_weight => [0.0, 0.01, 0.1, 1.0, 10.0],
-                    ),
-                    :distance_metric => [:cosine, :euclidean],
-                    :n_clusters => [20, 32],
-                    # :distance_membership_levels_method => [:hclust_complete],  # later should check also :pam_exemplars_fuzzy
+                    :n_clusters => [20, 32, 64],
+                    :m_value => [1, 2],
+                    :distance_membership_levels_method => [:hclust_complete, :pam_exemplars_fuzzy],  # later should check also :pam_exemplars_fuzzy
                 ),
                 :fihc => Dict(
-                    # :fihc_mode => [:per_gene_rand],
+                    :fihc_mode => [:per_gene_rand],
                     # :norm_mode => [:d_sum],  # [:d_sum, :min_0]
                     :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
-                    :factor => [1.0, 4.0],  # [0.5, 1.0, 2.0, 4.0]
+                    :factor => [1.0, 3.0, 10.0],  # [0.5, 1.0, 2.0, 4.0]
                 ),
             ),
         ),
     ),
-    # (
-    #     :ContinuousStatesGroupingSimpleGA,
-    #     Dict(
-    #         :ContinuousStatesGroupingSimpleGA => Dict(
-    #             :env_wrapper => Dict(
-    #                 :n_clusters => [20, 40],
-    #                 :distance_membership_levels_method => [:flat, :hclust_complete, :hclust_single, :kmeans_exemplars_fuzzy, :pam_exemplars_fuzzy],
-    #             ),
-    #             :fihc => Dict(
-    #                 :fihc_mode => [:hier_decrease, :hier_increase],
-    #                 :hier_factor => [0.5, 0.7, 0.9],
-    #                 :norm_mode => [:d_sum, :min_0],
-    #                 :random_matrix_mode => [:rand_different, :rand_n_different, :rand_same, :rand_n_same],
-    #                 :factor => [0.5, 1.0, 2.0],
-    #             ),
-    #         ),
-    #     ),
-    # ),
+    (
+        :ContinuousStatesGroupingSimpleGA,
+        Dict(
+            :ContinuousStatesGroupingSimpleGA => Dict(
+                :env_wrapper => Dict(
+                    :n_clusters => [20, 32, 64],
+                    :m_value => [1, 2],
+                    :distance_membership_levels_method => [:hclust_complete, :pam_exemplars_fuzzy],
+                ),
+                :fihc => Dict(
+                    :fihc_mode => [:hier_decrease, :hier_increase],
+                    :hier_factor => [0.5, 0.7, 0.9],
+                    # :norm_mode => [:d_sum],
+                    :random_matrix_mode => [:rand_n_different, :rand_n_same],
+                    :factor => [1.0, 3.0, 10.0],
+                ),
+            ),
+        ),
+    ),
 ]
 
 
@@ -164,7 +162,6 @@ LOGS_DIR_ANALYSIS = joinpath(LOGS_DIR, "analysis")
 DistributedEnvironments.@initcluster(CLUSTER_CONFIG_MAIN, CLUSTER_CONFIG_HOSTS, TMP_DIR_NAME, COPY_ENV_AND_CODE)
 relative_path_tmp = splitpath(@__DIR__)[length(splitpath(dirname(Base.active_project())))+1:end]
 
-
 if false # this one just makes linter happy :)
     using MKL
     using LinearAlgebra
@@ -182,61 +179,102 @@ if false # this one just makes linter happy :)
     include("_tests_utils.jl")
 end
 
-function create_worker_initializator()
-    relative_path_outer = relative_path_tmp
-    constants_dict_outer = CONSTANTS_DICT
-
-    function initialize_workers(pids=[])
-        if isempty(pids)
-            pids = Distributed.procs()
-        end
-        relative_path_inner = relative_path_outer
-        constants_dict_inner = constants_dict_outer
-
-        eval(quote
-        Distributed.@everywhere $pids begin
-            println("Worker $(Distributed.myid()) started instantiating")
-            # important things to improve performance on intel CPUs:
-            using MKL
-            using LinearAlgebra
-            import Distributed
-            import Pkg
-            import Logging
-            import Dates
-            import Random
-            import ProgressMeter
-            import DataFrames
-            import CSV
-            
-            RELATIVE_PATH_TO_THIS_DIR = $relative_path_inner
-            CONSTANTS_DICT_LOCAL_ON_WORKER = $constants_dict_inner
+Distributed.@everywhere begin
+    println("Worker $(Distributed.myid()) started instantiating")
+    # important things to improve performance on intel CPUs:
+    using MKL
+    using LinearAlgebra
+    import Distributed
+    import Pkg
+    import Logging
+    import Dates
+    import Random
+    import ProgressMeter
+    import DataFrames
+    import CSV
     
-            seed = time_ns() ⊻ UInt64(hash(Distributed.myid())) # xor between time nano seconds and hash of worker id
-            Random.seed!(seed)
+    RELATIVE_PATH_TO_THIS_DIR = $relative_path_tmp
+    CONSTANTS_DICT_LOCAL_ON_WORKER = $CONSTANTS_DICT
 
-            current_absolute_dir = joinpath(dirname(Base.active_project()), (RELATIVE_PATH_TO_THIS_DIR)...)
-            blas_threads = parse(Int, get(ENV, "JULIA_BLAS_THREADS", "1"))
-            BLAS.set_num_threads(blas_threads)
-            include(joinpath(current_absolute_dir, "../../src/JuliaEvolutionaryCars.jl"))
-            import .JuliaEvolutionaryCars
-            include(joinpath(current_absolute_dir,"../custom_loggers.jl"))
-            import .CustomLoggers
-            include(joinpath(current_absolute_dir, "_tests_utils.jl"))
-            # number of julia threads for main one doesnt make any difference, since it is not used
-            text = (
-                "Worker $(Distributed.myid()) started at $(Dates.now()) with seed: $seed\n" *
-                "Project name: $(Pkg.project().name)\n" *
-                "BLAS kernel: $(BLAS.get_config())\n" *
-                "Number of BLAS threads: $(BLAS.get_num_threads())\n" *
-                "Number of Julia threads: $(Threads.nthreads())\n"
-            )
-            println(text)
-        end end)
-    end
-    return initialize_workers
+    seed = time_ns() ⊻ UInt64(hash(Distributed.myid())) # xor between time nano seconds and hash of worker id
+    Random.seed!(seed)
+
+    current_absolute_dir = joinpath(dirname(Base.active_project()), (RELATIVE_PATH_TO_THIS_DIR)...)
+    blas_threads = parse(Int, get(ENV, "JULIA_BLAS_THREADS", "1"))
+    BLAS.set_num_threads(blas_threads)
+    include(joinpath(current_absolute_dir, "../../src/JuliaEvolutionaryCars.jl"))
+    import .JuliaEvolutionaryCars
+    include(joinpath(current_absolute_dir,"../custom_loggers.jl"))
+    import .CustomLoggers
+    include(joinpath(current_absolute_dir, "_tests_utils.jl"))
+    # number of julia threads for main one doesnt make any difference, since it is not used
+    text = (
+        "Worker $(Distributed.myid()) started at $(Dates.now()) with seed: $seed\n" *
+        "Project name: $(Pkg.project().name)\n" *
+        "BLAS kernel: $(BLAS.get_config())\n" *
+        "Number of BLAS threads: $(BLAS.get_num_threads())\n" *
+        "Number of Julia threads: $(Threads.nthreads())\n"
+    )
+    println(text)
 end
-WORKERS_INITIALIZATOR = create_worker_initializator()
-WORKERS_INITIALIZATOR()
+
+
+# this function works well, I have tested it, but unless I create my own pmap function, it is useless
+# function create_worker_initializator()
+#     relative_path_outer = relative_path_tmp
+#     constants_dict_outer = CONSTANTS_DICT
+
+#     function initialize_workers(pids=[])
+#         if isempty(pids)
+#             pids = Distributed.procs()
+#         end
+#         relative_path_inner = relative_path_outer
+#         constants_dict_inner = constants_dict_outer
+
+#         eval(quote
+#         Distributed.@everywhere $pids begin
+#             println("Worker $(Distributed.myid()) started instantiating")
+#             # important things to improve performance on intel CPUs:
+#             using MKL
+#             using LinearAlgebra
+#             import Distributed
+#             import Pkg
+#             import Logging
+#             import Dates
+#             import Random
+#             import ProgressMeter
+#             import DataFrames
+#             import CSV
+            
+#             RELATIVE_PATH_TO_THIS_DIR = $relative_path_inner
+#             CONSTANTS_DICT_LOCAL_ON_WORKER = $constants_dict_inner
+    
+#             seed = time_ns() ⊻ UInt64(hash(Distributed.myid())) # xor between time nano seconds and hash of worker id
+#             Random.seed!(seed)
+
+#             current_absolute_dir = joinpath(dirname(Base.active_project()), (RELATIVE_PATH_TO_THIS_DIR)...)
+#             blas_threads = parse(Int, get(ENV, "JULIA_BLAS_THREADS", "1"))
+#             BLAS.set_num_threads(blas_threads)
+#             include(joinpath(current_absolute_dir, "../../src/JuliaEvolutionaryCars.jl"))
+#             import .JuliaEvolutionaryCars
+#             include(joinpath(current_absolute_dir,"../custom_loggers.jl"))
+#             import .CustomLoggers
+#             include(joinpath(current_absolute_dir, "_tests_utils.jl"))
+#             # number of julia threads for main one doesnt make any difference, since it is not used
+#             text = (
+#                 "Worker $(Distributed.myid()) started at $(Dates.now()) with seed: $seed\n" *
+#                 "Project name: $(Pkg.project().name)\n" *
+#                 "BLAS kernel: $(BLAS.get_config())\n" *
+#                 "Number of BLAS threads: $(BLAS.get_num_threads())\n" *
+#                 "Number of Julia threads: $(Threads.nthreads())\n"
+#             )
+#             println(text)
+#         end end)
+#     end
+#     return initialize_workers
+# end
+# WORKERS_INITIALIZATOR = create_worker_initializator()
+# WORKERS_INITIALIZATOR()
 
 # --------------------------------------------------------------------------------------------------
 # creating dirs, copying files, setting up loggers

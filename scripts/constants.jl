@@ -126,7 +126,7 @@ CONSTANTS_DICT = Dict(
                 )
             ),
             :autoencoder_dict => Dict(
-                :mmd_weight => 0.0,  # IDK why, but in early tests clearly 0.0 was the best, so MMD wasnt used at all, there was a huge difference
+                :mmd_weight => 0.0,  # turns out it might be beneficial to set it to 0.01, so maybe in the future compare e.g. 0.0, 0.01, 0.1
                 :learning_rate => 0.001
             ),
             :initial_space_explorers_n => 30,
@@ -144,9 +144,9 @@ CONSTANTS_DICT = Dict(
         :fihc => Dict(
             :fihc_mode => :per_gene_rand,
             :norm_mode => :d_sum,
-            :factor => 0.5,
+            :factor => 2.0,
             :hier_factor => 0.5,
-            :random_matrix_mode => :rand_same
+            :random_matrix_mode => :rand_n_different,
         ),
         :initial_genes_mode => :scale,  # :scale or :softmax
     ),

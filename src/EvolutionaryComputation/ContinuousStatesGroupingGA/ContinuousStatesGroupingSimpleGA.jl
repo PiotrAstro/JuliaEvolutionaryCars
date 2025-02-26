@@ -390,7 +390,7 @@ function FIHC_test!(ind::Individual;
             for node in Random.shuffle(nodes_level)
                 old_fitness = get_fitness_test!(ind)
                 old_genes = Base.copy(ind.genes)
-                random_values = generate_random_matrix(size(ind.genes, 1), size(ind.genes, 2), factor, random_matrix_mode)
+                random_values = generate_random_matrix(size(ind.genes, 1), size(ind.genes, 2), factor_tmp, random_matrix_mode)
                 for (rand_col, membership) in zip(eachcol(random_values), node)
                     rand_col .*= membership
                 end
@@ -421,7 +421,7 @@ function FIHC_test!(ind::Individual;
             for node in Random.shuffle(nodes_level)
                 old_fitness = get_fitness_test!(ind)
                 old_genes = Base.copy(ind.genes)
-                random_values = generate_random_matrix(size(ind.genes, 1), size(ind.genes, 2), factor, random_matrix_mode)
+                random_values = generate_random_matrix(size(ind.genes, 1), size(ind.genes, 2), factor_tmp, random_matrix_mode)
                 for (rand_col, membership) in zip(eachcol(random_values), node)
                     rand_col .*= membership
                 end

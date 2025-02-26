@@ -147,3 +147,14 @@ end # module EvolutionaryCarsJulia
 # Zajebisty pomysł:
 # Create Fundamental Matrix
 # Jest już zaimplemenotwany, w continuous env_wrap wystarczy chyba podać odpowiedni symbol, ale trzeba dokładnie potestować
+
+
+
+
+
+
+# ------------------------------------------------------------------------------------------------------
+# Pomysł - dodatkowy fihc
+# dla każdego genu patrzymy jaki ma on membership do wszystkich innyych exemplarów poza nim samym
+# na podstawie tego obliczamy jaka byłaby jego wartość i dodajemy tą wartość do niego
+# ewentualnie możemy patrzeć na geny po kolei dookoła i sprawdzać czy one z wartością membership swoją coś pomogą

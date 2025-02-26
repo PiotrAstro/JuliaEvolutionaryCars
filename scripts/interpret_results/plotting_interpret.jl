@@ -11,7 +11,7 @@ import Statistics
 # My params
 
 
-TEST_DIR = joinpath("log", "parameters_tests_2025-02-26_00-52-12")
+TEST_DIR = joinpath("log", "parameters_tests_2025-02-26_20-18-33")
 RESULTS_DIR = joinpath(TEST_DIR, "results")
 ANALYSIS_DIR = joinpath(TEST_DIR, "analysis")
 
@@ -25,14 +25,14 @@ SHOW_STD = false  # whether to show std ribbon, doesnt matter for :all
 
 # By default [], so no GROUPS
 # could be e.g. ["NClu", "MmdWei"] it will create groups for each combination of these, if entry doesnt have any of these, it will be a group on its own
-GROUPS = ["RanMatMod", "NorMod"]
+GROUPS = ["NClu", "MmdWei"]
 GROUPS_IN_LEGEND = :col1  # :all - different colours in groups, :col1 - one colour in groups, :col1_ent1 - one colour in groups and one entry in legend
 
 # will stay in the plot entries, used for filtering
 # TEST_INFIX_LIST = ["40", ("30", "!50")]  ->  contains("40") && (contains("30") || !contains("50"))
 # usually you should use it like this TEST_INFIX_LIST = ["(MmdWei=0.0)"] 
 # if you add ! as the first string index, it means not this one, e.g. TEST_INFIX_LIST = ["!40", "!50"] -> !contains("40") && !contains("50")
-TEST_INFIX_LIST = ["NClu=40", "DisMemLevMet=PamExeCri"]
+TEST_INFIX_LIST = [("MmdWei=0.0", "MmdWei=0.01"), "DisMet=Cos"]
 
 
 # ------------------------------------------------------------------------------------------------
