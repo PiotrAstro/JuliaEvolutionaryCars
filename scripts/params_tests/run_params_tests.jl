@@ -77,9 +77,11 @@ How to set TESTED_VALUES:
         ),
     ]
 """
+
 # --------------------------------------------------------------------------------------------------
 # Start of real settings
 # --------------------------------------------------------------------------------------------------
+
 
 # we will change these values globally for all tests
 CONSTANTS_DICT[:run_config] = Dict(
@@ -102,16 +104,18 @@ TESTED_VALUES = [
         Dict(
             :ContinuousStatesGroupingSimpleGA => Dict(
                 :env_wrapper => Dict(
-                    :n_clusters => [20, 40],
-                    :distance_membership_levels_method => [:flat, :hclust_complete, :hclust_average, :hclust_single,
-                        :kmeans_exemplars_crisp, :kmeans_all_crisp, :pam_exemplars_crisp, :pam_all_crisp,
-                        :kmeans_exemplars_fuzzy, :kmeans_all_fuzzy, :pam_exemplars_fuzzy, :pam_all_fuzzy],
+                    :autoencoder_dict => Dict(
+                        :mmd_weight => [0.0, 0.01, 0.1, 1.0, 10.0],
+                    ),
+                    :distance_metric => [:cosine, :euclidean],
+                    :n_clusters => [20, 32],
+                    # :distance_membership_levels_method => [:hclust_complete],  # later should check also :pam_exemplars_fuzzy
                 ),
                 :fihc => Dict(
-                    :fihc_mode => [:per_gene_rand],
-                    :norm_mode => [:d_sum, :min_0],
-                    :random_matrix_mode => [:rand_different, :rand_n_different, :rand_same, :rand_n_same],
-                    :factor => [0.5, 1.0, 2.0],
+                    # :fihc_mode => [:per_gene_rand],
+                    # :norm_mode => [:d_sum],  # [:d_sum, :min_0]
+                    :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
+                    :factor => [1.0, 4.0],  # [0.5, 1.0, 2.0, 4.0]
                 ),
             ),
         ),
@@ -136,9 +140,15 @@ TESTED_VALUES = [
     # ),
 ]
 
+
 # --------------------------------------------------------------------------------------------------
 # End of real settings
 # --------------------------------------------------------------------------------------------------
+
+
+
+
+
 
 # Rather constant settings:
 OUTPUT_LOG_FILE = "_output_$(timestamp).log"
@@ -184,45 +194,44 @@ function create_worker_initializator()
         constants_dict_inner = constants_dict_outer
 
         eval(quote
-            Distributed.@everywhere $pids begin
-                println("Worker $(Distributed.myid()) started instantiating")
-                # important things to improve performance on intel CPUs:
-                using MKL
-                using LinearAlgebra
-                import Distributed
-                import Pkg
-                import Logging
-                import Dates
-                import Random
-                import ProgressMeter
-                import DataFrames
-                import CSV
-                
-                RELATIVE_PATH_TO_THIS_DIR = $relative_path_inner
-                CONSTANTS_DICT_LOCAL_ON_WORKER = $constants_dict_inner
-        
-                seed = time_ns() ⊻ UInt64(hash(Distributed.myid())) # xor between time nano seconds and hash of worker id
-                Random.seed!(seed)
+        Distributed.@everywhere $pids begin
+            println("Worker $(Distributed.myid()) started instantiating")
+            # important things to improve performance on intel CPUs:
+            using MKL
+            using LinearAlgebra
+            import Distributed
+            import Pkg
+            import Logging
+            import Dates
+            import Random
+            import ProgressMeter
+            import DataFrames
+            import CSV
+            
+            RELATIVE_PATH_TO_THIS_DIR = $relative_path_inner
+            CONSTANTS_DICT_LOCAL_ON_WORKER = $constants_dict_inner
+    
+            seed = time_ns() ⊻ UInt64(hash(Distributed.myid())) # xor between time nano seconds and hash of worker id
+            Random.seed!(seed)
 
-                current_absolute_dir = joinpath(dirname(Base.active_project()), (RELATIVE_PATH_TO_THIS_DIR)...)
-                blas_threads = parse(Int, get(ENV, "JULIA_BLAS_THREADS", "1"))
-                BLAS.set_num_threads(blas_threads)
-                include(joinpath(current_absolute_dir, "../../src/JuliaEvolutionaryCars.jl"))
-                import .JuliaEvolutionaryCars
-                include(joinpath(current_absolute_dir,"../custom_loggers.jl"))
-                import .CustomLoggers
-                include(joinpath(current_absolute_dir, "_tests_utils.jl"))
-                # number of julia threads for main one doesnt make any difference, since it is not used
-                text = (
-                    "Worker $(Distributed.myid()) started at $(Dates.now()) with seed: $seed\n" *
-                    "Project name: $(Pkg.project().name)\n" *
-                    "BLAS kernel: $(BLAS.get_config())\n" *
-                    "Number of BLAS threads: $(BLAS.get_num_threads())\n" *
-                    "Number of Julia threads: $(Threads.nthreads())\n"
-                )
-                println(text)
-            end
-        end)
+            current_absolute_dir = joinpath(dirname(Base.active_project()), (RELATIVE_PATH_TO_THIS_DIR)...)
+            blas_threads = parse(Int, get(ENV, "JULIA_BLAS_THREADS", "1"))
+            BLAS.set_num_threads(blas_threads)
+            include(joinpath(current_absolute_dir, "../../src/JuliaEvolutionaryCars.jl"))
+            import .JuliaEvolutionaryCars
+            include(joinpath(current_absolute_dir,"../custom_loggers.jl"))
+            import .CustomLoggers
+            include(joinpath(current_absolute_dir, "_tests_utils.jl"))
+            # number of julia threads for main one doesnt make any difference, since it is not used
+            text = (
+                "Worker $(Distributed.myid()) started at $(Dates.now()) with seed: $seed\n" *
+                "Project name: $(Pkg.project().name)\n" *
+                "BLAS kernel: $(BLAS.get_config())\n" *
+                "Number of BLAS threads: $(BLAS.get_num_threads())\n" *
+                "Number of Julia threads: $(Threads.nthreads())\n"
+            )
+            println(text)
+        end end)
     end
     return initialize_workers
 end
@@ -270,6 +279,8 @@ result_info = [FinalResultLog(save_name(entry...), false, "Not yet computed") fo
 
 cases_results_path = joinpath(LOGS_DIR, CASES_RESULTS_FILE)
 channel_controller_task = Threads.@spawn run_channel_controller!(remote_channel, result_info, LOGS_DIR_RESULTS, cases_results_path)
+# should_end_task_manager = Ref(false)
+# host_manager_task = Threads.@spawn DistributedEnvironments.hosts_manager(CLUSTER_CONFIG_HOSTS, WORKERS_INITIALIZATOR, should_end_task_manager, CHECK_HOSTS_EACH_N_SECONDS, CHECK_WORKER_TIMEOUT)
 enumerated_special_dicts_with_cases = collect(enumerate(special_dicts_with_cases))  # actually currently it is sorted by case number, so I do not have to shuffle it
 
 # results_trash itself is not used, hence the name
@@ -282,6 +293,8 @@ end
 # finishing computations, gently stopping everything
 put!(remote_channel, RemoteResult("", "", :stop, "Finished", 1, -1))
 wait(channel_controller_task)
+# should_end_task_manager[] = true
+# wait(host_manager_task)
 
 Logging.@info construct_text_from_final_results(result_info)
 DistributedEnvironments.remove_workers!()

@@ -16,12 +16,14 @@ tmp_blas_threads_per_worker = 1  # actually I think it should always be 1, it is
 # -----------------------------------------------------------------------
 
 CLUSTER_CONFIG_MAIN = Dict(
-    :use_n_workers => 0,  # if set to 0, main will only collect data from other workers
+    :use_n_workers => 0,  # if set to 0, main will only collect data from other workers, should be int
     :blas_threads_per_worker => tmp_blas_threads_per_worker,
     :julia_threads_per_worker => tmp_julia_threads_per_worker,
 )
 
-RESULT_CHANNEL_BUFFER_SIZE = 16 # how many results main worker can hold, if it exceeds, remote workers will wait until main worker will take some results
+RESULT_CHANNEL_BUFFER_SIZE = 16  # how many results main worker can hold, if it exceeds, remote workers will wait until main worker will take some results
+CHECK_HOSTS_EACH_N_SECONDS = 60 * 3  # how often to check if hosts are still alive and add new ones if needed
+CHECK_WORKER_TIMEOUT = 20  # how long to wait for worker to respond
 
 # cluster settings:
 private_key_path = raw"C:\Users\username\.ssh\private_key"
@@ -36,7 +38,7 @@ CLUSTER_CONFIG_HOSTS = [
     Dict(
         # changable stuff
         :host_address => "User@10.10.10.10",
-        :use_n_workers => 23,  # int or :auto to use threads_num processes
+        :use_n_workers => 23,  # int
         :dir => raw"Documents",  # I think for scp it should rather be relative path
 
         # mostly same for all hosts

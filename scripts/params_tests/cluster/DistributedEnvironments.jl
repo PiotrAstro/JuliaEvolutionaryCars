@@ -4,7 +4,7 @@ module DistributedEnvironments
 import Pkg
 using Distributed, MacroTools
 
-export @eachmachine, @eachworker, @initcluster, cluster_status!, remove_workers!, addprocs_one_host!
+export @eachmachine, @eachworker, @initcluster, cluster_status!, remove_workers!, addprocs_one_host!, host_status, hosts_manager
 
 macro initcluster(cluster_main, cluster_hosts, tmp_dir_name, copy_env_and_code)
     return _initcluster(cluster_main, cluster_hosts, tmp_dir_name, copy_env_and_code)
@@ -56,7 +56,7 @@ function _initcluster(
                         throw("other shells than :wincmd are currently not implemented, implement them yourself!")
                     end
                     println("Adding one worker to $(host[:host_address]) for setup...")
-                    _addprocs_one_host(host, 1)
+                    addprocs_one_host!(host, 1)
                     println("Worker added.")
                 end
                 rm(project_archive)
@@ -167,7 +167,7 @@ function addprocs_one_host!(host::Dict, workers_n=-1) # if workers_n = -1, it wi
         enable_threaded_blas = host[:blas_threads_per_worker] > 1,
         topology = :master_worker,
     )
-    host[:pids] = added_pids
+    host[:pids] = append!(get(host, :pids, Vector{Int}()), added_pids)
 end
 
 get_unique_machine_ids() = unique(id -> Distributed.get_bind_addr(id), procs())
@@ -186,12 +186,9 @@ function cluster_status!(cluster::Vector)
 
     connection_error = []
     for node in cluster
-        printstyled("Checking machine $(node[:host_address]):\n", bold=true, color=:magenta)
-        try
-            output = read(`ssh -i $(node[:private_key_path]) $(node[:host_address]) julia -v`, String)
-            println("Host available, julia version: "*output)
-        catch e
-            connection_error = vcat(connection_error, (node, e))
+        result_error, e = host_status(node)
+        if !result_error
+            push!(connection_error, (node, e))
         end
     end
 
@@ -206,6 +203,17 @@ function cluster_status!(cluster::Vector)
     end
 
     printstyled("\nAll machines are reachable\n\n", bold=true, color=:green)
+end
+
+function host_status(host::Dict)::Tuple{Bool, Union{Nothing, Exception}}
+    printstyled("Checking machine $(host[:host_address]):\n", bold=true, color=:magenta)
+    try
+        output = read(`ssh -i $(host[:private_key_path]) $(host[:host_address]) julia -v`, String)
+        println("Host available, julia version: "*output)
+        return true, nothing
+    catch e
+        return false, e
+    end
 end
 
 function create_project_archive(archive_path::String)
@@ -223,5 +231,62 @@ function extract_project_archive(archive_path::String, extract_dir::String)
     run(`tar -xzf $archive_path -C $extract_dir`)
 end
 
+"""
+Currently, it will not work at all, unfortunatelly pmap doesnt handle workers termination, I will have to create my own pmap alternative.
+
+It will take some time, I do not want to do it now, so currently this feature is not used.
+"""
+function hosts_manager(hosts::Vector{<:Dict}, initializator_function::Function, should_exit::Ref{Bool}, sleep_seconds, check_timeout=20)
+    sleep_start_time = time()
+    while !should_exit[]
+        if time() - sleep_start_time < sleep_seconds
+            sleep(1)
+            continue
+        end
+        
+        workers = Distributed.workers()
+        for host in hosts
+            workers_in_pool = [pid in workers for pid in host[:pids]]
+            workers_unreachability = map(host[:pids]) do pid
+                @async begin
+                    try
+                        # Simple health check
+                        remotecall_fetch(() -> 1, pid; timeout=check_timeout)
+                        return false
+                    catch
+                        return true
+                    end
+                end
+            end
+            workers_unreachability = fetch.(workers_unreachability)
+            try
+                Distributed.rmprocs(workers_in_pool[workers_unreachability])
+            catch
+                println("Failed to remove dead workers")
+            end
+
+            host[:pids] = workers_in_pool[.!workers_unreachability]
+            if length(host[:pids]) < host[:use_n_workers]
+                println("Some workers died on host $(host[:host_address])")
+                result, e = host_status(host)
+                if result
+                    try
+                        pids_n = host[:use_n_workers] - length(host[:pids])
+                        new_pids = addprocs_one_host!(host, pids_n)
+                        host[:pids] = vcat(host[:pids], new_pids)
+                        initializator_function(new_pids)
+                    catch
+                        println("Failed to add new workers to $(host[:host_address])")
+                    end
+                else !result
+                    println(e)
+                end
+            else
+                println("All workers alive on host $(host[:host_address])")
+            end
+        end
+        sleep_start_time = time()
+    end
+end
 
 end
