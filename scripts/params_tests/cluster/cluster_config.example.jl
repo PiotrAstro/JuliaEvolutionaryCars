@@ -19,7 +19,6 @@ CLUSTER_CONFIG_MAIN = Dict(
     :use_n_workers => 0,  # if set to 0, main will only collect data from other workers
     :blas_threads_per_worker => tmp_blas_threads_per_worker,
     :julia_threads_per_worker => tmp_julia_threads_per_worker,
-    :load_code_n_parallel => 10,  # how many workers can load code in parallel on this host
 )
 
 RESULT_CHANNEL_BUFFER_SIZE = 16 # how many results main worker can hold, if it exceeds, remote workers will wait until main worker will take some results
@@ -39,7 +38,6 @@ CLUSTER_CONFIG_HOSTS = [
         :host_address => "User@10.10.10.10",
         :use_n_workers => 23,  # int or :auto to use threads_num processes
         :dir => raw"Documents",  # I think for scp it should rather be relative path
-        :load_code_n_parallel => 10,  # how many workers can load code in parallel on this host
 
         # mostly same for all hosts
         :private_key_path => private_key_path,

@@ -1,6 +1,9 @@
 using Images
 using FileIO
-import Flux
+
+# Important! types inside the dictionary should be from Julia std, simple types if possible, so e.g.
+# Dict, Symbol, Int, Float, Vector, BitArray
+# Shouldnt use e.g. things from Flux etc.
 
 map_image_path = raw"data\map2.png"
 car_image_path = raw"data\car.png"
@@ -119,7 +122,7 @@ CONSTANTS_DICT = Dict(
                     :activation_function => :relu,  # :relu
                     :input_activation_function => :relu,  # shouldnt it be :none?
                     :last_activation_function => :none, # was :none
-                    :loss => Flux.mse  # was Flux.mse
+                    :loss => :mse
                 )
             ),
             :autoencoder_dict => Dict(
@@ -178,7 +181,7 @@ CONSTANTS_DICT = Dict(
                     :activation_function => :relu,  # :relu
                     :input_activation_function => :relu,  # shouldnt it be :none?
                     :last_activation_function => :none, # was :none
-                    :loss => Flux.mse  # was Flux.mse
+                    :loss => :mse
                 )
             ),
             :autoencoder_dict => Dict(
@@ -230,7 +233,7 @@ CONSTANTS_DICT = Dict(
                     :activation_function => :relu,  # :relu
                     :input_activation_function => :relu,
                     :last_activation_function => :none, # was :none
-                    :loss => Flux.mse  # was Flux.mse
+                    :loss => :mse
                 )
             ),
             :autoencoder_dict => Dict(
@@ -248,7 +251,7 @@ CONSTANTS_DICT = Dict(
                     :activation_function => :relu,  # :relu
                     :input_activation_function => :none,  # :relu,
                     :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
-                    :loss => Flux.crossentropy
+                    :loss => :crossentropy
                 )
             ),
             :initial_space_explorers_n => 30,
@@ -291,7 +294,7 @@ CONSTANTS_DICT = Dict(
                 :dropout => 0.0,
                 :activation_function => :relu,  # :relu
                 :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
-                :loss => Flux.kldivergence,
+                :loss => :kldivergence,
             )
         ),
     ),
@@ -315,7 +318,7 @@ CONSTANTS_DICT = Dict(
                 :dropout => 0.0,
                 :activation_function => :relu,  # :relu
                 :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
-                :loss => Flux.kldivergence
+                :loss => :kldivergence
             )
         ),
     ),
@@ -345,7 +348,7 @@ CONSTANTS_DICT = Dict(
                 :dropout => 0.0,
                 :activation_function => :relu,  # :relu
                 :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
-                :loss => Flux.kldivergence
+                :loss => :kldivergence
             )
         ),
     ),
@@ -374,7 +377,7 @@ CONSTANTS_DICT = Dict(
                 :dropout => 0.0,
                 :activation_function => :relu,  # :relu
                 :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
-                :loss => Flux.kldivergence
+                :loss => :kldivergence
             )
         ),
     ),
@@ -399,7 +402,7 @@ CONSTANTS_DICT = Dict(
                 :dropout => 0.0,
                 :activation_function => :relu,  # :relu
                 :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
-                :loss => Flux.kldivergence
+                :loss => :kldivergence
             )
         ),
     ),
@@ -428,7 +431,7 @@ CONSTANTS_DICT = Dict(
                 :dropout => 0.0,
                 :activation_function => :relu,  # :relu
                 :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
-                :loss => Flux.kldivergence
+                :loss => :kldivergence
             )
         ),
     ),
@@ -452,7 +455,7 @@ CONSTANTS_DICT = Dict(
                 :dropout => 0.0,
                 :activation_function => :relu,  # :relu
                 :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
-                :loss => Flux.kldivergence
+                :loss => :kldivergence
             )
         ),
     ),

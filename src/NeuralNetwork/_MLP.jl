@@ -36,9 +36,11 @@ function MLP_NN(;
                 activation_function::Symbol=:relu,
                 input_activation_function::Symbol=:none,
                 last_activation_function::Union{Symbol, Function}=:none,  # previosly was Union{Symbol, Vector{Tuple{Symbol, Int}}, Function}
-                loss::Function=Flux.mse)
+                loss::Symbol = :mse)
     layers = []
     activation = _get_activation_function(activation_function)[1]
+
+    loss_function = _get_loss_function(loss)
     
     if input_activation_function != :none
         push!(layers, Flux.Dropout(dropout))
@@ -68,7 +70,7 @@ function MLP_NN(;
         push!(layers, last_activation_function)
     end
     
-    return MLP_NN(Flux.Chain(layers...), loss)
+    return MLP_NN(Flux.Chain(layers...), loss_function)
 end
 
 function get_loss(nn::MLP_NN) :: Function
@@ -148,5 +150,27 @@ function _get_activation_function(name::Symbol)::Tuple{Function, Bool}
         return (identity, false)
     else
         throw("Activation function not implemented")
+    end
+end
+
+"""
+Get loss function from symbol
+
+    Available values:
+    - :crossentropy
+    - :mse
+    - :mae
+"""
+function _get_loss_function(name::Symbol)
+    if name == :crossentropy
+        return Flux.crossentropy
+    elseif name == :mse
+        return Flux.mse
+    elseif name == :mae
+        return Flux.mae
+    elseif name == :kldivergence
+        return Flux.kldivergence
+    else
+        throw("Loss function not implemented")
     end
 end

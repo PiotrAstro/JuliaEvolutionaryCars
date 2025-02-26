@@ -4,7 +4,7 @@ module DistributedEnvironments
 import Pkg
 using Distributed, MacroTools
 
-export @eachmachine, @eachworker, @initcluster, cluster_status!, remove_workers!
+export @eachmachine, @eachworker, @initcluster, cluster_status!, remove_workers!, addprocs_one_host!
 
 macro initcluster(cluster_main, cluster_hosts, tmp_dir_name, copy_env_and_code)
     return _initcluster(cluster_main, cluster_hosts, tmp_dir_name, copy_env_and_code)
@@ -85,18 +85,18 @@ function _initcluster(
 
         try
             printstyled("Adding main host -> $(cluster_config_main[:use_n_workers]) workers\n", bold=true, color=:magenta)
-            push!(added_pids, Distributed.addprocs(
+            Distributed.addprocs(
                 cluster_config_main[:use_n_workers],
                 env=["JULIA_BLAS_THREADS" => "$(cluster_config_main[:blas_threads_per_worker])"],
                 exeflags="--threads=$(cluster_config_main[:julia_threads_per_worker])",
                 enable_threaded_blas=cluster_config_main[:blas_threads_per_worker] > 1,
                 topology=:master_worker
-            ))
+            )
             println("Added main host\n")
 
             for host in cluster_config_hosts
                 printstyled("Adding $(host[:host_address]) -> $(host[:use_n_workers]) workers\n", bold=true, color=:magenta)
-                push!(added_pids, _addprocs_one_host(host))
+                addprocs_one_host!(host)
                 println("Added $(host[:host_address])\n")
             end
 
@@ -105,12 +105,6 @@ function _initcluster(
             println("Failed adding some workers, you should check it manually and change / remove these hosts")
             throw(e)
         end
-
-        if workers()[1] != 1
-            push!(added_pids[1], 1)
-        end
-
-        added_pids
     end
 end
 
@@ -157,8 +151,8 @@ function _eachmachine(expr)
     end
 end
 
-function _addprocs_one_host(host::Dict, workers_n=-1) # if workers_n = -1, it will take workers_n from host
-    Distributed.addprocs(
+function addprocs_one_host!(host::Dict, workers_n=-1) # if workers_n = -1, it will take workers_n from host
+    added_pids = Distributed.addprocs(
         [(host[:host_address], workers_n == -1 ? host[:use_n_workers] : workers_n)],
         sshflags = `-i $(host[:private_key_path])`,
         env = [
@@ -173,6 +167,7 @@ function _addprocs_one_host(host::Dict, workers_n=-1) # if workers_n = -1, it wi
         enable_threaded_blas = host[:blas_threads_per_worker] > 1,
         topology = :master_worker,
     )
+    host[:pids] = added_pids
 end
 
 get_unique_machine_ids() = unique(id -> Distributed.get_bind_addr(id), procs())

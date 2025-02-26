@@ -151,63 +151,83 @@ LOGS_DIR_ANALYSIS = joinpath(LOGS_DIR, "analysis")
 # --------------------------------------------------------------------------------------------------
 # Run the tests
 
-pids_by_host = DistributedEnvironments.@initcluster(CLUSTER_CONFIG_MAIN, CLUSTER_CONFIG_HOSTS, TMP_DIR_NAME, COPY_ENV_AND_CODE)
-
+DistributedEnvironments.@initcluster(CLUSTER_CONFIG_MAIN, CLUSTER_CONFIG_HOSTS, TMP_DIR_NAME, COPY_ENV_AND_CODE)
 relative_path_tmp = splitpath(@__DIR__)[length(splitpath(dirname(Base.active_project())))+1:end]
-Distributed.@everywhere RELATIVE_PATH_TO_THIS_DIR = $relative_path_tmp
 
-for (host, pids) in zip([CLUSTER_CONFIG_MAIN, CLUSTER_CONFIG_HOSTS...], pids_by_host)
-    channel = Distributed.RemoteChannel(() -> Channel{Int}(host[:load_code_n_parallel]))
-    Distributed.@everywhere pids begin
-        INITIALIZATION_CHANNEL = $channel
-    end
-end
 
-Distributed.@everywhere begin
-    put!(INITIALIZATION_CHANNEL, Distributed.myid())
-    println("Worker $(Distributed.myid()) started instantiating")
-    # important things to improve performance on intel CPUs:
+if false # this one just makes linter happy :)
     using MKL
     using LinearAlgebra
     import Distributed
-    import Pkg
     import Logging
     import Dates
     import Random
     import ProgressMeter
     import DataFrames
     import CSV
-
-    seed = time_ns() ⊻ UInt64(hash(Distributed.myid())) # xor between time nano seconds and hash of worker id
-    Random.seed!(seed)
-
-    if Distributed.myid() == 1  # I could run one version for all, but I want to make linter happy with normal paths :)
-        include("../../src/JuliaEvolutionaryCars.jl")
-        import .JuliaEvolutionaryCars
-        include("../custom_loggers.jl")
-        import .CustomLoggers
-        include("_tests_utils.jl")
-    else
-        current_absolute_dir = joinpath(dirname(Base.active_project()), (RELATIVE_PATH_TO_THIS_DIR)...)
-        blas_threads = parse(Int, ENV["JULIA_BLAS_THREADS"])
-        BLAS.set_num_threads(blas_threads)
-        include(joinpath(current_absolute_dir, "../../src/JuliaEvolutionaryCars.jl"))
-        import .JuliaEvolutionaryCars
-        include(joinpath(current_absolute_dir,"../custom_loggers.jl"))
-        import .CustomLoggers
-        include(joinpath(current_absolute_dir, "_tests_utils.jl"))
-        # number of julia threads for main one doesnt make any difference, since it is not used
-        text = (
-            "Worker $(Distributed.myid()) started at $(Dates.now()) with seed: $seed\n" *
-            "Project name: $(Pkg.project().name)\n" *
-            "BLAS kernel: $(BLAS.get_config())\n" *
-            "Number of BLAS threads: $(BLAS.get_num_threads())\n" *
-            "Number of Julia threads: $(Threads.nthreads())\n"
-        )
-        println(text)
-    end
-    take!(INITIALIZATION_CHANNEL)
+    include("../../src/JuliaEvolutionaryCars.jl")
+    import .JuliaEvolutionaryCars
+    include("../custom_loggers.jl")
+    import .CustomLoggers
+    include("_tests_utils.jl")
 end
+
+function create_worker_initializator()
+    relative_path_outer = relative_path_tmp
+    constants_dict_outer = CONSTANTS_DICT
+
+    function initialize_workers(pids=[])
+        if isempty(pids)
+            pids = Distributed.procs()
+        end
+        relative_path_inner = relative_path_outer
+        constants_dict_inner = constants_dict_outer
+
+        eval(quote
+            Distributed.@everywhere $pids begin
+                println("Worker $(Distributed.myid()) started instantiating")
+                # important things to improve performance on intel CPUs:
+                using MKL
+                using LinearAlgebra
+                import Distributed
+                import Pkg
+                import Logging
+                import Dates
+                import Random
+                import ProgressMeter
+                import DataFrames
+                import CSV
+                
+                RELATIVE_PATH_TO_THIS_DIR = $relative_path_inner
+                CONSTANTS_DICT_LOCAL_ON_WORKER = $constants_dict_inner
+        
+                seed = time_ns() ⊻ UInt64(hash(Distributed.myid())) # xor between time nano seconds and hash of worker id
+                Random.seed!(seed)
+
+                current_absolute_dir = joinpath(dirname(Base.active_project()), (RELATIVE_PATH_TO_THIS_DIR)...)
+                blas_threads = parse(Int, get(ENV, "JULIA_BLAS_THREADS", "1"))
+                BLAS.set_num_threads(blas_threads)
+                include(joinpath(current_absolute_dir, "../../src/JuliaEvolutionaryCars.jl"))
+                import .JuliaEvolutionaryCars
+                include(joinpath(current_absolute_dir,"../custom_loggers.jl"))
+                import .CustomLoggers
+                include(joinpath(current_absolute_dir, "_tests_utils.jl"))
+                # number of julia threads for main one doesnt make any difference, since it is not used
+                text = (
+                    "Worker $(Distributed.myid()) started at $(Dates.now()) with seed: $seed\n" *
+                    "Project name: $(Pkg.project().name)\n" *
+                    "BLAS kernel: $(BLAS.get_config())\n" *
+                    "Number of BLAS threads: $(BLAS.get_num_threads())\n" *
+                    "Number of Julia threads: $(Threads.nthreads())\n"
+                )
+                println(text)
+            end
+        end)
+    end
+    return initialize_workers
+end
+WORKERS_INITIALIZATOR = create_worker_initializator()
+WORKERS_INITIALIZATOR()
 
 # --------------------------------------------------------------------------------------------------
 # creating dirs, copying files, setting up loggers
@@ -250,12 +270,10 @@ result_info = [FinalResultLog(save_name(entry...), false, "Not yet computed") fo
 
 cases_results_path = joinpath(LOGS_DIR, CASES_RESULTS_FILE)
 channel_controller_task = Threads.@spawn run_channel_controller!(remote_channel, result_info, LOGS_DIR_RESULTS, cases_results_path)
-# rand_perm_special_dicts_with_cases = Random.shuffle(collect(enumerate(special_dicts_with_cases)))  # they will process in random order
-rand_perm_special_dicts_with_cases = collect(enumerate(special_dicts_with_cases))  # actually currently it is sorted by case number, so I do not have to shuffle it
+enumerated_special_dicts_with_cases = collect(enumerate(special_dicts_with_cases))  # actually currently it is sorted by case number, so I do not have to shuffle it
 
-Distributed.@everywhere CONSTANTS_DICT_LOCAL_ON_WORKER = deepcopy($CONSTANTS_DICT)
 # results_trash itself is not used, hence the name
-results_trash = ProgressMeter.@showprogress Distributed.pmap(rand_perm_special_dicts_with_cases; retry_delays = zeros(3)) do entry
+results_trash = ProgressMeter.@showprogress Distributed.pmap(enumerated_special_dicts_with_cases; retry_delays = zeros(3)) do entry
     task_id, one_special_dict_with_case = entry
     remote_run(one_special_dict_with_case, CONSTANTS_DICT_LOCAL_ON_WORKER, task_id, remote_channel)  # this constants dict is deepcopied inside that function
 end
