@@ -308,8 +308,8 @@ function ContinuousStatesGroupingSimpleGA_Algorithm(;
 
     individuals = [Individual(env_wrapper_struct, cross, fihc, initial_genes_mode) for _ in 1:individuals_n]
 
-    Threads.@threads for ind in individuals
-    # for ind in individuals
+    # Threads.@threads for ind in individuals
+    for ind in individuals
         ind.env_wrapper = EnvironmentWrapper.copy(env_wrapper_struct)
         EnvironmentWrapper.random_reinitialize_exemplars!(ind.env_wrapper)
         get_fitness!(ind)
@@ -358,21 +358,21 @@ function AbstractOptimizerModule.run!(csgs::ContinuousStatesGroupingSimpleGA_Alg
         start_time = time()
 
         individuals_copy_for_crossover = [individual_copy(ind) for ind in csgs.population]
-        new_env_wrapper = Threads.@spawn EnvironmentWrapper.create_new_based_on(
-        # new_env_wrapper = EnvironmentWrapper.create_new_based_on(
+        # new_env_wrapper = Threads.@spawn EnvironmentWrapper.create_new_based_on(
+        new_env_wrapper = EnvironmentWrapper.create_new_based_on(
             csgs.current_env_wrapper,
             [
                 (1.0, get_flattened_trajectories(individuals_copy_for_crossover)),
             ]
         )
-        new_individuals_evals = [(Threads.@spawn run_one_individual_generation(ind, individuals_copy_for_crossover)) for ind in csgs.population]
-        # new_individuals_evals = [run_one_individual_generation(ind, individuals_copy_for_crossover) for ind in csgs.population]
+        # new_individuals_evals = [(Threads.@spawn run_one_individual_generation(ind, individuals_copy_for_crossover)) for ind in csgs.population]
+        new_individuals_evals = [run_one_individual_generation(ind, individuals_copy_for_crossover) for ind in csgs.population]
         for i in eachindex(csgs.population)
-            # csgs.total_evaluations += new_individuals_evals[i]
-            csgs.total_evaluations += fetch(new_individuals_evals[i])
+            csgs.total_evaluations += new_individuals_evals[i]
+            # csgs.total_evaluations += fetch(new_individuals_evals[i])
         end
-        # csgs.current_env_wrapper = new_env_wrapper
-        csgs.current_env_wrapper = fetch(new_env_wrapper)
+        csgs.current_env_wrapper = new_env_wrapper
+        # csgs.current_env_wrapper = fetch(new_env_wrapper)
         best_ind_arg = argmax(get_fitness!.(csgs.population))
         csgs.best_individual = individual_copy(csgs.population[best_ind_arg])
 
