@@ -94,7 +94,9 @@ function crossover!(ind::Individual, other_individuals::Vector{Individual}) :: I
     strategy = ind.cross_dict[:strategy]  # :one_rand or :one_tournament or :rand or :all_seq or :all_comb or rand_comb
     evals = 0
 
-    if strategy == :one_rand
+    if strategy == :none
+        return 0
+    elseif strategy == :one_rand
         other = other_individuals[rand(1:other_n)]
         for nodes_level in genes_comb
             for node in Random.shuffle(nodes_level)
@@ -213,7 +215,7 @@ function get_genes_combinations(ind::Individual, mode::Symbol)::Vector{Vector{Ve
     elseif mode == :flat
         arr = [[zeros(Float32, genes_n) for _ in 1:genes_n]]
         for i in 1:genes_n
-            arr[1][i][i] .= 1.0f0
+            arr[1][i][i] = 1.0f0
         end
         return arr
     elseif mode == :tree_up

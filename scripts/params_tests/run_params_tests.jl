@@ -139,6 +139,23 @@ TESTED_VALUES = [
             ),
         ),
     ),
+    (
+        :ContinuousStatesGroupingSimpleGA,
+        Dict(
+            :ContinuousStatesGroupingSimpleGA => Dict(
+                :individuals_n => [20, 100],
+                :env_wrapper => Dict(
+                    :n_clusters => [20, 40],
+                ),
+                :fihc => Dict(
+                    :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
+                ),
+                :cross => Dict(
+                    :strategy => [:none],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
+                ),
+            ),
+        ),
+    ),
 ]
 
 
