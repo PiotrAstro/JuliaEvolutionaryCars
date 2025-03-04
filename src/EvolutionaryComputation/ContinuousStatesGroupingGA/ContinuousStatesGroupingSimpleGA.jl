@@ -213,7 +213,7 @@ function get_genes_combinations(ind::Individual, mode::Symbol)::Vector{Vector{Ve
     elseif mode == :flat
         arr = [[zeros(Float32, genes_n) for _ in 1:genes_n]]
         for i in 1:genes_n
-            arr[i][i] .= 1.0f0
+            arr[1][i][i] .= 1.0f0
         end
         return arr
     elseif mode == :tree_up

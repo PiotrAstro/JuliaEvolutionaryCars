@@ -151,7 +151,7 @@ CONSTANTS_DICT = Dict(
         ),
         :cross => Dict(
             :norm_mode => :d_sum,
-            :self_vs_other => (0.0, 0.1),
+            :self_vs_other => (0.0, 1.0),
             :genes_combinations => :tree_up, # :tree_up or :tree_down or :flat or :all
             :strategy => :rand_comb,  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
         ),
