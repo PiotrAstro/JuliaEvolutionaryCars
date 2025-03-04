@@ -90,6 +90,9 @@ function copy(nn::MLP_NN) :: MLP_NN
     return MLP_NN(deepcopy(nn.layers), nn.loss)
 end
 
+function get_parameters(nn::MLP_NN)
+    return Flux.params(nn.layers)
+end
 # --------------------------------------------------------------------------------
 # protected functions
 

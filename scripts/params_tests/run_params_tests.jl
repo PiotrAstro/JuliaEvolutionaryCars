@@ -86,7 +86,7 @@ How to set TESTED_VALUES:
 # we will change these values globally for all tests
 CONSTANTS_DICT[:run_config] = Dict(
     :max_generations => 10_000_000,  # 200
-    :max_evaluations => 20_000,
+    :max_evaluations => 1_000_000,
     :log => false,
     :visualize_each_n_epochs => 0,
 )
@@ -103,16 +103,18 @@ TESTED_VALUES = [
         :ContinuousStatesGroupingSimpleGA,
         Dict(
             :ContinuousStatesGroupingSimpleGA => Dict(
+                :individuals_n => [20, 100],
                 :env_wrapper => Dict(
-                    :n_clusters => [20, 32, 64],
-                    :m_value => [1, 2],
-                    :distance_membership_levels_method => [:hclust_complete, :pam_exemplars_fuzzy],  # later should check also :pam_exemplars_fuzzy
+                    :n_clusters => [20, 40],
                 ),
                 :fihc => Dict(
-                    :fihc_mode => [:per_gene_rand],
-                    # :norm_mode => [:d_sum],  # [:d_sum, :min_0]
                     :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
-                    :factor => [1.0, 3.0, 10.0],  # [0.5, 1.0, 2.0, 4.0]
+                ),
+                :cross => Dict(
+                    :norm_mode => [:d_sum, :min_0],
+                    :self_vs_other => [(0.5, 0.5), (0.0, 1.0)],
+                    :genes_combinations => [:tree_up, :tree_down, :flat], # :tree_up or :tree_down or :flat or :all
+                    :strategy => [:one_rand, :one_tournament, :rand_comb],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
                 ),
             ),
         ),
@@ -121,17 +123,18 @@ TESTED_VALUES = [
         :ContinuousStatesGroupingSimpleGA,
         Dict(
             :ContinuousStatesGroupingSimpleGA => Dict(
+                :individuals_n => [20, 100],
                 :env_wrapper => Dict(
-                    :n_clusters => [20, 32, 64],
-                    :m_value => [1, 2],
-                    :distance_membership_levels_method => [:hclust_complete, :pam_exemplars_fuzzy],
+                    :n_clusters => [20, 40],
                 ),
                 :fihc => Dict(
-                    :fihc_mode => [:hier_decrease, :hier_increase],
-                    :hier_factor => [0.5, 0.7, 0.9],
-                    # :norm_mode => [:d_sum],
-                    :random_matrix_mode => [:rand_n_different, :rand_n_same],
-                    :factor => [1.0, 3.0, 10.0],
+                    :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
+                ),
+                :cross => Dict(
+                    :norm_mode => [:d_sum, :min_0],
+                    :self_vs_other => [(0.8, 0.2), (0.5, 0.5), (0.0, 1.0)],
+                    :genes_combinations => [:all], # :tree_up or :tree_down or :flat or :all
+                    :strategy => [:all_seq],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
                 ),
             ),
         ),

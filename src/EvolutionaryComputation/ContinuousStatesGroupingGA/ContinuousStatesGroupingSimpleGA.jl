@@ -21,6 +21,9 @@ import .EnvironmentWrapper
 mutable struct Individual
     genes::Matrix{Float32}
     env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct
+    fihc_dict::Dict
+    cross_dict::Dict
+    _tree::StatesGrouping.TreeNode
     _trajectories::Vector{<:Environment.Trajectory}
     _trajectories_actual::Bool
     _fitness::Float64
@@ -28,11 +31,14 @@ mutable struct Individual
     _verbose::Bool
 end
 
-function Individual(env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct, initial_genes_mode::Symbol=:scale, verbose=false)
+function Individual(env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct, cross_dict::Dict, fihc_dict::Dict, initial_genes_mode::Symbol=:scale, verbose=false)
     genes = initial_genes(env_wrapper, initial_genes_mode)
     return Individual(
         genes,
         env_wrapper,
+        fihc_dict,
+        cross_dict,
+        StatesGrouping.TreeNode(nothing, nothing, 1:EnvironmentWrapper.get_groups_number(env_wrapper)),
         Vector{Environment.Trajectory}(undef, 0),
         false,
         -Inf64,
@@ -45,6 +51,9 @@ function individual_copy(ind::Individual)
     Individual(
         Base.copy(ind.genes),
         ind.env_wrapper,
+        ind.fihc_dict,
+        ind.cross_dict,
+        ind._tree,
         ind._trajectories,
         ind._trajectories_actual,
         ind._fitness,
@@ -54,7 +63,7 @@ function individual_copy(ind::Individual)
 end
 
 function get_flattened_trajectories(individuals::Vector{Individual})::Vector{<:Environment.Trajectory}
-    return vcat([individual._trajectories for individual in individuals]...)
+    return reduce(vcat, [individual._trajectories for individual in individuals])
 end
 
 function get_fitness!(individual::Individual)::Float64
@@ -68,7 +77,7 @@ end
 
 function get_trajectories!(individual::Individual)::Float64
     if !individual._trajectories_actual
-        individual._trajectories = EnvironmentWrapper.get_trajectories(individual.env_wrapper, individual.genes)
+        individual._trajectories, individual._tree = EnvironmentWrapper.create_time_distance_tree(individual.env_wrapper, individual.genes)
         individual._trajectories_actual = true
         individual._fitness_actual = true
         individual._fitness = sum([tra.rewards_sum for tra in individual._trajectories])
@@ -77,61 +86,183 @@ function get_trajectories!(individual::Individual)::Float64
     return individual._fitness
 end
 
-function FIHC_crossover!(ind::Individual, other_individuals::Vector{Individual}) :: Int
-    permutation_of_individuals = Random.randperm(length(other_individuals))
-    did_anything_change = false
+function crossover!(ind::Individual, other_individuals::Vector{Individual}) :: Int
+    original_genes = Base.copy(ind.genes)
 
-    for ind_other in other_individuals[permutation_of_individuals]
-        old_genes = Base.copy(ind.genes)
-        old_fitness = get_fitness!(ind)
+    other_n = length(other_individuals)
+    genes_comb = get_genes_combinations(ind, ind.cross_dict[:genes_combinations])
+    strategy = ind.cross_dict[:strategy]  # :one_rand or :one_tournament or :rand or :all_seq or :all_comb or rand_comb
+    evals = 0
 
-        ind.genes += ind_other.genes
-        EnvironmentWrapper.normalize_genes_min_0!(ind.genes)
-        ind._fitness_actual = false
-        new_fitness = get_fitness!(ind)
-
-        if new_fitness < old_fitness
-            ind.genes = old_genes
-            ind._fitness = old_fitness
-        else
-            did_anything_change = true
+    if strategy == :one_rand
+        other = other_individuals[rand(1:other_n)]
+        for nodes_level in genes_comb
+            for node in Random.shuffle(nodes_level)
+                accept_if_better!(ind, other, node)
+                evals += 1
+            end
         end
+    elseif strategy == :one_tournament
+        other_inds = other_individuals[Random.randperm(other_n)[1:2]]
+        other = other_inds[1]
+        if Random.rand() < 0.5
+            other = get_fitness!(other_inds[1]) > get_fitness!(other_inds[2]) ? other_inds[1] : other_inds[2]
+        end
+
+        for nodes_level in genes_comb
+            for node in Random.shuffle(nodes_level)
+                accept_if_better!(ind, other, node)
+                evals += 1
+            end
+        end
+    elseif strategy == :all_seq
+        for other in other_individuals
+            for nodes_level in genes_comb
+                for node in Random.shuffle(nodes_level)
+                    accept_if_better!(ind, other, node)
+                    evals += 1
+                end
+            end
+        end
+    elseif strategy == :all_comb
+        for nodes_level in genes_comb
+            for node in Random.shuffle(nodes_level)
+                for other in other_individuals
+                    accept_if_better!(ind, other, node)
+                    evals += 1
+                end
+            end
+        end
+    elseif strategy == :rand_comb
+        for nodes_level in genes_comb
+            for node in Random.shuffle(nodes_level)
+                other = other_individuals[rand(1:other_n)]
+                accept_if_better!(ind, other, node)
+                evals += 1
+            end
+        end
+    else
+        throw(ArgumentError("Unknown strategy: $strategy"))
     end
 
-    if did_anything_change
+    if original_genes != ind.genes
         ind._trajectories_actual = false
     end
 
-    return length(other_individuals)
+    return evals
 end
 
-function FIHC!(ind::Individual, check_max_n_combinations::Int = 1) :: Int
-    genes_n = size(ind.genes, 2)
-    permutation_of_genes = Random.randperm(genes_n)
-    did_anything_change = false
+function accept_if_better!(ind::Individual, other::Individual, genes_changed::Vector{Float32})::Bool
+    # for _ in 1:10
+    #     FIHC_test!(ind; ind.fihc_dict...)
+    # end
 
-    for gene_id in permutation_of_genes
-        old_genes = Base.copy(ind.genes)
-        old_fitness = get_fitness!(ind)
+    # for _ in 1:10
+    #     FIHC_test!(other; other.fihc_dict...)
+    # end
 
-        random_new_gene = rand(Float32, size(ind.genes, 1))
-        ind._fitness_actual = false
-        ind.genes[:, gene_id] += random_new_gene
-        EnvironmentWrapper.normalize_genes_min_0!(ind.genes)
-        new_fitness = get_fitness!(ind)
-        if new_fitness < old_fitness
-            ind.genes = old_genes
-            ind._fitness = old_fitness
-        else
-            did_anything_change = true
-        end
+    # println("\n\n\nThis:")
+    # display(ind.genes)
+    # println("\nOther:")
+    # display(EnvironmentWrapper.translate(other.env_wrapper, other.genes, ind.env_wrapper))
+    # throw("dsdsvdsfvfdbjkfd")
+
+    old_genes = Base.copy(ind.genes)
+    old_fitness = get_fitness!(ind)
+
+    new_genes = generate_new_genes(ind, other, genes_changed)
+    ind.genes = new_genes
+    ind._fitness_actual = false
+    new_fitness = get_fitness!(ind)
+
+    if new_fitness < old_fitness
+        ind.genes = old_genes
+        ind._fitness = old_fitness
+        return false
+    else
+        ind._trajectories_actual = false
+        return true
+    end
+end
+
+function generate_new_genes(ind::Individual, other::Individual, genes_changed::Vector{Float32})::Matrix{Float32}
+    self_factor, other_factor = ind.cross_dict[:self_vs_other]
+
+    self_new_genes = Base.copy(ind.genes)
+    self_new_genes .*= self_factor
+    
+    other_new_genes = EnvironmentWrapper.translate(other.env_wrapper, other.genes, ind.env_wrapper)
+    other_new_genes .*= other_factor
+
+    new_genes = norm_genes(self_new_genes, other_new_genes, ind.cross_dict[:norm_mode])
+
+    final_new_genes = Base.copy(ind.genes)
+    for (final_col, new_col, changed_val) in zip(eachcol(final_new_genes), eachcol(new_genes), genes_changed)
+        final_col .*= 1.0 - changed_val
+        final_col .+= changed_val .* new_col
     end
 
-    if did_anything_change
+    return final_new_genes
+end
+
+function get_genes_combinations(ind::Individual, mode::Symbol)::Vector{Vector{Vector{Float32}}}
+    genes_n = EnvironmentWrapper.get_groups_number(ind.env_wrapper)
+
+    if mode == :all
+        return [[ones(Float32, genes_n)]]
+    elseif mode == :flat
+        arr = [[zeros(Float32, genes_n) for _ in 1:genes_n]]
+        for i in 1:genes_n
+            arr[i][i] .= 1.0f0
+        end
+        return arr
+    elseif mode == :tree_up
+        tree_up = get_genes_combinations(ind, :tree_down)
+        return reverse(tree_up)
+    elseif mode == :tree_down
+        levels = Vector{Vector{Vector{Float32}}}()
+        levels_nodes = Vector{Vector{StatesGrouping.TreeNode}}()
+        push!(levels_nodes, [ind._tree.left, ind._tree.right])
+        while true
+            last_level = levels_nodes[end]
+            new_level = Vector{StatesGrouping.TreeNode}()
+            for node in last_level
+                if !StatesGrouping.is_leaf(node)
+                    push!(new_level, node.left)
+                    push!(new_level, node.right)
+                end
+            end
+            if isempty(new_level)
+                break
+            end
+            push!(levels_nodes, new_level)
+        end
+
+        for level in levels_nodes
+            level_distances = Vector{Vector{Float32}}()
+            for node in level
+                this_node_membership = zeros(Float32, genes_n)
+                this_node_membership[node.elements] .= one(Float32)
+                push!(level_distances, this_node_membership)
+            end
+            push!(levels, level_distances)
+        end
+
+        return levels
+    else
+        throw(ArgumentError("Unknown mode: $mode"))
+    end
+end
+
+
+
+function FIHC!(ind::Individual)::Int
+    old_genes = Base.copy(ind.genes)
+    eval_num = FIHC_test!(ind; ind.fihc_dict...)
+    if ind.genes != old_genes
         ind._trajectories_actual = false
     end
-
-    return genes_n
+    return eval_num
 end
 
 # --------------------------------------------------------------------------------------------------
@@ -145,6 +276,7 @@ mutable struct ContinuousStatesGroupingSimpleGA_Algorithm <: AbstractOptimizerMo
     current_env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct
     total_evaluations::Int
     fihc::Dict
+    cross::Dict
     initial_genes_mode::Symbol
     verbose::Bool
 end
@@ -160,8 +292,9 @@ function ContinuousStatesGroupingSimpleGA_Algorithm(;
     environment::Symbol,
     env_wrapper::Dict{Symbol, <:Any},
     individuals_n::Int,
-    initial_genes_mode::Symbol,
-    fihc::Dict
+    fihc::Dict,
+    cross::Dict,
+    initial_genes_mode::Symbol
 )
     environment_type = Environment.get_environment(environment)
     environments = [(environment_type)(;environment_kwarg...) for environment_kwarg in environment_kwargs]
@@ -173,9 +306,12 @@ function ContinuousStatesGroupingSimpleGA_Algorithm(;
         env_wrapper...
     )
 
-    individuals = [Individual(env_wrapper_struct, initial_genes_mode) for _ in 1:individuals_n]
+    individuals = [Individual(env_wrapper_struct, cross, fihc, initial_genes_mode) for _ in 1:individuals_n]
 
     Threads.@threads for ind in individuals
+    # for ind in individuals
+        ind.env_wrapper = EnvironmentWrapper.copy(env_wrapper_struct)
+        EnvironmentWrapper.random_reinitialize_exemplars!(ind.env_wrapper)
         get_fitness!(ind)
         get_trajectories!(ind)
     end
@@ -190,6 +326,7 @@ function ContinuousStatesGroupingSimpleGA_Algorithm(;
         env_wrapper_struct,
         0,
         fihc,
+        cross,
         initial_genes_mode,
         false
     )
@@ -198,8 +335,7 @@ end
 function AbstractOptimizerModule.run!(csgs::ContinuousStatesGroupingSimpleGA_Algorithm; max_generations::Int, max_evaluations::Int, log::Bool, visualize_each_n_epochs::Int=0) :: DataFrames.DataFrame
     # --------------------------------------------------
     # Test!!!
-    return run_test(csgs; max_generations=max_generations, max_evaluations=max_evaluations, log=log, fihc_settings=csgs.fihc)
-
+    # return run_test(csgs; max_generations=max_generations, max_evaluations=max_evaluations, log=log, fihc_settings=csgs.fihc)
     # --------------------------------------------------
     # Real implementation
 
@@ -223,22 +359,26 @@ function AbstractOptimizerModule.run!(csgs::ContinuousStatesGroupingSimpleGA_Alg
 
         individuals_copy_for_crossover = [individual_copy(ind) for ind in csgs.population]
         new_env_wrapper = Threads.@spawn EnvironmentWrapper.create_new_based_on(
+        # new_env_wrapper = EnvironmentWrapper.create_new_based_on(
             csgs.current_env_wrapper,
             [
                 (1.0, get_flattened_trajectories(individuals_copy_for_crossover)),
             ]
         )
-        new_individuals_evals = [Threads.@spawn run_one_individual_generation(ind, individuals_copy_for_crossover) for ind in csgs.population]
+        new_individuals_evals = [(Threads.@spawn run_one_individual_generation(ind, individuals_copy_for_crossover)) for ind in csgs.population]
+        # new_individuals_evals = [run_one_individual_generation(ind, individuals_copy_for_crossover) for ind in csgs.population]
         for i in eachindex(csgs.population)
+            # csgs.total_evaluations += new_individuals_evals[i]
             csgs.total_evaluations += fetch(new_individuals_evals[i])
         end
+        # csgs.current_env_wrapper = new_env_wrapper
         csgs.current_env_wrapper = fetch(new_env_wrapper)
-        best_ind_arg = argmax([get_fitness!(ind) for ind in csgs.population])
+        best_ind_arg = argmax(get_fitness!.(csgs.population))
         csgs.best_individual = individual_copy(csgs.population[best_ind_arg])
 
         # put random individual at random place different from best individual
         random_ind = rand(collect(eachindex(csgs.population))[eachindex(csgs.population) .!= best_ind_arg])
-        csgs.population[random_ind] = Individual(csgs.current_env_wrapper, csgs.initial_genes_mode, csgs.verbose)
+        csgs.population[random_ind] = Individual(csgs.current_env_wrapper, csgs.cross, csgs.fihc, csgs.initial_genes_mode, csgs.verbose)
         get_fitness!(csgs.population[random_ind])
 
         end_time = time()
@@ -272,9 +412,30 @@ function AbstractOptimizerModule.run!(csgs::ContinuousStatesGroupingSimpleGA_Alg
     return data_frame
 end
 
+# import BenchmarkTools
+# function get_trajectories_tmp(ind2)
+#     ind2._trajectories_actual = false
+#     get_trajectories!(ind2)
+# end
+# function fihc_tmp(ind2)
+#     FIHC!(individual_copy(ind2))
+# end
+# function crossover_tmp(ind2, other2)
+#     crossover!(individual_copy(ind2), other2)
+# end
 function run_one_individual_generation(ind::Individual, other::Vector{Individual})::Int
-    evaluations = FIHC_crossover!(ind, other)
+    # println("\n\n\nTrajs:")
+    # display(BenchmarkTools.@benchmark get_trajectories_tmp($ind))
+    # println("\n\nFIHC:")
+    # display(BenchmarkTools.@benchmark fihc_tmp($ind))
+    # println("\n\nCrossover:")
+    # display(BenchmarkTools.@benchmark crossover_tmp($ind, $other))
+    # throw("dsdsvdsfvfdbjkfd")
+
+    get_trajectories!(ind)
+    evaluations = crossover!(ind, other)
     evaluations += FIHC!(ind)
+    evaluations += ifelse(ind._trajectories_actual, 0, 1)
     get_trajectories!(ind)
     return evaluations
 end

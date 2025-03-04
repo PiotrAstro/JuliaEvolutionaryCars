@@ -40,6 +40,10 @@ function copy(nn::AbstractNeuralNetwork) :: AbstractNeuralNetwork
     throw("not implemented")
 end
 
+function get_parameters(nn::AbstractNeuralNetwork)
+    throw("not implemented")
+end
+
 # -------------------------------------------------------
 # end interface
 

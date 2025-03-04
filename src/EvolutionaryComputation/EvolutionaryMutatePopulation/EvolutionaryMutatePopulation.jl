@@ -13,14 +13,14 @@ import Random
 import Flux
 import Plots
 
-export EvolutionaryMutatePopulationAlgorithm, run!
+export EvolutionaryMutatePopulationAlgorithm
 
 #--------------------------------------------------------------------------------------------------------
 # protected
 
 mutable struct Individual{T<:Environment.AbstractEnvironment, N<:NeuralNetwork.AbstractNeuralNetwork}
     const neural_network_type::Type{N}
-    const neural_network::N
+    neural_network::N
     const neural_network_kwargs::Dict{Symbol, Any}
     # const parent::Union{Individual{T,N}, Nothing}
     _fitness::Float64
@@ -80,7 +80,7 @@ function mutate(ind::Individual, mutation_rate::Float64) :: Individual
         param .+= randn(Float32, size(param)) .* mutation_rate
     end
 
-    NeuralNetwork.set_parameters!(new_individual.neural_network, params)
+    # NeuralNetwork.set_parameters!(new_individual.neural_network, params)
     new_individual._is_fitness_calculated = false
     get_fitness(new_individual)
     return new_individual
@@ -179,7 +179,7 @@ function copy(ind::Individual) :: Individual
         ind.environment_type,
         # ind
     )
-    NeuralNetwork.set_parameters!(new_individual.neural_network, NeuralNetwork.get_parameters(ind.neural_network))
+    new_individual.neural_network = NeuralNetwork.copy(ind.neural_network)
     new_individual._fitness = ind._fitness
     new_individual._is_fitness_calculated = ind._is_fitness_calculated
     new_individual._trajectory = ind._trajectory
@@ -197,7 +197,6 @@ mutable struct EvolutionaryMutatePopulationAlgorithm <: AbstractOptimizerModule.
     const visualization_kwargs::Dict{Symbol, Any}
     const visualization_environment::Environment.AbstractEnvironment
     best_individual::Individual
-    const n_threads::Int
 end
 
 function AbstractOptimizerModule.get_optimizer(::Val{:Evolutionary_Mutate_Population})
@@ -207,7 +206,6 @@ end
 function EvolutionaryMutatePopulationAlgorithm(;
     population_size::Int,
     mutation_rate::Float64,
-    n_threads::Int,
     environment_kwargs::Vector{Dict{Symbol, Any}},
     visualization_kwargs::Dict{Symbol, Any},
     environment_visualization_kwargs::Dict{Symbol, Any},
@@ -235,8 +233,7 @@ function EvolutionaryMutatePopulationAlgorithm(;
         mutation_rate,
         visualization_kwargs,
         visualization_environment,
-        copy(population[1]),
-        n_threads > 0 ? n_threads : Threads.nthreads()
+        copy(population[1])
     )
 end
 
@@ -265,18 +262,18 @@ function AbstractOptimizerModule.run!(algo::EvolutionaryMutatePopulationAlgorith
         #     algo.population[rand_permutation[index_to_replace]] = new_individual
         # end
 
-        append!(algo.population, new_individuals)
+        # append!(algo.population, new_individuals)
 
         # differential evolution test
-        rand_permutation = Random.randperm(length(algo.population))
-        Threads.@threads for i in 1:2:99 # 2:10  # Threads.@threads
-            parent1 = algo.population[rand_permutation[i]]
-            parent2 = algo.population[rand_permutation[i+1]]
-            new_individual = differential_evolution_one_run(algo.best_individual, parent1, parent2)
-            if get_fitness(new_individual) > get_fitness(parent1)
-                algo.population[rand_permutation[i]] = new_individual
-            end
-        end
+        # rand_permutation = Random.randperm(length(algo.population))
+        # Threads.@threads for i in 1:2:99 # 2:10  # Threads.@threads
+        #     parent1 = algo.population[rand_permutation[i]]
+        #     parent2 = algo.population[rand_permutation[i+1]]
+        #     new_individual = differential_evolution_one_run(algo.best_individual, parent1, parent2)
+        #     if get_fitness(new_individual) > get_fitness(parent1)
+        #         algo.population[rand_permutation[i]] = new_individual
+        #     end
+        # end
 
         sorted = sort(algo.population, by=get_fitness, rev=true)
         algo.population = sorted[1:algo.population_size]

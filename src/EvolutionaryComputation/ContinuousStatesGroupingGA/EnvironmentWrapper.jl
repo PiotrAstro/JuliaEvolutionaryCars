@@ -39,6 +39,7 @@ mutable struct EnvironmentWrapperStruct
     _m_value::Int
     _create_time_distance_tree
     _verbose::Bool
+    _initial_space_explorers_n::Int
 end
 
 
@@ -63,9 +64,9 @@ function EnvironmentWrapperStruct(
         verbose::Bool=false
     ) :: EnvironmentWrapperStruct
     if time_distance_tree == :mine
-        create_time_distance_tree = StatesGrouping.create_time_distance_tree_mine
+        _create_time_distance_tree = StatesGrouping.create_time_distance_tree_mine
     elseif time_distance_tree == :markov
-        create_time_distance_tree = StatesGrouping.create_time_distance_tree_markov_fundamental
+        _create_time_distance_tree = StatesGrouping.create_time_distance_tree_markov_fundamental
     else
         throw(ArgumentError("time_distance_tree must be :mine or :markov"))
     end
@@ -91,7 +92,14 @@ function EnvironmentWrapperStruct(
     end
 
     encoded_states = NeuralNetwork.predict(encoder, states_nn_input)
-    exemplars_ids, _ = StatesGrouping.get_exemplars(encoded_states, n_clusters; distance_metric, exemplars_clustering, hclust_distance)
+    exemplars_ids, _ = StatesGrouping.get_exemplars(
+        encoded_states,
+        n_clusters;
+        distance_metric=distance_metric,
+        exemplars_clustering=exemplars_clustering,
+        hclust_distance=hclust_distance,
+        mval=m_value
+    )
     encoded_exemplars = encoded_states[:, exemplars_ids]
     distance_membership_levels = StatesGrouping.distance_membership_levels(
         encoded_states,
@@ -152,9 +160,41 @@ function EnvironmentWrapperStruct(
         hclust_distance,
         hclust_time,
         m_value,
-        create_time_distance_tree,
-        verbose
+        _create_time_distance_tree,
+        verbose,
+        initial_space_explorers_n
     )
+end
+
+function random_reinitialize_exemplars!(env_wrap::EnvironmentWrapperStruct, n_clusters::Int=env_wrap._n_clusters)
+    action_n = Environment.get_action_size(env_wrap._envs[1])
+    NNs = [
+        NeuralNetwork.Random_NN(action_n) for _ in 1:env_wrap._initial_space_explorers_n
+    ]
+    # states collection
+    trajectories = _collect_trajectories(env_wrap._envs, NNs)
+    states = _combine_states_from_trajectories([(1.0, trajectories)], env_wrap._max_states_considered)
+
+    env_wrap._n_clusters = n_clusters
+    states_nn_input = Environment.get_nn_input(states)
+    encoded_states = NeuralNetwork.predict(env_wrap._encoder, states_nn_input)
+    exemplars_ids, _ = StatesGrouping.get_exemplars(
+        encoded_states,
+        n_clusters;
+        distance_metric=env_wrap._distance_metric,
+        exemplars_clustering=env_wrap._exemplars_clustering,
+        hclust_distance=env_wrap._hclust_distance,
+        mval=env_wrap._m_value
+    )
+    env_wrap._encoded_exemplars = encoded_states[:, exemplars_ids]
+    env_wrap._distance_membership_levels = StatesGrouping.distance_membership_levels(
+        encoded_states,
+        env_wrap._encoded_exemplars; 
+        distance_metric=env_wrap._distance_metric,
+        method=env_wrap._distance_membership_levels_method,
+        mval=env_wrap._m_value
+    )
+    env_wrap._raw_exemplars = Environment.get_sequence_with_ids(states, exemplars_ids)
 end
 
 """
@@ -194,8 +234,9 @@ function copy(env_wrap::EnvironmentWrapperStruct)::EnvironmentWrapperStruct
         env_wrap._hclust_distance,
         env_wrap._hclust_time,
         env_wrap._m_value,
-        create_time_distance_tree,
-        env_wrap._verbose
+        env_wrap._create_time_distance_tree,
+        env_wrap._verbose,
+        env_wrap._initial_space_explorers_n
     )
 end
 

@@ -22,7 +22,7 @@ CONSTANTS_DICT = Dict(
     # Universal staff
     :run_config => Dict(
         :max_generations => 1000,
-        :max_evaluations => 1_000_000,
+        :max_evaluations => 1_00_000,
         :log => true,
         :visualize_each_n_epochs => 0,
     ),
@@ -131,7 +131,7 @@ CONSTANTS_DICT = Dict(
             ),
             :initial_space_explorers_n => 30,
             :max_states_considered => 10_000,
-            :n_clusters => 20,  # 40 and 200 works very well, should try different values
+            :n_clusters => 40,  # 40 and 200 works very well, should try different values
             :verbose => false,
             :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock, after some initial tests it should definatelly be cosine!
             :hclust_distance => :complete,  # :ward or :single or :complete or :average
@@ -139,14 +139,21 @@ CONSTANTS_DICT = Dict(
             :m_value => 2,  # 2 is better than 1
             :exemplars_clustering => :pam,  # :genie or :kmedoids or :pam
             :distance_membership_levels_method => :hclust_complete,
+            :time_distance_tree => :markov,  # :markov or :mine
         ),
-        :individuals_n => 30,
+        :individuals_n => 20,
         :fihc => Dict(
             :fihc_mode => :per_gene_rand,
             :norm_mode => :d_sum,
-            :factor => 2.0,
-            :hier_factor => 0.5,
+            :factor => 1.0,
+            :hier_factor => 1.0,
             :random_matrix_mode => :rand_n_different,
+        ),
+        :cross => Dict(
+            :norm_mode => :d_sum,
+            :self_vs_other => (0.0, 0.1),
+            :genes_combinations => :tree_up, # :tree_up or :tree_down or :flat or :all
+            :strategy => :rand_comb,  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
         ),
         :initial_genes_mode => :scale,  # :scale or :softmax
     ),
@@ -335,10 +342,9 @@ CONSTANTS_DICT = Dict(
         #         :use_children => false
         #     )
         # ),
-        :n_threads => 8,
         # :save_logs_every_n_epochs => 50,
         # :logs_path => raw"logs"
-        :neural_network => Dict(
+        :neural_network_data => Dict(
             :name => :MLP_NN,
             :kwargs => Dict(
                 :input_size => 10,
