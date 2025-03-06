@@ -15,7 +15,7 @@ import ..GenieClust
 import ..PAM
 import ..FCM
 
-export distance_membership_levels, get_exemplars, TreeNode, is_leaf, create_time_distance_tree_mine, create_time_distance_tree_markov_fundamental
+export distance_membership_levels, get_exemplars, TreeNode, is_leaf, create_time_distance_tree_mine, create_time_distance_tree_markov_fundamental, get_membership
 
 # ------------------------------------------------------------------------------------------
 # TreeNode for hierarchical clustering
@@ -207,6 +207,19 @@ function pam_levels(encoded_states_for_medoids::Matrix{F}, encoded_exemplars::Ma
     push!(levels, tmp_last_level)
 
     return levels
+end
+
+function get_membership(from_points::Matrix{F}, to_points::Matrix{F}, distance::Symbol, mval; crisp::Bool=false) :: Matrix{F} where {F<:AbstractFloat}
+    if distance == :cosine
+        distance_premetric = Distances.CosineDist()
+    elseif distance == :euclidean
+        distance_premetric = Distances.Euclidean()
+    elseif distance == :cityblock
+        distance_premetric = Distances.Cityblock()
+    else
+        throw(ArgumentError("Unknown distance metric: $distance"))
+    end
+    return get_membership(from_points, to_points, distance_premetric, mval, crisp=crisp)
 end
 
 function get_membership(from_points::Matrix{F}, to_points::Matrix{F}, distance_premetric, mval; crisp::Bool=false) :: Matrix{F} where {F<:AbstractFloat}

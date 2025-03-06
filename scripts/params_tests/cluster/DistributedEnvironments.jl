@@ -4,10 +4,25 @@ module DistributedEnvironments
 import Pkg
 using Distributed, MacroTools
 
-export @eachmachine, @eachworker, @initcluster, cluster_status!, remove_workers!, addprocs_one_host!, host_status, hosts_manager
+export @eachmachine, @eachworker, @initcluster, cluster_status!, remove_workers!, addprocs_one_host!, Cluster, cluster_foreach!
 
-macro initcluster(cluster_main, cluster_hosts, tmp_dir_name, copy_env_and_code)
-    return _initcluster(cluster_main, cluster_hosts, tmp_dir_name, copy_env_and_code)
+struct Cluster
+    main::Dict
+    hosts::Vector
+    initialization_function
+    free_pids::Channel{Int}
+    working_number::Threads.Atomic{Int}
+end
+
+function Cluster(main_host::Dict, remote_hosts::Vector, initialization_function)
+    sum_of_workers = (length(remote_hosts) > 0 ? sum(host[:use_n_workers] for host in remote_hosts) : 0) + main_host[:use_n_workers]
+    free_pids = Channel{Int}(sum_of_workers)
+    working_number = Threads.Atomic{Int}(0)
+    Cluster(main_host, remote_hosts, initialization_function, free_pids, working_number)
+end
+
+macro initcluster(cluster, tmp_dir_name, copy_env_and_code)
+    return _initcluster(cluster, tmp_dir_name, copy_env_and_code)
 end
 
 """
@@ -17,23 +32,20 @@ It will copy code and project info and precompile them, if copy_env_and_code is 
 Otherwise it will not do it, it will just go to the right place and activate env, without instantiiate it, it should only be used if one already copied everything and it is all set up.
 """
 function _initcluster(
-    cluster_config_main_macro_input,
-    cluster_config_hosts_main_macro_input,
+    cluster,
     tmp_dir_name_macro_input,
     copy_env_and_code_main_macro_input,
 )
     quote
-        cluster_config_main = $(esc(cluster_config_main_macro_input))
-        cluster_config_hosts = $(esc(cluster_config_hosts_main_macro_input))
+        cluster_tmp = $(esc(cluster))
         copy_env_and_code = $(esc(copy_env_and_code_main_macro_input))
         tmp_dir_name = $(esc(tmp_dir_name_macro_input))
-
-        added_pids = []
+        cluster_config_main = cluster_tmp.main
 
         remove_workers!()
 
-        cluster_status!(cluster_config_hosts)
-        for host in cluster_config_hosts
+        cluster_status!(cluster_tmp.hosts)
+        for host in cluster_tmp.hosts
             host[:dir_project] = joinpath(host[:dir], tmp_dir_name)
         end
 
@@ -42,7 +54,7 @@ function _initcluster(
             project_archive = "_tmp_julia_comp_$(tmp_dir_name).tar.gz"
             create_project_archive(project_archive)
             try
-                for host in cluster_config_hosts
+                for host in cluster_tmp.hosts
                     printstyled("Copying project to $(host[:host_address]) : $(host[:dir_project])\n", bold=true, color=:magenta)
                     if host[:shell] == :wincmd
                         run(`ssh -i $(host[:private_key_path]) $(host[:host_address]) "(if exist $(host[:dir_project]) (rd /q /s $(host[:dir_project]))) & mkdir $(host[:dir_project])"`)
@@ -85,7 +97,7 @@ function _initcluster(
 
         try
             printstyled("Adding main host -> $(cluster_config_main[:use_n_workers]) workers\n", bold=true, color=:magenta)
-            Distributed.addprocs(
+            main_pids = Distributed.addprocs(
                 cluster_config_main[:use_n_workers],
                 env=["JULIA_BLAS_THREADS" => "$(cluster_config_main[:blas_threads_per_worker])"],
                 exeflags="--threads=$(cluster_config_main[:julia_threads_per_worker])",
@@ -93,11 +105,17 @@ function _initcluster(
                 topology=:master_worker
             )
             println("Added main host\n")
+            for pid in main_pids
+                put!(cluster_tmp.free_pids, pid)
+            end
 
-            for host in cluster_config_hosts
+            for host in cluster_tmp.hosts
                 printstyled("Adding $(host[:host_address]) -> $(host[:use_n_workers]) workers\n", bold=true, color=:magenta)
-                addprocs_one_host!(host)
+                host[:pids] = addprocs_one_host!(host)
                 println("Added $(host[:host_address])\n")
+                for pid in host[:pids]
+                    put!(cluster_tmp.free_pids, pid)
+                end
             end
 
             printstyled("All workers added\n", bold=true, color=:green)
@@ -105,6 +123,9 @@ function _initcluster(
             println("Failed adding some workers, you should check it manually and change / remove these hosts")
             throw(e)
         end
+
+        all_pids = Distributed.procs()
+        cluster_tmp.initialization_function(all_pids)
     end
 end
 
@@ -167,7 +188,7 @@ function addprocs_one_host!(host::Dict, workers_n=-1) # if workers_n = -1, it wi
         enable_threaded_blas = host[:blas_threads_per_worker] > 1,
         topology = :master_worker,
     )
-    host[:pids] = append!(get(host, :pids, Vector{Int}()), added_pids)
+    return added_pids
 end
 
 get_unique_machine_ids() = unique(id -> Distributed.get_bind_addr(id), procs())
@@ -236,7 +257,7 @@ Currently, it will not work at all, unfortunatelly pmap doesnt handle workers te
 
 It will take some time, I do not want to do it now, so currently this feature is not used.
 """
-function hosts_manager(hosts::Vector{<:Dict}, initializator_function::Function, should_exit::Ref{Bool}, sleep_seconds, check_timeout=20)
+function hosts_manager(cluster::Cluster, should_exit::Ref{Bool}, sleep_seconds=300, check_timeout=20)
     sleep_start_time = time()
     while !should_exit[]
         if time() - sleep_start_time < sleep_seconds
@@ -244,23 +265,29 @@ function hosts_manager(hosts::Vector{<:Dict}, initializator_function::Function, 
             continue
         end
         
-        workers = Distributed.workers()
-        for host in hosts
-            workers_in_pool = [pid in workers for pid in host[:pids]]
+        for host in cluster.hosts
+            workers_in_pool = host[:pids]
             workers_unreachability = map(host[:pids]) do pid
                 @async begin
                     try
                         # Simple health check
                         remotecall_fetch(() -> 1, pid; timeout=check_timeout)
                         return false
-                    catch
-                        return true
+                    catch e
+                        if isa(e, TaskFailedException)
+                            return true
+                        elseif isa(e, ProcessExitedException)
+                            return false
+                        else
+                            throw(e)
+                        end
                     end
                 end
             end
             workers_unreachability = fetch.(workers_unreachability)
+
             try
-                Distributed.rmprocs(workers_in_pool[workers_unreachability])
+                Distributed.rmprocs(workers_in_pool[workers_unreachability]; waitfor=sleep_seconds)
             catch
                 println("Failed to remove dead workers")
             end
@@ -274,7 +301,10 @@ function hosts_manager(hosts::Vector{<:Dict}, initializator_function::Function, 
                         pids_n = host[:use_n_workers] - length(host[:pids])
                         new_pids = addprocs_one_host!(host, pids_n)
                         host[:pids] = vcat(host[:pids], new_pids)
-                        initializator_function(new_pids)
+                        cluster.initialization_function(new_pids)
+                        for pid in new_pids
+                            put!(cluster.free_pids, pid)
+                        end
                     catch
                         println("Failed to add new workers to $(host[:host_address])")
                     end
@@ -287,6 +317,55 @@ function hosts_manager(hosts::Vector{<:Dict}, initializator_function::Function, 
         end
         sleep_start_time = time()
     end
+end
+
+function cluster_foreach!(f, cluster::Cluster, iterable; progress_meter_func=nothing, constants=[])
+    should_exit = Ref(false)
+    host_manager_task = Threads.@spawn hosts_manager(cluster, should_exit)
+    items_array = reverse(iterable)
+    array_locker = Threads.RentrantLock()
+    progress_meter_lock = Threads.RentrantLock()
+
+    while true
+        if length(items_array) > 0
+            pid = take!(cluster.free_pids)
+            item = lock(array_locker) do
+                pop!(items_array)
+            end
+            @async begin
+                Threads.atomic_add!(cluster.working_number, 1)
+                try
+                    fetch(Distributed.@spawnat pid f(item, constants...))
+                    put!(cluster.free_pids, pid)
+                    lock(progress_meter_lock) do
+                        if !isnothing(progress_meter_func)
+                            progress_meter_func()
+                        end
+                    end
+                catch e
+                    if isa(e, ProcessExitedException)
+                        println("Worker $(pid) exited with code $(e.exitcode)")
+                    elseif isa(e, RemoteException)
+                        println("Worker $(pid) exited with error: $(e)")
+                        put!(cluster.free_pids, pid)
+                    else 
+                        throw(e)
+                    end
+                    lock(array_locker) do
+                        push!(items_array, item)
+                    end
+                end
+                Threads.atomic_sub!(cluster.working_number, 1)
+            end
+        elseif cluster.working_number[] == 0
+            break
+        else
+            sleep(1)
+        end
+    end
+
+    should_exit[] = true
+    wait(host_manager_task)
 end
 
 end

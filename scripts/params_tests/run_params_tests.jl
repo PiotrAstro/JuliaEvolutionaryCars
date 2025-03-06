@@ -86,7 +86,7 @@ How to set TESTED_VALUES:
 # we will change these values globally for all tests
 CONSTANTS_DICT[:run_config] = Dict(
     :max_generations => 10_000_000,  # 200
-    :max_evaluations => 1_000_000,
+    :max_evaluations => 20_000,  # 1_000_000
     :log => false,
     :visualize_each_n_epochs => 0,
 )
@@ -103,59 +103,76 @@ TESTED_VALUES = [
         :ContinuousStatesGroupingSimpleGA,
         Dict(
             :ContinuousStatesGroupingSimpleGA => Dict(
-                :individuals_n => [20, 100],
                 :env_wrapper => Dict(
                     :n_clusters => [20, 40],
+                    :distance_membership_levels_method => [:hclust_complete, :flat, :pam_all_fuzzy],
                 ),
                 :fihc => Dict(
-                    :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
-                ),
-                :cross => Dict(
                     :norm_mode => [:d_sum, :min_0],
-                    :self_vs_other => [(0.5, 0.5), (0.0, 1.0)],
-                    :genes_combinations => [:tree_up, :tree_down, :flat], # :tree_up or :tree_down or :flat or :all
-                    :strategy => [:one_rand, :one_tournament, :rand_comb],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
-                ),
-            ),
-        ),
-    ),
-    (
-        :ContinuousStatesGroupingSimpleGA,
-        Dict(
-            :ContinuousStatesGroupingSimpleGA => Dict(
-                :individuals_n => [20, 100],
-                :env_wrapper => Dict(
-                    :n_clusters => [20, 40],
-                ),
-                :fihc => Dict(
+                    :factor => [0.3, 1.0, 3.0],
                     :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
-                ),
-                :cross => Dict(
-                    :norm_mode => [:d_sum, :min_0],
-                    :self_vs_other => [(0.8, 0.2), (0.5, 0.5), (0.0, 1.0)],
-                    :genes_combinations => [:all], # :tree_up or :tree_down or :flat or :all
-                    :strategy => [:all_seq],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
+                    :local_fuzzy => [:none, :global, :per_gene],
                 ),
             ),
         ),
     ),
-    (
-        :ContinuousStatesGroupingSimpleGA,
-        Dict(
-            :ContinuousStatesGroupingSimpleGA => Dict(
-                :individuals_n => [20, 100],
-                :env_wrapper => Dict(
-                    :n_clusters => [20, 40],
-                ),
-                :fihc => Dict(
-                    :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
-                ),
-                :cross => Dict(
-                    :strategy => [:none],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
-                ),
-            ),
-        ),
-    ),
+    # (
+    #     :ContinuousStatesGroupingSimpleGA,
+    #     Dict(
+    #         :ContinuousStatesGroupingSimpleGA => Dict(
+    #             :individuals_n => [20, 100],
+    #             :env_wrapper => Dict(
+    #                 :n_clusters => [20, 40],
+    #             ),
+    #             :fihc => Dict(
+    #                 :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
+    #             ),
+    #             :cross => Dict(
+    #                 :norm_mode => [:d_sum, :min_0],
+    #                 :self_vs_other => [(0.5, 0.5), (0.0, 1.0)],
+    #                 :genes_combinations => [:tree_up, :tree_down, :flat], # :tree_up or :tree_down or :flat or :all
+    #                 :strategy => [:one_rand, :one_tournament, :rand_comb],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
+    #             ),
+    #         ),
+    #     ),
+    # ),
+    # (
+    #     :ContinuousStatesGroupingSimpleGA,
+    #     Dict(
+    #         :ContinuousStatesGroupingSimpleGA => Dict(
+    #             :individuals_n => [20, 100],
+    #             :env_wrapper => Dict(
+    #                 :n_clusters => [20, 40],
+    #             ),
+    #             :fihc => Dict(
+    #                 :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
+    #             ),
+    #             :cross => Dict(
+    #                 :norm_mode => [:d_sum, :min_0],
+    #                 :self_vs_other => [(0.8, 0.2), (0.5, 0.5), (0.0, 1.0)],
+    #                 :genes_combinations => [:all], # :tree_up or :tree_down or :flat or :all
+    #                 :strategy => [:all_seq],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
+    #             ),
+    #         ),
+    #     ),
+    # ),
+    # (
+    #     :ContinuousStatesGroupingSimpleGA,
+    #     Dict(
+    #         :ContinuousStatesGroupingSimpleGA => Dict(
+    #             :individuals_n => [20, 100],
+    #             :env_wrapper => Dict(
+    #                 :n_clusters => [20, 40],
+    #             ),
+    #             :fihc => Dict(
+    #                 :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
+    #             ),
+    #             :cross => Dict(
+    #                 :strategy => [:none],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
+    #             ),
+    #         ),
+    #     ),
+    # ),
 ]
 
 
@@ -179,7 +196,6 @@ LOGS_DIR_ANALYSIS = joinpath(LOGS_DIR, "analysis")
 # --------------------------------------------------------------------------------------------------
 # Run the tests
 
-DistributedEnvironments.@initcluster(CLUSTER_CONFIG_MAIN, CLUSTER_CONFIG_HOSTS, TMP_DIR_NAME, COPY_ENV_AND_CODE)
 relative_path_tmp = splitpath(@__DIR__)[length(splitpath(dirname(Base.active_project())))+1:end]
 
 if false # this one just makes linter happy :)
@@ -199,102 +215,60 @@ if false # this one just makes linter happy :)
     include("_tests_utils.jl")
 end
 
-Distributed.@everywhere begin
-    println("Worker $(Distributed.myid()) started instantiating")
-    # important things to improve performance on intel CPUs:
-    using MKL
-    using LinearAlgebra
-    import Distributed
-    import Pkg
-    import Logging
-    import Dates
-    import Random
-    import ProgressMeter
-    import DataFrames
-    import CSV
+# this function works well, I have tested it, but unless I create my own pmap function, it is useless
+function create_worker_initializator()
+    relative_path_outer = relative_path_tmp
+    constants_dict_outer = CONSTANTS_DICT
+
+    function initialize_workers(pids)
+        relative_path_inner = relative_path_outer
+        constants_dict_inner = constants_dict_outer
+
+        eval(quote
+        Distributed.@everywhere $pids begin
+            println("Worker $(Distributed.myid()) started instantiating")
+            # important things to improve performance on intel CPUs:
+            using MKL
+            using LinearAlgebra
+            import Distributed
+            import Pkg
+            import Logging
+            import Dates
+            import Random
+            import ProgressMeter
+            import DataFrames
+            import CSV
+            
+            RELATIVE_PATH_TO_THIS_DIR = $relative_path_inner
+            CONSTANTS_DICT_LOCAL_ON_WORKER = $constants_dict_inner
     
-    RELATIVE_PATH_TO_THIS_DIR = $relative_path_tmp
-    CONSTANTS_DICT_LOCAL_ON_WORKER = $CONSTANTS_DICT
+            seed = time_ns() ⊻ UInt64(hash(Distributed.myid())) # xor between time nano seconds and hash of worker id
+            Random.seed!(seed)
 
-    seed = time_ns() ⊻ UInt64(hash(Distributed.myid())) # xor between time nano seconds and hash of worker id
-    Random.seed!(seed)
-
-    current_absolute_dir = joinpath(dirname(Base.active_project()), (RELATIVE_PATH_TO_THIS_DIR)...)
-    blas_threads = parse(Int, get(ENV, "JULIA_BLAS_THREADS", "1"))
-    BLAS.set_num_threads(blas_threads)
-    include(joinpath(current_absolute_dir, "../../src/JuliaEvolutionaryCars.jl"))
-    import .JuliaEvolutionaryCars
-    include(joinpath(current_absolute_dir,"../custom_loggers.jl"))
-    import .CustomLoggers
-    include(joinpath(current_absolute_dir, "_tests_utils.jl"))
-    # number of julia threads for main one doesnt make any difference, since it is not used
-    text = (
-        "Worker $(Distributed.myid()) started at $(Dates.now()) with seed: $seed\n" *
-        "Project name: $(Pkg.project().name)\n" *
-        "BLAS kernel: $(BLAS.get_config())\n" *
-        "Number of BLAS threads: $(BLAS.get_num_threads())\n" *
-        "Number of Julia threads: $(Threads.nthreads())\n"
-    )
-    println(text)
+            current_absolute_dir = joinpath(dirname(Base.active_project()), (RELATIVE_PATH_TO_THIS_DIR)...)
+            blas_threads = parse(Int, get(ENV, "JULIA_BLAS_THREADS", "1"))
+            BLAS.set_num_threads(blas_threads)
+            include(joinpath(current_absolute_dir, "../../src/JuliaEvolutionaryCars.jl"))
+            import .JuliaEvolutionaryCars
+            include(joinpath(current_absolute_dir,"../custom_loggers.jl"))
+            import .CustomLoggers
+            include(joinpath(current_absolute_dir, "_tests_utils.jl"))
+            # number of julia threads for main one doesnt make any difference, since it is not used
+            text = (
+                "Worker $(Distributed.myid()) started at $(Dates.now()) with seed: $seed\n" *
+                "Project name: $(Pkg.project().name)\n" *
+                "BLAS kernel: $(BLAS.get_config())\n" *
+                "Number of BLAS threads: $(BLAS.get_num_threads())\n" *
+                "Number of Julia threads: $(Threads.nthreads())\n"
+            )
+            println(text)
+        end end)
+    end
+    return initialize_workers
 end
 
-
-# this function works well, I have tested it, but unless I create my own pmap function, it is useless
-# function create_worker_initializator()
-#     relative_path_outer = relative_path_tmp
-#     constants_dict_outer = CONSTANTS_DICT
-
-#     function initialize_workers(pids=[])
-#         if isempty(pids)
-#             pids = Distributed.procs()
-#         end
-#         relative_path_inner = relative_path_outer
-#         constants_dict_inner = constants_dict_outer
-
-#         eval(quote
-#         Distributed.@everywhere $pids begin
-#             println("Worker $(Distributed.myid()) started instantiating")
-#             # important things to improve performance on intel CPUs:
-#             using MKL
-#             using LinearAlgebra
-#             import Distributed
-#             import Pkg
-#             import Logging
-#             import Dates
-#             import Random
-#             import ProgressMeter
-#             import DataFrames
-#             import CSV
-            
-#             RELATIVE_PATH_TO_THIS_DIR = $relative_path_inner
-#             CONSTANTS_DICT_LOCAL_ON_WORKER = $constants_dict_inner
-    
-#             seed = time_ns() ⊻ UInt64(hash(Distributed.myid())) # xor between time nano seconds and hash of worker id
-#             Random.seed!(seed)
-
-#             current_absolute_dir = joinpath(dirname(Base.active_project()), (RELATIVE_PATH_TO_THIS_DIR)...)
-#             blas_threads = parse(Int, get(ENV, "JULIA_BLAS_THREADS", "1"))
-#             BLAS.set_num_threads(blas_threads)
-#             include(joinpath(current_absolute_dir, "../../src/JuliaEvolutionaryCars.jl"))
-#             import .JuliaEvolutionaryCars
-#             include(joinpath(current_absolute_dir,"../custom_loggers.jl"))
-#             import .CustomLoggers
-#             include(joinpath(current_absolute_dir, "_tests_utils.jl"))
-#             # number of julia threads for main one doesnt make any difference, since it is not used
-#             text = (
-#                 "Worker $(Distributed.myid()) started at $(Dates.now()) with seed: $seed\n" *
-#                 "Project name: $(Pkg.project().name)\n" *
-#                 "BLAS kernel: $(BLAS.get_config())\n" *
-#                 "Number of BLAS threads: $(BLAS.get_num_threads())\n" *
-#                 "Number of Julia threads: $(Threads.nthreads())\n"
-#             )
-#             println(text)
-#         end end)
-#     end
-#     return initialize_workers
-# end
-# WORKERS_INITIALIZATOR = create_worker_initializator()
-# WORKERS_INITIALIZATOR()
+CLUSTER = DistributedEnvironments.Cluster(CLUSTER_CONFIG_MAIN, CLUSTER_CONFIG_HOSTS, create_worker_initializator())
+DistributedEnvironments.@initcluster(CLUSTER, TMP_DIR_NAME, COPY_ENV_AND_CODE)
 
 # --------------------------------------------------------------------------------------------------
 # creating dirs, copying files, setting up loggers
@@ -337,8 +311,6 @@ result_info = [FinalResultLog(save_name(entry...), false, "Not yet computed") fo
 
 cases_results_path = joinpath(LOGS_DIR, CASES_RESULTS_FILE)
 channel_controller_task = Threads.@spawn run_channel_controller!(remote_channel, result_info, LOGS_DIR_RESULTS, cases_results_path)
-# should_end_task_manager = Ref(false)
-# host_manager_task = Threads.@spawn DistributedEnvironments.hosts_manager(CLUSTER_CONFIG_HOSTS, WORKERS_INITIALIZATOR, should_end_task_manager, CHECK_HOSTS_EACH_N_SECONDS, CHECK_WORKER_TIMEOUT)
 enumerated_special_dicts_with_cases = collect(enumerate(special_dicts_with_cases))  # actually currently it is sorted by case number, so I do not have to shuffle it
 
 # results_trash itself is not used, hence the name
@@ -347,12 +319,24 @@ results_trash = ProgressMeter.@showprogress Distributed.pmap(enumerated_special_
     remote_run(one_special_dict_with_case, CONSTANTS_DICT_LOCAL_ON_WORKER, task_id, remote_channel)  # this constants dict is deepcopied inside that function
 end
 
+# try
+#     progress_meter = ProgressMeter.Progress(length(enumerated_special_dicts_with_cases))
+#     DistributedEnvironments.cluster_foreach!(
+#         CLUSTER,
+#         enumerated_special_dicts_with_cases;
+#         progress_meter_func=() -> ProgressMeter.next!(progress_meter),
+#         constants=(remote_channel,)
+#     ) do entry, remote_channel_tmp
+#         task_id, one_special_dict_with_case = entry
+#         remote_run(one_special_dict_with_case, CONSTANTS_DICT_LOCAL_ON_WORKER, task_id, remote_channel_tmp)
+#     end
+# finally
+#     DistributedEnvironments.remove_workers!()
+# end
+
 # --------------------------------------------------------------------------------------------------
 # finishing computations, gently stopping everything
 put!(remote_channel, RemoteResult("", "", :stop, "Finished", 1, -1))
 wait(channel_controller_task)
-# should_end_task_manager[] = true
-# wait(host_manager_task)
 
 Logging.@info construct_text_from_final_results(result_info)
-DistributedEnvironments.remove_workers!()

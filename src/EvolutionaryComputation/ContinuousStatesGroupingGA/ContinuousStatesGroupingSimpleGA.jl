@@ -309,16 +309,15 @@ function ContinuousStatesGroupingSimpleGA_Algorithm(;
     )
 
     individuals = [Individual(env_wrapper_struct, cross, fihc, initial_genes_mode) for _ in 1:individuals_n]
-
+    best_individual = individuals[1]
     # Threads.@threads for ind in individuals
-    for ind in individuals
-        ind.env_wrapper = EnvironmentWrapper.copy(env_wrapper_struct)
-        EnvironmentWrapper.random_reinitialize_exemplars!(ind.env_wrapper)
-        get_fitness!(ind)
-        get_trajectories!(ind)
-    end
-
-    best_individual = individuals[argmax([get_fitness!(ind) for ind in individuals])]
+    # for ind in individuals
+    #     ind.env_wrapper = EnvironmentWrapper.copy(env_wrapper_struct)
+    #     EnvironmentWrapper.random_reinitialize_exemplars!(ind.env_wrapper)
+    #     get_fitness!(ind)
+    #     get_trajectories!(ind)
+    # end
+    # best_individual = individuals[argmax([get_fitness!(ind) for ind in individuals])]
 
     return ContinuousStatesGroupingSimpleGA_Algorithm(
         visualization_env,
@@ -337,7 +336,7 @@ end
 function AbstractOptimizerModule.run!(csgs::ContinuousStatesGroupingSimpleGA_Algorithm; max_generations::Int, max_evaluations::Int, log::Bool, visualize_each_n_epochs::Int=0) :: DataFrames.DataFrame
     # --------------------------------------------------
     # Test!!!
-    # return run_test(csgs; max_generations=max_generations, max_evaluations=max_evaluations, log=log, fihc_settings=csgs.fihc)
+    return run_test(csgs; max_generations=max_generations, max_evaluations=max_evaluations, log=log, fihc_settings=csgs.fihc)
     # --------------------------------------------------
     # Real implementation
 
@@ -450,7 +449,7 @@ end
 # tests
 
 function run_test(csgs::ContinuousStatesGroupingSimpleGA_Algorithm; max_generations::Int, max_evaluations::Int, log::Bool, fihc_settings::Dict)
-    new_ind = Individual(csgs.current_env_wrapper, csgs.initial_genes_mode, log)
+    new_ind = csgs.best_individual
     total_eval = 0
 
     # combinations_flat = get_genes_combination(new_ind.env_wrapper, :flat)
@@ -502,7 +501,8 @@ function FIHC_test!(ind::Individual;
     norm_mode::Symbol,
     random_matrix_mode::Symbol,
     factor::Float64,
-    hier_factor::Float64
+    hier_factor::Float64,
+    local_fuzzy::Symbol
 ) :: Int
 
     # It doesnt work anyway, thus I do not want to keep updating it
@@ -522,7 +522,7 @@ function FIHC_test!(ind::Individual;
     #     end
     #     return evals_num_now
     # elseif fihc_mode == :per_gene_rand
-
+    evals = 0
     if fihc_mode == :per_gene_rand
         evals = 0
         for nodes_level in ind.env_wrapper._distance_membership_levels
@@ -544,10 +544,8 @@ function FIHC_test!(ind::Individual;
                 end
             end
         end
-        return evals
     
     elseif fihc_mode == :hier_decrease
-        evals = 0
         factor_tmp = factor
         for nodes_level in ind.env_wrapper._distance_membership_levels
             for node in Random.shuffle(nodes_level)
@@ -569,10 +567,8 @@ function FIHC_test!(ind::Individual;
             end
             factor_tmp *= hier_factor
         end
-        return evals
 
     elseif fihc_mode == :hier_increase
-        evals = 0
         genes_combinations = ind.env_wrapper._distance_membership_levels
         factors = Vector{Float64}(undef, length(genes_combinations))
         factors[1] = factor
@@ -599,7 +595,6 @@ function FIHC_test!(ind::Individual;
                 end
             end
         end
-        return evals
 
     # elseif fihc_mode == :disc_fihc
     #     for col in eachcol(ind.genes)
@@ -608,7 +603,6 @@ function FIHC_test!(ind::Individual;
     #         col[argmax_col] = 1.0
     #     end
 
-    #     evals = 0
     #     actions_n = EnvironmentWrapper.get_action_size(ind.env_wrapper)
     #     for nodes_level in ind.env_wrapper._distance_membership_levels
     #         for node in Random.shuffle(nodes_level)
@@ -630,10 +624,8 @@ function FIHC_test!(ind::Individual;
     #             end
     #         end
     #     end
-    #     return evals
 
     # elseif fihc_mode == :fihc_cont
-    #     evals = 0
     #     actions_n = EnvironmentWrapper.get_action_size(ind.env_wrapper)
     #     for nodes_level in ind.env_wrapper._distance_membership_levels
     #         for node in Random.shuffle(nodes_level)
@@ -654,11 +646,71 @@ function FIHC_test!(ind::Individual;
     #             end
     #         end
     #     end
-    #     return evals
 
     else
         throw(ArgumentError("Unknown mode: $fihc_mode"))
     end
+
+    evals += local_fuzzy_FIHC!(ind, local_fuzzy)
+    return evals
+end
+
+function local_fuzzy_FIHC!(ind::Individual, mode::Symbol)
+    if mode == :none
+        return 0
+    elseif mode == :global
+        new_genes = Base.copy(ind.genes)
+        for gene_id in 1:EnvironmentWrapper.get_groups_number(ind.env_wrapper)
+            new_genes[:, gene_id] .= local_get_fuzzier_gene(ind, gene_id)
+        end
+        old_genes = ind.genes
+        old_fitness = get_fitness_test!(ind)
+        ind.genes = new_genes
+        ind._fitness_actual = false
+        if get_fitness_test!(ind) < old_fitness
+            ind.genes = old_genes
+            ind._fitness = old_fitness
+        end
+        return 1
+    elseif mode == :per_gene
+        evals = 0
+        for gene_id in Random.randperm(EnvironmentWrapper.get_groups_number(ind.env_wrapper))
+            new_genes = Base.copy(ind.genes)
+            new_genes[:, gene_id] = local_get_fuzzier_gene(ind, gene_id)
+            old_genes = ind.genes
+            old_fitness = get_fitness_test!(ind)
+            ind.genes = new_genes
+            ind._fitness_actual = false
+            evals += 1
+            if get_fitness_test!(ind) < old_fitness
+                ind.genes = old_genes
+                ind._fitness = old_fitness
+            end
+        end
+        return evals
+    elseif mode == :always
+        new_genes = Base.copy(ind.genes)
+        for gene_id in 1:EnvironmentWrapper.get_groups_number(ind.env_wrapper)
+            new_genes[:, gene_id] .= local_get_fuzzier_gene(ind, gene_id)
+        end
+        ind.genes = new_genes
+        ind._fitness_actual = false
+        get_fitness_test!(ind)
+        return 1
+    else
+        throw(ArgumentError("Unknown mode: $mode"))
+    end
+end
+
+function local_get_fuzzier_gene(ind::Individual, gene_id)
+    genes_n = EnvironmentWrapper.get_groups_number(ind.env_wrapper)
+    this_exemplar = ind.env_wrapper._encoded_exemplars[:, gene_id:gene_id]
+    other_exemplars = ind.env_wrapper._encoded_exemplars[:, (1:genes_n) .!= gene_id]
+    old_genes_not_this_one = ind.genes[:, (1:genes_n) .!= gene_id]
+    memberships = StatesGrouping.get_membership(this_exemplar, other_exemplars, ind.env_wrapper._distance_metric, ind.env_wrapper._m_value)
+    new_gene_value = old_genes_not_this_one * memberships
+    new_gene_value ./= sum(new_gene_value)
+    return new_gene_value
 end
 
 function initial_genes(env_wrap::EnvironmentWrapper.EnvironmentWrapperStruct, mode::Symbol) :: Matrix{Float32}

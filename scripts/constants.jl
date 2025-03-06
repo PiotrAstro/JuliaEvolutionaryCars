@@ -131,7 +131,7 @@ CONSTANTS_DICT = Dict(
             ),
             :initial_space_explorers_n => 30,
             :max_states_considered => 10_000,
-            :n_clusters => 40,  # 40 and 200 works very well, should try different values
+            :n_clusters => 20,  # 40 and 200 works very well, should try different values
             :verbose => false,
             :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock, after some initial tests it should definatelly be cosine!
             :hclust_distance => :complete,  # :ward or :single or :complete or :average
@@ -148,6 +148,7 @@ CONSTANTS_DICT = Dict(
             :factor => 1.0,
             :hier_factor => 1.0,
             :random_matrix_mode => :rand_n_different,
+            :local_fuzzy => :global,
         ),
         :cross => Dict(
             :norm_mode => :d_sum,
