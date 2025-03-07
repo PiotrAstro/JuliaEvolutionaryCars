@@ -310,14 +310,14 @@ function ContinuousStatesGroupingSimpleGA_Algorithm(;
 
     individuals = [Individual(env_wrapper_struct, cross, fihc, initial_genes_mode) for _ in 1:individuals_n]
     best_individual = individuals[1]
-    # Threads.@threads for ind in individuals
+    Threads.@threads for ind in individuals
     # for ind in individuals
-    #     ind.env_wrapper = EnvironmentWrapper.copy(env_wrapper_struct)
-    #     EnvironmentWrapper.random_reinitialize_exemplars!(ind.env_wrapper)
-    #     get_fitness!(ind)
-    #     get_trajectories!(ind)
-    # end
-    # best_individual = individuals[argmax([get_fitness!(ind) for ind in individuals])]
+        ind.env_wrapper = EnvironmentWrapper.copy(env_wrapper_struct)
+        EnvironmentWrapper.random_reinitialize_exemplars!(ind.env_wrapper)
+        get_fitness!(ind)
+        get_trajectories!(ind)
+    end
+    best_individual = individuals[argmax([get_fitness!(ind) for ind in individuals])]
 
     return ContinuousStatesGroupingSimpleGA_Algorithm(
         visualization_env,
@@ -336,7 +336,7 @@ end
 function AbstractOptimizerModule.run!(csgs::ContinuousStatesGroupingSimpleGA_Algorithm; max_generations::Int, max_evaluations::Int, log::Bool, visualize_each_n_epochs::Int=0) :: DataFrames.DataFrame
     # --------------------------------------------------
     # Test!!!
-    return run_test(csgs; max_generations=max_generations, max_evaluations=max_evaluations, log=log, fihc_settings=csgs.fihc)
+    # return run_test(csgs; max_generations=max_generations, max_evaluations=max_evaluations, log=log, fihc_settings=csgs.fihc)
     # --------------------------------------------------
     # Real implementation
 

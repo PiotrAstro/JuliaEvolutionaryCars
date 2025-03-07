@@ -22,8 +22,6 @@ CLUSTER_CONFIG_MAIN = Dict(
 )
 
 RESULT_CHANNEL_BUFFER_SIZE = 16  # how many results main worker can hold, if it exceeds, remote workers will wait until main worker will take some results
-CHECK_HOSTS_EACH_N_SECONDS = 60 * 3  # how often to check if hosts are still alive and add new ones if needed
-CHECK_WORKER_TIMEOUT = 20  # how long to wait for worker to respond
 
 # cluster settings:
 private_key_path = raw"C:\Users\username\.ssh\private_key"

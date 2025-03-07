@@ -148,7 +148,7 @@ CONSTANTS_DICT = Dict(
             :factor => 1.0,
             :hier_factor => 1.0,
             :random_matrix_mode => :rand_n_different,
-            :local_fuzzy => :global,
+            :local_fuzzy => :none,
         ),
         :cross => Dict(
             :norm_mode => :d_sum,

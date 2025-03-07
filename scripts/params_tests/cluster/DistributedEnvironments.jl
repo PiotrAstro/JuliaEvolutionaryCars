@@ -2,9 +2,10 @@
 module DistributedEnvironments
 
 import Pkg
+import Logging
 using Distributed, MacroTools
 
-export @eachmachine, @eachworker, @initcluster, cluster_status!, remove_workers!, addprocs_one_host!, Cluster, cluster_foreach!
+export @eachmachine, @eachworker, @initcluster, cluster_status!, remove_workers!, addprocs_one_host!, Cluster, @cluster_foreach!
 
 struct Cluster
     main::Dict
@@ -257,115 +258,149 @@ Currently, it will not work at all, unfortunatelly pmap doesnt handle workers te
 
 It will take some time, I do not want to do it now, so currently this feature is not used.
 """
-function hosts_manager(cluster::Cluster, should_exit::Ref{Bool}, sleep_seconds=300, check_timeout=20)
+function hosts_manager(cluster::Cluster, should_exit::Ref{Bool}, sleep_seconds=300)
     sleep_start_time = time()
     while !should_exit[]
         if time() - sleep_start_time < sleep_seconds
-            sleep(1)
-            continue
-        end
-        
-        for host in cluster.hosts
-            workers_in_pool = host[:pids]
-            workers_unreachability = map(host[:pids]) do pid
-                @async begin
-                    try
-                        # Simple health check
-                        remotecall_fetch(() -> 1, pid; timeout=check_timeout)
-                        return false
-                    catch e
-                        if isa(e, TaskFailedException)
-                            return true
-                        elseif isa(e, ProcessExitedException)
-                            return false
-                        else
-                            throw(e)
+            sleep(2)
+        else
+            Logging.@info("Checking workers")
+            workers_official_pool = Distributed.workers()
+            for host in cluster.hosts
+                Logging.@info("Checking workers on host $(host[:host_address])")
+                workers_in_pool = [pid for pid in host[:pids] if pid in workers_official_pool]
+                # workers_unreachability = map(workers_in_pool) do pid
+                #     @async begin
+                #         channel = Channel{Bool}(1)
+                #         @async begin
+                #             sleep(check_timeout)
+                #             put!(channel, false)
+                #         end
+                #         @async begin
+                #             try
+                #                 # Simple health check
+                #                 remotecall_fetch(() -> 1, pid)
+                #                 put!(channel, true)
+                #             catch e
+                #                 if isa(e, TaskFailedException)
+                #                     put!(channel, false)
+                #                 elseif isa(e, ProcessExitedException)
+                #                     put!(channel, false)
+                #                 else
+                #                     throw(e)
+                #                 end
+                #             end
+                #         end
+                #         return take!(channel)
+                #     end
+                # end
+                # Logging.@info("Checks on $(host[:host_address]) scheduled")
+                # workers_unreachability = fetch.(workers_unreachability)
+                # display(workers_unreachability)
+                # try
+                #     Distributed.rmprocs(workers_in_pool[workers_unreachability]; waitfor=sleep_seconds)
+                # catch
+                #     Logging.@warn("Failed to remove dead workers")
+                # end
+                # host[:pids] = workers_in_pool[.!workers_unreachability]
+                host[:pids] = workers_in_pool
+                if length(host[:pids]) < host[:use_n_workers]
+                    Logging.@warn("Some workers died on host $(host[:host_address])")
+                    result, e = host_status(host)
+                    if result
+                        try
+                            pids_n = host[:use_n_workers] - length(host[:pids])
+                            new_pids = addprocs_one_host!(host, pids_n)
+                            host[:pids] = vcat(host[:pids], new_pids)
+                            cluster.initialization_function(new_pids)
+                            for pid in new_pids
+                                put!(cluster.free_pids, pid)
+                            end
+                            Logging.@info("Added new workers $new_pids to $(host[:host_address])")
+                        catch
+                            Logging.@warn("Failed to add new workers to $(host[:host_address])")
                         end
+                    else !result
+                        Logging.@warn(e)
                     end
+                else
+                    Logging.@info("All workers alive on host $(host[:host_address])")
                 end
             end
-            workers_unreachability = fetch.(workers_unreachability)
-
-            try
-                Distributed.rmprocs(workers_in_pool[workers_unreachability]; waitfor=sleep_seconds)
-            catch
-                println("Failed to remove dead workers")
-            end
-
-            host[:pids] = workers_in_pool[.!workers_unreachability]
-            if length(host[:pids]) < host[:use_n_workers]
-                println("Some workers died on host $(host[:host_address])")
-                result, e = host_status(host)
-                if result
-                    try
-                        pids_n = host[:use_n_workers] - length(host[:pids])
-                        new_pids = addprocs_one_host!(host, pids_n)
-                        host[:pids] = vcat(host[:pids], new_pids)
-                        cluster.initialization_function(new_pids)
-                        for pid in new_pids
-                            put!(cluster.free_pids, pid)
-                        end
-                    catch
-                        println("Failed to add new workers to $(host[:host_address])")
-                    end
-                else !result
-                    println(e)
-                end
-            else
-                println("All workers alive on host $(host[:host_address])")
-            end
+            sleep_start_time = time()
         end
-        sleep_start_time = time()
     end
+
+    Logging.@info("Exiting host manager")
 end
 
-function cluster_foreach!(f, cluster::Cluster, iterable; progress_meter_func=nothing, constants=[])
-    should_exit = Ref(false)
-    host_manager_task = Threads.@spawn hosts_manager(cluster, should_exit)
-    items_array = reverse(iterable)
-    array_locker = Threads.RentrantLock()
-    progress_meter_lock = Threads.RentrantLock()
+macro cluster_foreach!(f, cluster, iterable, progress_meter_func=nothing, constants=[])
+    # Notice we return an escaped expression
+    return quote
+        # Access everything through the properly escaped variables
+        local _cluster = $(esc(cluster))
+        local _f = $(esc(f))
+        local _iterable = $(esc(iterable))
+        local _progress_meter_func = $(esc(progress_meter_func))
+        local _constants = $(esc(constants))
+        
+        local should_exit = Ref(false)
+        local host_manager_task = Threads.@spawn hosts_manager(_cluster, should_exit)
+        local items_array = reverse(_iterable)
+        local array_locker = Threads.ReentrantLock()
+        local progress_meter_lock = Threads.ReentrantLock()
 
-    while true
-        if length(items_array) > 0
-            pid = take!(cluster.free_pids)
-            item = lock(array_locker) do
-                pop!(items_array)
-            end
-            @async begin
-                Threads.atomic_add!(cluster.working_number, 1)
-                try
-                    fetch(Distributed.@spawnat pid f(item, constants...))
-                    put!(cluster.free_pids, pid)
-                    lock(progress_meter_lock) do
-                        if !isnothing(progress_meter_func)
-                            progress_meter_func()
+        try
+            while true
+                if length(items_array) > 0
+                    local pid = take!(_cluster.free_pids)
+                    local item = lock(array_locker) do
+                        pop!(items_array)
+                    end
+                    @async begin
+                        pid_local = pid
+                        Threads.atomic_add!(_cluster.working_number, 1)
+                        try
+                            # Now we're using the escaped function
+                            fetch(Distributed.@spawnat pid_local _f(item, _constants...))
+                            put!(_cluster.free_pids, pid_local)
+                            lock(progress_meter_lock) do
+                                if !isnothing(_progress_meter_func)
+                                    _progress_meter_func()
+                                end
+                            end
+                        catch e
+                            if isa(e, ProcessExitedException) || isa(e, IOError)
+                                Logging.@warn("Worker $(pid_local) exited with code $(e.exitcode)")
+                                # check if it is in workers, remove if so
+                                if pid_local in Distributed.workers()
+                                    Logging.@warn("Removing worker $(pid_local)")
+                                    Distributed.rmprocs(pid_local)
+                                end
+                            elseif isa(e, RemoteException)
+                                Logging.@warn("Worker $(pid_local) exited with error: $(e)")
+                                put!(_cluster.free_pids, pid_local)
+                            else 
+                                throw(e)
+                            end
+                            Logging.@warn("Some errors occured, will rerun $(item)")
+                            lock(array_locker) do
+                                push!(items_array, item)
+                            end
                         end
+                        Threads.atomic_sub!(_cluster.working_number, 1)
                     end
-                catch e
-                    if isa(e, ProcessExitedException)
-                        println("Worker $(pid) exited with code $(e.exitcode)")
-                    elseif isa(e, RemoteException)
-                        println("Worker $(pid) exited with error: $(e)")
-                        put!(cluster.free_pids, pid)
-                    else 
-                        throw(e)
-                    end
-                    lock(array_locker) do
-                        push!(items_array, item)
-                    end
+                elseif _cluster.working_number[] == 0
+                    break
+                else
+                    sleep(2)
                 end
-                Threads.atomic_sub!(cluster.working_number, 1)
             end
-        elseif cluster.working_number[] == 0
-            break
-        else
-            sleep(1)
+        finally
+            should_exit[] = true
+            wait(host_manager_task)
         end
     end
-
-    should_exit[] = true
-    wait(host_manager_task)
 end
 
 end

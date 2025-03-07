@@ -417,6 +417,8 @@ function run_channel_controller!(
         result_info[remote_result.task_id] = final_result
         save_cases_result_info(result_info, save_result_path)
     end
+
+    Logging.@info "Exiting channel controller"
 end
 
 function save_cases_result_info(result_info::Vector{FinalResultLog}, save_result_path::String)

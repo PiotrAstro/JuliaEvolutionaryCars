@@ -86,13 +86,13 @@ How to set TESTED_VALUES:
 # we will change these values globally for all tests
 CONSTANTS_DICT[:run_config] = Dict(
     :max_generations => 10_000_000,  # 200
-    :max_evaluations => 20_000,  # 1_000_000
+    :max_evaluations => 1_000_000,  # 1_000_000
     :log => false,
     :visualize_each_n_epochs => 0,
 )
 
 # Number of run tests per each combination of tested values
-CASES_PER_TEST = 50
+CASES_PER_TEST = 10
 
 LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_" * timestamp)  # running test from scratch
 # LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_2024-12-27_12-31-13")  # running test from some start_position - it will recognize already done cases
@@ -103,76 +103,59 @@ TESTED_VALUES = [
         :ContinuousStatesGroupingSimpleGA,
         Dict(
             :ContinuousStatesGroupingSimpleGA => Dict(
+                :individuals_n => [4, 5],  # :individuals_n => [20, 100],
                 :env_wrapper => Dict(
                     :n_clusters => [20, 40],
-                    :distance_membership_levels_method => [:hclust_complete, :flat, :pam_all_fuzzy],
                 ),
                 :fihc => Dict(
-                    :norm_mode => [:d_sum, :min_0],
-                    :factor => [0.3, 1.0, 3.0],
                     :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
-                    :local_fuzzy => [:none, :global, :per_gene],
+                ),
+                :cross => Dict(
+                    :norm_mode => [:d_sum, :min_0],
+                    :self_vs_other => [(0.5, 0.5), (0.0, 1.0)],
+                    :genes_combinations => [:tree_up, :tree_down, :flat], # :tree_up or :tree_down or :flat or :all
+                    :strategy => [:one_rand, :one_tournament, :rand_comb],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
                 ),
             ),
         ),
     ),
-    # (
-    #     :ContinuousStatesGroupingSimpleGA,
-    #     Dict(
-    #         :ContinuousStatesGroupingSimpleGA => Dict(
-    #             :individuals_n => [20, 100],
-    #             :env_wrapper => Dict(
-    #                 :n_clusters => [20, 40],
-    #             ),
-    #             :fihc => Dict(
-    #                 :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
-    #             ),
-    #             :cross => Dict(
-    #                 :norm_mode => [:d_sum, :min_0],
-    #                 :self_vs_other => [(0.5, 0.5), (0.0, 1.0)],
-    #                 :genes_combinations => [:tree_up, :tree_down, :flat], # :tree_up or :tree_down or :flat or :all
-    #                 :strategy => [:one_rand, :one_tournament, :rand_comb],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
-    #             ),
-    #         ),
-    #     ),
-    # ),
-    # (
-    #     :ContinuousStatesGroupingSimpleGA,
-    #     Dict(
-    #         :ContinuousStatesGroupingSimpleGA => Dict(
-    #             :individuals_n => [20, 100],
-    #             :env_wrapper => Dict(
-    #                 :n_clusters => [20, 40],
-    #             ),
-    #             :fihc => Dict(
-    #                 :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
-    #             ),
-    #             :cross => Dict(
-    #                 :norm_mode => [:d_sum, :min_0],
-    #                 :self_vs_other => [(0.8, 0.2), (0.5, 0.5), (0.0, 1.0)],
-    #                 :genes_combinations => [:all], # :tree_up or :tree_down or :flat or :all
-    #                 :strategy => [:all_seq],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
-    #             ),
-    #         ),
-    #     ),
-    # ),
-    # (
-    #     :ContinuousStatesGroupingSimpleGA,
-    #     Dict(
-    #         :ContinuousStatesGroupingSimpleGA => Dict(
-    #             :individuals_n => [20, 100],
-    #             :env_wrapper => Dict(
-    #                 :n_clusters => [20, 40],
-    #             ),
-    #             :fihc => Dict(
-    #                 :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
-    #             ),
-    #             :cross => Dict(
-    #                 :strategy => [:none],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
-    #             ),
-    #         ),
-    #     ),
-    # ),
+    (
+        :ContinuousStatesGroupingSimpleGA,
+        Dict(
+            :ContinuousStatesGroupingSimpleGA => Dict(
+                :individuals_n => [20, 100],
+                :env_wrapper => Dict(
+                    :n_clusters => [20, 40],
+                ),
+                :fihc => Dict(
+                    :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
+                ),
+                :cross => Dict(
+                    :norm_mode => [:d_sum, :min_0],
+                    :self_vs_other => [(0.8, 0.2), (0.5, 0.5), (0.0, 1.0)],
+                    :genes_combinations => [:all], # :tree_up or :tree_down or :flat or :all
+                    :strategy => [:all_seq],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
+                ),
+            ),
+        ),
+    ),
+    (
+        :ContinuousStatesGroupingSimpleGA,
+        Dict(
+            :ContinuousStatesGroupingSimpleGA => Dict(
+                :individuals_n => [20, 100],
+                :env_wrapper => Dict(
+                    :n_clusters => [20, 40],
+                ),
+                :fihc => Dict(
+                    :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
+                ),
+                :cross => Dict(
+                    :strategy => [:none],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
+                ),
+            ),
+        ),
+    ),
 ]
 
 
@@ -314,29 +297,29 @@ channel_controller_task = Threads.@spawn run_channel_controller!(remote_channel,
 enumerated_special_dicts_with_cases = collect(enumerate(special_dicts_with_cases))  # actually currently it is sorted by case number, so I do not have to shuffle it
 
 # results_trash itself is not used, hence the name
-results_trash = ProgressMeter.@showprogress Distributed.pmap(enumerated_special_dicts_with_cases; retry_delays = zeros(3)) do entry
-    task_id, one_special_dict_with_case = entry
-    remote_run(one_special_dict_with_case, CONSTANTS_DICT_LOCAL_ON_WORKER, task_id, remote_channel)  # this constants dict is deepcopied inside that function
-end
-
-# try
-#     progress_meter = ProgressMeter.Progress(length(enumerated_special_dicts_with_cases))
-#     DistributedEnvironments.cluster_foreach!(
-#         CLUSTER,
-#         enumerated_special_dicts_with_cases;
-#         progress_meter_func=() -> ProgressMeter.next!(progress_meter),
-#         constants=(remote_channel,)
-#     ) do entry, remote_channel_tmp
-#         task_id, one_special_dict_with_case = entry
-#         remote_run(one_special_dict_with_case, CONSTANTS_DICT_LOCAL_ON_WORKER, task_id, remote_channel_tmp)
-#     end
-# finally
-#     DistributedEnvironments.remove_workers!()
+# results_trash = ProgressMeter.@showprogress Distributed.pmap(enumerated_special_dicts_with_cases; retry_delays = zeros(3)) do entry
+#     task_id, one_special_dict_with_case = entry
+#     remote_run(one_special_dict_with_case, CONSTANTS_DICT_LOCAL_ON_WORKER, task_id, remote_channel)  # this constants dict is deepcopied inside that function
 # end
 
-# --------------------------------------------------------------------------------------------------
-# finishing computations, gently stopping everything
-put!(remote_channel, RemoteResult("", "", :stop, "Finished", 1, -1))
-wait(channel_controller_task)
+try
+    progress_meter = ProgressMeter.Progress(length(enumerated_special_dicts_with_cases))
+    DistributedEnvironments.@cluster_foreach!(
+        CLUSTER,
+        enumerated_special_dicts_with_cases,
+        progress_meter_func=() -> ProgressMeter.next!(progress_meter),
+        constants=(remote_channel,)
+    ) do entry, remote_channel_tmp
+        task_id, one_special_dict_with_case = entry
+        remote_run(one_special_dict_with_case, CONSTANTS_DICT_LOCAL_ON_WORKER, task_id, remote_channel_tmp)
+    end
+finally
+    Logging.@info "Removing workers"
+    DistributedEnvironments.remove_workers!()
+    # --------------------------------------------------------------------------------------------------
+    # finishing computations, gently stopping everything
+    put!(remote_channel, RemoteResult("", "", :stop, "Finished", 1, -1))
+    wait(channel_controller_task)
+    Logging.@info construct_text_from_final_results(result_info)
+end
 
-Logging.@info construct_text_from_final_results(result_info)
