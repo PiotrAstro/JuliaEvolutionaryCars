@@ -269,6 +269,11 @@ function hosts_manager(cluster::Cluster, should_exit::Ref{Bool}, sleep_seconds=3
             for host in cluster.hosts
                 Logging.@info("Checking workers on host $(host[:host_address])")
                 workers_in_pool = [pid for pid in host[:pids] if pid in workers_official_pool]
+
+                # Currently this check doesnt work, cause main task blocks this task so I do not get any result from ay of them
+                # I just hope that when some workers exit I will get some information about it in cluster_foreach! macro
+                # So that these workers will be removed and I will add new ones here
+
                 # workers_unreachability = map(workers_in_pool) do pid
                 #     @async begin
                 #         channel = Channel{Bool}(1)
@@ -323,10 +328,9 @@ function hosts_manager(cluster::Cluster, should_exit::Ref{Bool}, sleep_seconds=3
                     else !result
                         Logging.@warn(e)
                     end
-                else
-                    Logging.@info("All workers alive on host $(host[:host_address])")
                 end
             end
+            Logging.@info("Checking workers finished, waiting $sleep_seconds seconds till next check")
             sleep_start_time = time()
         end
     end

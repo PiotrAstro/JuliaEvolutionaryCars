@@ -22,7 +22,7 @@ struct DistanceBasedClassificator{M<:Val, N <: AbstractNeuralNetwork, F<:Functio
         actions_number::Int,
         fuzzy_logic_of_n_closest::Int,
         distance_metric::Symbol,
-        m_value::Int = 1,  # m value for fuzzy membership function, it is (1 / distance[i]) ^ m_value, usually 2, I used 1
+        m_value::Int = 2,  # m value for fuzzy membership function, it is (1 / distance[i]) ^ m_value, usually 2, I used 1
     ) where N
         states_n = size(encoded_exemplars, 2)
         if distance_metric == :cosine

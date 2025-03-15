@@ -8,7 +8,6 @@ import IterTools
 import Optimisers
 import Distances
 import LinearAlgebra
-import SparseArrays
 import StatsBase
 import Logging
 using LoopVectorization
@@ -97,6 +96,7 @@ include("_Combined.jl")
 include("_DistanceBasedClassificator.jl")
 include("_Autoencoder.jl")
 include("_Random.jl")
+include("_ExemplarBasedNN.jl")
 
 # -------------------------------------------------------
 # module functions:

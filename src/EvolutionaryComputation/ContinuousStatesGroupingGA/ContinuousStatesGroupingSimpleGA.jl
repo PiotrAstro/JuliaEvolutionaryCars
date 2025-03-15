@@ -154,6 +154,12 @@ function crossover!(ind::Individual, other_individuals::Vector{Individual}) :: I
     return evals
 end
 
+function copy_genes!(ind_to::Individual, ind_from::Individual)
+    ind_to.genes = EnvironmentWrapper.translate(ind_from.env_wrapper, ind_from.genes, ind_to.env_wrapper)
+    ind_to._fitness_actual = false
+    ind_to._trajectories_actual = false
+end
+
 function accept_if_better!(ind::Individual, other::Individual, genes_changed::Vector{Float32})::Bool
     # for _ in 1:10
     #     FIHC_test!(ind; ind.fihc_dict...)
@@ -303,21 +309,21 @@ function ContinuousStatesGroupingSimpleGA_Algorithm(;
     visualization_env = (environment_type)(;environment_visualization_kwargs...)
     
 
-    env_wrapper_struct = EnvironmentWrapper.EnvironmentWrapperStruct(
+    env_wrapper_struct, _ = EnvironmentWrapper.EnvironmentWrapperStruct(
         environments;
         env_wrapper...
     )
 
     individuals = [Individual(env_wrapper_struct, cross, fihc, initial_genes_mode) for _ in 1:individuals_n]
     best_individual = individuals[1]
-    Threads.@threads for ind in individuals
-    # for ind in individuals
-        ind.env_wrapper = EnvironmentWrapper.copy(env_wrapper_struct)
-        EnvironmentWrapper.random_reinitialize_exemplars!(ind.env_wrapper)
-        get_fitness!(ind)
-        get_trajectories!(ind)
-    end
-    best_individual = individuals[argmax([get_fitness!(ind) for ind in individuals])]
+    # Threads.@threads for ind in individuals
+    # # for ind in individuals
+    #     ind.env_wrapper = EnvironmentWrapper.copy(env_wrapper_struct)
+    #     EnvironmentWrapper.random_reinitialize_exemplars!(ind.env_wrapper)
+    #     get_fitness!(ind)
+    #     get_trajectories!(ind)
+    # end
+    # best_individual = individuals[argmax([get_fitness!(ind) for ind in individuals])]
 
     return ContinuousStatesGroupingSimpleGA_Algorithm(
         visualization_env,
@@ -336,7 +342,7 @@ end
 function AbstractOptimizerModule.run!(csgs::ContinuousStatesGroupingSimpleGA_Algorithm; max_generations::Int, max_evaluations::Int, log::Bool, visualize_each_n_epochs::Int=0) :: DataFrames.DataFrame
     # --------------------------------------------------
     # Test!!!
-    # return run_test(csgs; max_generations=max_generations, max_evaluations=max_evaluations, log=log, fihc_settings=csgs.fihc)
+    return run_test(csgs; max_generations=max_generations, max_evaluations=max_evaluations, log=log, fihc_settings=csgs.fihc)
     # --------------------------------------------------
     # Real implementation
 
@@ -372,14 +378,16 @@ function AbstractOptimizerModule.run!(csgs::ContinuousStatesGroupingSimpleGA_Alg
             csgs.total_evaluations += new_individuals_evals[i]
             # csgs.total_evaluations += fetch(new_individuals_evals[i])
         end
-        csgs.current_env_wrapper = new_env_wrapper
-        # csgs.current_env_wrapper = fetch(new_env_wrapper)
+        csgs.current_env_wrapper, _ = new_env_wrapper
+        # csgs.current_env_wrapper, _ = fetch(new_env_wrapper)
         best_ind_arg = argmax(get_fitness!.(csgs.population))
         csgs.best_individual = individual_copy(csgs.population[best_ind_arg])
 
         # put random individual at random place different from best individual
         random_ind = rand(collect(eachindex(csgs.population))[eachindex(csgs.population) .!= best_ind_arg])
-        csgs.population[random_ind] = Individual(csgs.current_env_wrapper, csgs.cross, csgs.fihc, csgs.initial_genes_mode, csgs.verbose)
+        new_individual = Individual(csgs.current_env_wrapper, csgs.cross, csgs.fihc, csgs.initial_genes_mode, csgs.verbose)
+        copy_genes!(new_individual, csgs.best_individual)
+        csgs.population[random_ind] = new_individual
         get_fitness!(csgs.population[random_ind])
 
         end_time = time()
@@ -525,7 +533,7 @@ function FIHC_test!(ind::Individual;
     evals = 0
     if fihc_mode == :per_gene_rand
         evals = 0
-        for nodes_level in ind.env_wrapper._distance_membership_levels
+        for nodes_level in ind.env_wrapper._struct_memory._distance_membership_levels
             for node in Random.shuffle(nodes_level)
                 old_fitness = get_fitness_test!(ind)
                 old_genes = Base.copy(ind.genes)
@@ -547,7 +555,7 @@ function FIHC_test!(ind::Individual;
     
     elseif fihc_mode == :hier_decrease
         factor_tmp = factor
-        for nodes_level in ind.env_wrapper._distance_membership_levels
+        for nodes_level in ind.env_wrapper._struct_memory._distance_membership_levels
             for node in Random.shuffle(nodes_level)
                 old_fitness = get_fitness_test!(ind)
                 old_genes = Base.copy(ind.genes)
@@ -569,7 +577,7 @@ function FIHC_test!(ind::Individual;
         end
 
     elseif fihc_mode == :hier_increase
-        genes_combinations = ind.env_wrapper._distance_membership_levels
+        genes_combinations = ind.env_wrapper._struct_memory._distance_membership_levels
         factors = Vector{Float64}(undef, length(genes_combinations))
         factors[1] = factor
         for i in 2:length(factors)
@@ -604,7 +612,7 @@ function FIHC_test!(ind::Individual;
     #     end
 
     #     actions_n = EnvironmentWrapper.get_action_size(ind.env_wrapper)
-    #     for nodes_level in ind.env_wrapper._distance_membership_levels
+    #     for nodes_level in ind.env_wrapper._struct_memory._distance_membership_levels
     #         for node in Random.shuffle(nodes_level)
     #             for action in 1:actions_n
     #                 old_fitness = get_fitness_test!(ind)
@@ -627,7 +635,7 @@ function FIHC_test!(ind::Individual;
 
     # elseif fihc_mode == :fihc_cont
     #     actions_n = EnvironmentWrapper.get_action_size(ind.env_wrapper)
-    #     for nodes_level in ind.env_wrapper._distance_membership_levels
+    #     for nodes_level in ind.env_wrapper._struct_memory._distance_membership_levels
     #         for node in Random.shuffle(nodes_level)
     #             for action in 1:actions_n
     #                 old_fitness = get_fitness_test!(ind)
@@ -734,6 +742,14 @@ function norm_genes(genes_origianal::Matrix{Float32}, genes_new::Matrix{Float32}
     elseif mode == :min_0
         new_genes += genes_new
         EnvironmentWrapper.normalize_genes_min_0!(new_genes)
+    elseif mode == :none
+        new_genes += genes_new
+    elseif mode == :std
+        new_genes += genes_new
+        for col in eachcol(new_genes)
+            col .-= Statistics.mean(col)
+            col ./= (Statistics.std(col) + eps(Float32))
+        end
     # elseif mode == :around_0
     #     # we transform genes to mean 0 std 0, than add randn and then normalize  -= minimum  and  / sum
     #     genes_changed = genes_origianal[:, changed_genes]

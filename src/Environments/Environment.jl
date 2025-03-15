@@ -59,6 +59,13 @@ function Trajectory(states::ASSEQ, actions::Matrix{Float32}, rewards::Vector{Flo
     return Trajectory{ASSEQ}(states, actions, rewards, rewards_sum)
 end
 
+"""
+This one is used as holder only for states, other parts are not valid
+"""
+function Trajectory(states::ASSEQ) where {ASSEQ<:AbstractStateSequence}
+    return Trajectory{ASSEQ}(states, Matrix{Float32}(undef, 0, 0), Vector{Float64}(), 0.0)
+end
+
 # ------------------------------------------------------------------------------------------------
 # Interface functions
 

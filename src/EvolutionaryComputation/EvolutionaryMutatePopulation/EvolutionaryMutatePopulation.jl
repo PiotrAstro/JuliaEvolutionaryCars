@@ -11,7 +11,6 @@ import Random
 
 # tmp
 import Flux
-import Plots
 
 export EvolutionaryMutatePopulationAlgorithm
 

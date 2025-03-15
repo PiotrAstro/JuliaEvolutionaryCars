@@ -66,7 +66,7 @@ function lab_initialization(
     return medoids
 end
 
-@inline
+
 function get_point_nearest_second(distances::Matrix{F}, medoids::Vector{Int}, point::Int)::Tuple{Int,Int,F,F} where {F<:AbstractFloat}
     best_dist = typemax(F)
     second_best_dist = typemax(F)

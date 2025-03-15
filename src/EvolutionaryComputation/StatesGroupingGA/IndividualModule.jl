@@ -5,7 +5,6 @@ import ..EnvironmentWrapper
 import ..StatesGrouping
 
 import Random
-import Plots
 import Dates
 import Logging
 import Printf
@@ -462,23 +461,23 @@ function FIHC_top_to_bottom!(individual::Individual)
     end
 end
 
-function save_decision_plot(individual::Individual, path::Union{String, Nothing}=nothing)
-    env_wrapper = individual.env_wrapper
-    action_number = EnvironmentWrapper.get_action_size(env_wrapper)
-    genes_grouped = [[id for id in eachindex(individual.genes) if individual.genes[id] == action] for action in 1:action_number]
+# function save_decision_plot(individual::Individual, path::Union{String, Nothing}=nothing)
+#     env_wrapper = individual.env_wrapper
+#     action_number = EnvironmentWrapper.get_action_size(env_wrapper)
+#     genes_grouped = [[id for id in eachindex(individual.genes) if individual.genes[id] == action] for action in 1:action_number]
     
-    Plots.scatter(env_wrapper._encoded_exemplars[1, genes_grouped[1]], env_wrapper._encoded_exemplars[2, genes_grouped[1]], legend=false, size=(1500, 1500), markerstrokewidth=0)
-    for i in 2:action_number
-        Plots.scatter!(env_wrapper._encoded_exemplars[1, genes_grouped[i]], env_wrapper._encoded_exemplars[2, genes_grouped[i]], legend=false, markerstrokewidth=0)
-    end
+#     Plots.scatter(env_wrapper._encoded_exemplars[1, genes_grouped[1]], env_wrapper._encoded_exemplars[2, genes_grouped[1]], legend=false, size=(1500, 1500), markerstrokewidth=0)
+#     for i in 2:action_number
+#         Plots.scatter!(env_wrapper._encoded_exemplars[1, genes_grouped[i]], env_wrapper._encoded_exemplars[2, genes_grouped[i]], legend=false, markerstrokewidth=0)
+#     end
 
-    if isnothing(path)
-        timestamp_string = Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS")
-        path = "log/_P3_FIHC_output/$(timestamp_string)_$(get_fitness!(individual)).png"
-    end
+#     if isnothing(path)
+#         timestamp_string = Dates.format(Dates.now(), "yyyy-mm-dd_HH-MM-SS")
+#         path = "log/_P3_FIHC_output/$(timestamp_string)_$(get_fitness!(individual)).png"
+#     end
 
-    Plots.savefig(path)
-end
+#     Plots.savefig(path)
+# end
 
 
 

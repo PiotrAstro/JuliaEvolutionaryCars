@@ -86,13 +86,13 @@ How to set TESTED_VALUES:
 # we will change these values globally for all tests
 CONSTANTS_DICT[:run_config] = Dict(
     :max_generations => 10_000_000,  # 200
-    :max_evaluations => 1_000_000,  # 1_000_000
+    :max_evaluations => 30_000,  # 1_000_000
     :log => false,
     :visualize_each_n_epochs => 0,
 )
 
 # Number of run tests per each combination of tested values
-CASES_PER_TEST = 10
+CASES_PER_TEST = 50
 
 LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_" * timestamp)  # running test from scratch
 # LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_2024-12-27_12-31-13")  # running test from some start_position - it will recognize already done cases
@@ -103,18 +103,19 @@ TESTED_VALUES = [
         :ContinuousStatesGroupingSimpleGA,
         Dict(
             :ContinuousStatesGroupingSimpleGA => Dict(
-                :individuals_n => [4, 5],  # :individuals_n => [20, 100],
                 :env_wrapper => Dict(
                     :n_clusters => [20, 40],
+                    :distance_metric => [:cosine],
+                    :distance_membership_levels_method => [:flat, :hclust_complete],
+                    :exemplar_nn=>Dict(
+                        :interaction_method=>[:cosine],
+                        :membership_normalization=>[:none, :mval_2, :softmax]  # checking norm and unit doesnt make sense here, I take max anyway
+                    ),
                 ),
                 :fihc => Dict(
                     :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
-                ),
-                :cross => Dict(
-                    :norm_mode => [:d_sum, :min_0],
-                    :self_vs_other => [(0.5, 0.5), (0.0, 1.0)],
-                    :genes_combinations => [:tree_up, :tree_down, :flat], # :tree_up or :tree_down or :flat or :all
-                    :strategy => [:one_rand, :one_tournament, :rand_comb],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
+                    :norm_mode => [:d_sum, :none, :std],
+                    :factor => [0.3, 1.0, 3.0],
                 ),
             ),
         ),
@@ -123,39 +124,82 @@ TESTED_VALUES = [
         :ContinuousStatesGroupingSimpleGA,
         Dict(
             :ContinuousStatesGroupingSimpleGA => Dict(
-                :individuals_n => [20, 100],
                 :env_wrapper => Dict(
                     :n_clusters => [20, 40],
+                    :distance_metric => [:cosine, :mul, :mul_weighted, :mul_norm],
+                    :distance_membership_levels_method => [:flat, :hclust_complete],
+                    :exemplar_nn=>Dict(
+                        :interaction_method=>[:mul, :mul_norm],
+                        :membership_normalization=>[:none, :softmax]  # checking norm and unit doesnt make sense here, I take max anyway
+                    ),
                 ),
                 :fihc => Dict(
                     :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
-                ),
-                :cross => Dict(
-                    :norm_mode => [:d_sum, :min_0],
-                    :self_vs_other => [(0.8, 0.2), (0.5, 0.5), (0.0, 1.0)],
-                    :genes_combinations => [:all], # :tree_up or :tree_down or :flat or :all
-                    :strategy => [:all_seq],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
+                    :norm_mode => [:d_sum, :none, :std],
+                    :factor => [0.3, 1.0, 3.0],
                 ),
             ),
         ),
     ),
-    (
-        :ContinuousStatesGroupingSimpleGA,
-        Dict(
-            :ContinuousStatesGroupingSimpleGA => Dict(
-                :individuals_n => [20, 100],
-                :env_wrapper => Dict(
-                    :n_clusters => [20, 40],
-                ),
-                :fihc => Dict(
-                    :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
-                ),
-                :cross => Dict(
-                    :strategy => [:none],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
-                ),
-            ),
-        ),
-    ),
+
+    # some older test
+    # (
+    #     :ContinuousStatesGroupingSimpleGA,
+    #     Dict(
+    #         :ContinuousStatesGroupingSimpleGA => Dict(
+    #             :individuals_n => [20, 100],  # :individuals_n => [20, 100],
+    #             :env_wrapper => Dict(
+    #                 :n_clusters => [20, 40],
+    #             ),
+    #             :fihc => Dict(
+    #                 :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
+    #             ),
+    #             :cross => Dict(
+    #                 :norm_mode => [:d_sum, :min_0],
+    #                 :self_vs_other => [(0.5, 0.5), (0.0, 1.0)],
+    #                 :genes_combinations => [:tree_up, :tree_down, :flat], # :tree_up or :tree_down or :flat or :all
+    #                 :strategy => [:one_rand, :one_tournament, :rand_comb],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
+    #             ),
+    #         ),
+    #     ),
+    # ),
+    # (
+    #     :ContinuousStatesGroupingSimpleGA,
+    #     Dict(
+    #         :ContinuousStatesGroupingSimpleGA => Dict(
+    #             :individuals_n => [20, 100],
+    #             :env_wrapper => Dict(
+    #                 :n_clusters => [20, 40],
+    #             ),
+    #             :fihc => Dict(
+    #                 :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
+    #             ),
+    #             :cross => Dict(
+    #                 :norm_mode => [:d_sum, :min_0],
+    #                 :self_vs_other => [(0.8, 0.2), (0.5, 0.5), (0.0, 1.0)],
+    #                 :genes_combinations => [:all], # :tree_up or :tree_down or :flat or :all
+    #                 :strategy => [:all_seq],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
+    #             ),
+    #         ),
+    #     ),
+    # ),
+    # (
+    #     :ContinuousStatesGroupingSimpleGA,
+    #     Dict(
+    #         :ContinuousStatesGroupingSimpleGA => Dict(
+    #             :individuals_n => [20, 100],
+    #             :env_wrapper => Dict(
+    #                 :n_clusters => [20, 40],
+    #             ),
+    #             :fihc => Dict(
+    #                 :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
+    #             ),
+    #             :cross => Dict(
+    #                 :strategy => [:none],  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
+    #             ),
+    #         ),
+    #     ),
+    # ),
 ]
 
 
@@ -273,7 +317,7 @@ file_logger = CustomLoggers.SimpleFileLogger(joinpath(LOGS_DIR, OUTPUT_LOG_FILE)
 Logging.global_logger(file_logger)
 
 # --------------------------------------------------------------------------------------------------
-# logging, fguring out what computations we will do, which are already done
+# logging, figuring out what computations we will do, which are already done
 special_dicts = create_all_special_dicts(TESTED_VALUES)
 
 io = IOBuffer()

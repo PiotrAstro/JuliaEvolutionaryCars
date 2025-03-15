@@ -8,7 +8,6 @@ import ..Environment
 import ..EnvironmentWrapper
 
 import Random
-import Plots
 import Dates
 import Statistics
 

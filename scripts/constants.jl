@@ -22,7 +22,7 @@ CONSTANTS_DICT = Dict(
     # Universal staff
     :run_config => Dict(
         :max_generations => 1000,
-        :max_evaluations => 1_00_000,
+        :max_evaluations => 1_000_000,
         :log => true,
         :visualize_each_n_epochs => 0,
     ),
@@ -96,6 +96,77 @@ CONSTANTS_DICT = Dict(
 
     # ------------------------------------------------------------------------------------
     # method specific staff
+    :ContinuousStatesGroupingP3 => Dict(
+        :env_wrapper => Dict(
+            :encoder_dict => Dict(
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 10,
+                    :output_size => 16,  # 16
+                    :hidden_layers => 2,
+                    :hidden_neurons => 32,  # 32
+                    :dropout => 0.0,  # 0.5
+                    :activation_function => :relu,  # :relu
+                    :input_activation_function => :none,
+                    :last_activation_function => :none
+                )
+            ),
+            :decoder_dict => Dict(
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 16,  # 16
+                    :output_size => 10,  # it should be 10, 9 is for normal learning
+                    :hidden_layers => 2,  # was 1
+                    :hidden_neurons => 32,  # 64
+                    :dropout => 0.0,  # 0.5
+                    :activation_function => :relu,  # :relu
+                    :input_activation_function => :relu,  # shouldnt it be :none?
+                    :last_activation_function => :none, # was :none
+                    :loss => :mse
+                )
+            ),
+            :autoencoder_dict => Dict(
+                :mmd_weight => 0.0,  # turns out it might be beneficial to set it to 0.01, so maybe in the future compare e.g. 0.0, 0.01, 0.1
+                :learning_rate => 0.001
+            ),
+            :initial_space_explorers_n => 30,
+            :max_states_considered => 10_000,
+            :n_clusters => 40,  # 40 and 200 works very well, should try different values
+            :verbose => true,
+            :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock, after some initial tests it should definatelly be cosine!
+            :hclust_distance => :complete,  # :ward or :single or :complete or :average
+            :hclust_time => :complete,  # :ward or :single or :complete or :average
+            :exemplars_clustering => :pam,  # :genie or :kmedoids or :pam
+            :distance_membership_levels_method => :hclust_complete,
+            :time_distance_tree => :markov,  # :markov or :mine
+            :exemplar_nn=>Dict(
+                :interaction_method=>:cosine,
+                :membership_normalization=>:mval_2,
+                :activation_function=>:dsum,
+            ),
+        ),
+        :fihc => Dict(
+            :fihc_mode => :per_gene_rand,
+            :norm_mode => :d_sum,
+            :factor => 1.0,
+            :hier_factor => 1.0,
+            :random_matrix_mode => :rand_n_different,
+            :local_fuzzy => :none,
+        ),
+        :cross => Dict(
+            :norm_mode => :d_sum,
+            :self_vs_other => (0.0, 1.0),
+            :genes_combinations => :tree_up, # :tree_up or :tree_down or :flat or :all
+            :strategy => :all_comb,  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
+        ),
+        :initial_genes_mode => :scale,  # :scale or :softmax
+    ),
+
+
+
+
+
+
     :ContinuousStatesGroupingSimpleGA => Dict(
         :env_wrapper => Dict(
             :encoder_dict => Dict(
@@ -136,12 +207,16 @@ CONSTANTS_DICT = Dict(
             :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock, after some initial tests it should definatelly be cosine!
             :hclust_distance => :complete,  # :ward or :single or :complete or :average
             :hclust_time => :complete,  # :ward or :single or :complete or :average
-            :m_value => 2,  # 2 is better than 1
             :exemplars_clustering => :pam,  # :genie or :kmedoids or :pam
             :distance_membership_levels_method => :hclust_complete,
             :time_distance_tree => :markov,  # :markov or :mine
+            :exemplar_nn=>Dict(
+                :interaction_method=>:cosine,
+                :membership_normalization=>:mval_2,
+                :activation_function=>:none,
+            ),
         ),
-        :individuals_n => 20,
+        :individuals_n => 50,
         :fihc => Dict(
             :fihc_mode => :per_gene_rand,
             :norm_mode => :d_sum,
@@ -157,55 +232,6 @@ CONSTANTS_DICT = Dict(
             :strategy => :rand_comb,  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
         ),
         :initial_genes_mode => :scale,  # :scale or :softmax
-    ),
-
-
-
-
-
-    :ContinuousStatesGroupingP3 => Dict(
-        :env_wrapper => Dict(
-            :encoder_dict => Dict(
-                :name => :MLP_NN,
-                :kwargs => Dict(
-                    :input_size => 10,
-                    :output_size => 16,  # 16
-                    :hidden_layers => 2,
-                    :hidden_neurons => 32,  # 32
-                    :dropout => 0.0,  # 0.5
-                    :activation_function => :relu,  # :relu
-                    :input_activation_function => :none,
-                    :last_activation_function => :none
-                )
-            ),
-            :decoder_dict => Dict(
-                :name => :MLP_NN,
-                :kwargs => Dict(
-                    :input_size => 16,  # 16
-                    :output_size => 10,  # it should be 10, 9 is for normal learning
-                    :hidden_layers => 2,  # was 1
-                    :hidden_neurons => 32,  # 64
-                    :dropout => 0.0,  # 0.5
-                    :activation_function => :relu,  # :relu
-                    :input_activation_function => :relu,  # shouldnt it be :none?
-                    :last_activation_function => :none, # was :none
-                    :loss => :mse
-                )
-            ),
-            :autoencoder_dict => Dict(
-                :mmd_weight => 0.0,  # IDK why, but in early tests clearly 0.0 was the best, so MMD wasnt used at all, there was a huge difference
-                :learning_rate => 0.001
-            ),
-            :initial_space_explorers_n => 30,
-            :max_states_considered => 10_000,
-            :n_clusters => 40,  # 40 and 200 works very well, should try different values
-            :verbose => false,
-            :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock, after some initial tests it should definatelly be cosine!
-            :hclust_distance => :ward,  # :ward or :single or :complete or :average
-            :hclust_time => :ward,  # :ward or :single or :complete or :average
-            :m_value => 2,  # 2 is better than 1
-            :exemplars_clustering => :pam  # :genie or :kmedoids or :pam
-        )
     ),
 
 

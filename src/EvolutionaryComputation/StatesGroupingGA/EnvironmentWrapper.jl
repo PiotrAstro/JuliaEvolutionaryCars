@@ -7,11 +7,8 @@ import ..StatesGrouping
 import Statistics
 import Clustering
 import Distances
-import Plots
 import Dates
-import JLD
 import Logging
-using StatsPlots
 
 export EnvironmentWrapperStruct, get_action_size, get_groups_number, get_fitness, copy, is_verbose, set_verbose!, translate, create_new_based_on, create_time_distance_tree, clean_memory!
 
