@@ -93,9 +93,9 @@ struct MulNormDistance <: Distances.SemiMetric
 end
 
 function (_::MulNormDistance)(x::AbstractVector{F}, y::AbstractVector{F}) where {F<:AbstractFloat}
-    x_norm = x - Statistics.mean(x)
+    x_norm = x .- Statistics.mean(x)
     x_norm ./= Statistics.std(x)
-    y_norm = y - Statistics.mean(y)
+    y_norm = y .- Statistics.mean(y)
     y_norm ./= Statistics.std(y)
     return LinearAlgebra.dot(x_norm, y_norm)
 end
