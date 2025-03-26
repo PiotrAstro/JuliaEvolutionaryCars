@@ -158,3 +158,9 @@ end # module EvolutionaryCarsJulia
 # dla każdego genu patrzymy jaki ma on membership do wszystkich innyych exemplarów poza nim samym
 # na podstawie tego obliczamy jaka byłaby jego wartość i dodajemy tą wartość do niego
 # ewentualnie możemy patrzeć na geny po kolei dookoła i sprawdzać czy one z wartością membership swoją coś pomogą
+
+
+
+# ------------------------------------------------------------------------------------------------------
+# Zaimplementować DE!
+# dodatkowo jakiś lepszy lokal search, może VNS? Możel MLB czy coś takiego

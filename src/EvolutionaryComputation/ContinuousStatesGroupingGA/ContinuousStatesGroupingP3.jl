@@ -113,19 +113,6 @@ function crossover!(ind::Individual, other_individuals::Vector{Individual}) :: I
                 evals += 1
             end
         end
-    elseif strategy == :one_tournament
-        other_inds = other_individuals[Random.randperm(other_n)[1:2]]
-        other = other_inds[1]
-        if Random.rand() < 0.5
-            other = get_fitness!(other_inds[1]) > get_fitness!(other_inds[2]) ? other_inds[1] : other_inds[2]
-        end
-
-        for nodes_level in genes_comb
-            for node in Random.shuffle(nodes_level)
-                accept_if_better!(ind, other, node)
-                evals += 1
-            end
-        end
     elseif strategy == :all_seq
         for other in Random.shuffle(other_individuals)
             for nodes_level in genes_comb
@@ -164,23 +151,8 @@ function crossover!(ind::Individual, other_individuals::Vector{Individual}) :: I
 end
 
 function accept_if_better!(ind::Individual, other::Individual, genes_changed::Vector{Float32})::Bool
-    # for _ in 1:10
-    #     FIHC_test!(ind; ind.fihc_dict...)
-    # end
-
-    # for _ in 1:10
-    #     FIHC_test!(other; other.fihc_dict...)
-    # end
-
-    # println("\n\n\nThis:")
-    # display(ind.genes)
-    # println("\nOther:")
-    # display(EnvironmentWrapper.translate(other.env_wrapper, other.genes, ind.env_wrapper))
-    # throw("dsdsvdsfvfdbjkfd")
-
     old_genes = Base.copy(ind.genes)
     old_fitness = get_fitness!(ind)
-
     new_genes = generate_new_genes(ind, other, genes_changed)
     ind.genes = new_genes
     ind._fitness_actual = false
@@ -215,6 +187,7 @@ function generate_new_genes(ind::Individual, other::Individual, genes_changed::V
 
     return final_new_genes
 end
+
 
 function copy_genes!(ind_to::Individual, ind_from::Individual)
     ind_to.genes = EnvironmentWrapper.translate(ind_from.env_wrapper, ind_from.genes, ind_to.env_wrapper)

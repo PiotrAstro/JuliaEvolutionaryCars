@@ -86,13 +86,13 @@ How to set TESTED_VALUES:
 # we will change these values globally for all tests
 CONSTANTS_DICT[:run_config] = Dict(
     :max_generations => 10_000_000,  # 200
-    :max_evaluations => 30_000,  # 1_000_000
+    :max_evaluations => 300_000,  # 1_000_000
     :log => false,
     :visualize_each_n_epochs => 0,
 )
 
 # Number of run tests per each combination of tested values
-CASES_PER_TEST = 50
+CASES_PER_TEST = 5
 
 LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_" * timestamp)  # running test from scratch
 # LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_2024-12-27_12-31-13")  # running test from some start_position - it will recognize already done cases
@@ -105,17 +105,14 @@ TESTED_VALUES = [
             :ContinuousStatesGroupingSimpleGA => Dict(
                 :env_wrapper => Dict(
                     :n_clusters => [20, 40],
-                    :distance_metric => [:cosine],
-                    :distance_membership_levels_method => [:flat, :hclust_complete],
-                    :exemplar_nn=>Dict(
-                        :interaction_method=>[:cosine],
-                        :membership_normalization=>[:none, :mval_2, :softmax]  # checking norm and unit doesnt make sense here, I take max anyway
-                    ),
                 ),
-                :fihc => Dict(
-                    :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
-                    :norm_mode => [:d_sum, :none, :std],
-                    :factor => [0.3, 1.0, 3.0],
+                :individuals_n => [50, 300],
+                :initial_genes_mode => [:d_sum],
+                :cross => Dict(
+                    :norm_mode => [:d_sum],
+                    :genes_combinations => [:all, :flat, :tree_up], # :tree_up or :tree_down or :flat or :all
+                    :cross_strategy => [:best, :rand, :self],
+                    :f_value => [0.4, 0.8],
                 ),
             ),
         ),
@@ -126,17 +123,32 @@ TESTED_VALUES = [
             :ContinuousStatesGroupingSimpleGA => Dict(
                 :env_wrapper => Dict(
                     :n_clusters => [20, 40],
-                    :distance_metric => [:cosine, :mul, :mul_weighted, :mul_norm],
-                    :distance_membership_levels_method => [:flat, :hclust_complete],
-                    :exemplar_nn=>Dict(
-                        :interaction_method=>[:mul, :mul_norm],
-                        :membership_normalization=>[:none, :softmax]  # checking norm and unit doesnt make sense here, I take max anyway
-                    ),
                 ),
-                :fihc => Dict(
-                    :random_matrix_mode => [:rand_n_different, :rand_n_same],  # [:rand_different, :rand_n_different, :rand_same, :rand_n_same]
-                    :norm_mode => [:d_sum, :none, :std],
-                    :factor => [0.3, 1.0, 3.0],
+                :individuals_n => [50, 300],
+                :initial_genes_mode => [:none],
+                :cross => Dict(
+                    :norm_mode => [:none],
+                    :genes_combinations => [:all, :flat, :tree_up], # :tree_up or :tree_down or :flat or :all
+                    :cross_strategy => [:best, :rand, :self],
+                    :f_value => [0.4, 0.8],
+                ),
+            ),
+        ),
+    ),
+    (
+        :ContinuousStatesGroupingSimpleGA,
+        Dict(
+            :ContinuousStatesGroupingSimpleGA => Dict(
+                :env_wrapper => Dict(
+                    :n_clusters => [20, 40],
+                ),
+                :individuals_n => [50, 300],
+                :initial_genes_mode => [:std],
+                :cross => Dict(
+                    :norm_mode => [:std],
+                    :genes_combinations => [:all, :flat, :tree_up], # :tree_up or :tree_down or :flat or :all
+                    :cross_strategy => [:best, :rand, :self],
+                    :f_value => [0.4, 0.8],
                 ),
             ),
         ),

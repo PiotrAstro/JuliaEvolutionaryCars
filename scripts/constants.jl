@@ -202,7 +202,7 @@ CONSTANTS_DICT = Dict(
             ),
             :initial_space_explorers_n => 30,
             :max_states_considered => 10_000,
-            :n_clusters => 20,  # 40 and 200 works very well, should try different values
+            :n_clusters => 2,  # 40 and 200 works very well, should try different values
             :verbose => false,
             :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock, after some initial tests it should definatelly be cosine!
             :hclust_distance => :complete,  # :ward or :single or :complete or :average
@@ -216,9 +216,13 @@ CONSTANTS_DICT = Dict(
                 :activation_function=>:none,
             ),
         ),
-        :individuals_n => 50,
+        :individuals_n => 20,
+        :initial_genes_mode => :d_sum,  # :scale or :softmax
+        :new_individual_each_n_epochs => 1,
+        :new_individual_genes => :rand,
         :fihc => Dict(
-            :fihc_mode => :per_gene_rand,
+            :fihc_mode => :none,
+            :levels_mode => :distance,  # mostly :distance or :time_down
             :norm_mode => :d_sum,
             :factor => 1.0,
             :hier_factor => 1.0,
@@ -229,9 +233,13 @@ CONSTANTS_DICT = Dict(
             :norm_mode => :d_sum,
             :self_vs_other => (0.0, 1.0),
             :genes_combinations => :tree_up, # :tree_up or :tree_down or :flat or :all
-            :strategy => :rand_comb,  # :one_rand or :one_tournament or or :all_seq or :all_comb or rand_comb
+            :strategy => :yes,
+            :cross_strategy => :best,
+            :cross_prob => 1.0,
+            :f_value => 0.8,
+            :cross_prob_mode => :column,
         ),
-        :initial_genes_mode => :scale,  # :scale or :softmax
+        
     ),
 
 
