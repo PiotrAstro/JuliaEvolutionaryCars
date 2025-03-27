@@ -8,6 +8,7 @@ import Statistics as St
 import Printf as Pf
 import JLD
 import Random
+import DataFrames
 
 # tmp
 import Flux
@@ -237,6 +238,12 @@ function EvolutionaryMutatePopulationAlgorithm(;
 end
 
 function AbstractOptimizerModule.run!(algo::EvolutionaryMutatePopulationAlgorithm; max_generations::Int, max_evaluations::Int, log::Bool=true, visualize_each_n_epochs::Int=0)
+    quantiles = [0.25, 0.5, 0.75, 0.95]
+    percentiles = (trunc(Int, 100 * quantile) for quantile in quantiles)
+    percentiles_names = [Symbol("percentile_$percentile") for percentile in percentiles]
+    # (generation, total_evaluations, best_fitness)
+    list_with_results = Vector{Tuple}()
+
     for generation in 1:max_generations
         if generation * algo.population_size >= max_evaluations
             break
@@ -293,9 +300,9 @@ function AbstractOptimizerModule.run!(algo::EvolutionaryMutatePopulationAlgorith
             end
         end
 
-        if log
-            quantiles = [0.25, 0.5, 0.75, 0.95]
-            quantiles_values = St.quantile(get_fitness.(algo.population), quantiles)
+        quantiles_values = St.quantile(get_fitness.(algo.population), quantiles)
+
+        if log    
             elapsed_time = time_end - time_start
             one_mutation_ratio = Threads.nthreads() * elapsed_time / length(algo.population)
             Pf.@printf "Generation: %i, time: %.3f, threads: %i, calculated: %i, time*threads/calc: %.3f\n" generation elapsed_time Threads.nthreads() length(algo.population_size) one_mutation_ratio
@@ -307,7 +314,18 @@ function AbstractOptimizerModule.run!(algo::EvolutionaryMutatePopulationAlgorith
         if visualize_each_n_epochs > 0 && generation % visualize_each_n_epochs == 0
             Environment.visualize!(algo.visualization_environment, algo.best_individual.neural_network; algo.visualization_kwargs...)
         end
+
+        push!(
+            list_with_results,
+            (generation, generation * algo.population_size, get_fitness(algo.best_individual), quantiles_values...)
+        )
     end
+
+    data_frame = DataFrames.DataFrame(
+        list_with_results,
+        [:generation, :total_evaluations, :best_fitness, percentiles_names...]
+    )
+    return data_frame
 end
 
 function _save_previous_responses(algo::EvolutionaryMutatePopulationAlgorithm, save_dir::String = "log/_evolutionary_mutate_population/")
