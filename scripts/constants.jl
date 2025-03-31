@@ -202,7 +202,7 @@ CONSTANTS_DICT = Dict(
             ),
             :initial_space_explorers_n => 30,
             :max_states_considered => 10_000,
-            :n_clusters => 2,  # 40 and 200 works very well, should try different values
+            :n_clusters => 20,  # 40 and 200 works very well, should try different values
             :verbose => false,
             :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock, after some initial tests it should definatelly be cosine!
             :hclust_distance => :complete,  # :ward or :single or :complete or :average
@@ -216,21 +216,21 @@ CONSTANTS_DICT = Dict(
                 :activation_function=>:none,
             ),
         ),
-        :individuals_n => 20,
-        :initial_genes_mode => :d_sum,  # :scale or :softmax
+        :individuals_n => 100,
+        :initial_genes_mode => :std,  # :scale or :softmax
         :new_individual_each_n_epochs => 1,
         :new_individual_genes => :rand,
         :fihc => Dict(
             :fihc_mode => :none,
             :levels_mode => :distance,  # mostly :distance or :time_down
-            :norm_mode => :d_sum,
+            :norm_mode => :std,
             :factor => 1.0,
             :hier_factor => 1.0,
             :random_matrix_mode => :rand_n_different,
             :local_fuzzy => :none,
         ),
         :cross => Dict(
-            :norm_mode => :d_sum,
+            :norm_mode => :std,
             :self_vs_other => (0.0, 1.0),
             :genes_combinations => :tree_up, # :tree_up or :tree_down or :flat or :all
             :strategy => :yes,
@@ -385,7 +385,7 @@ CONSTANTS_DICT = Dict(
                 :input_size => 10,
                 :output_size => 9,  # 6 # 3 # 9
                 :hidden_layers => 2,
-                :hidden_neurons => 64,  # 64
+                :hidden_neurons => 32,  # was 64
                 :dropout => 0.0,
                 :activation_function => :relu,  # :relu
                 :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
