@@ -130,7 +130,7 @@ TESTED_VALUES = [
                         :dropout => [0.0],
                     )
                 ),
-                :game_decoder_dict => Dict(
+                :encoder_dict => Dict(
                     :kwargs => Dict(
                         :dropout => [0.0],
                     )
@@ -167,7 +167,7 @@ TESTED_VALUES = [
                         :dropout => [0.3],
                     )
                 ),
-                :game_decoder_dict => Dict(
+                :encoder_dict => Dict(
                     :kwargs => Dict(
                         :dropout => [0.3],
                     )
