@@ -113,20 +113,17 @@ end
 
 function membership_softmax!(interaction::AbstractVector{Float32})
     max_val = typemin(Float32)
-    LoopVectorization.@turbo for i in eachindex(interaction)
-        max_val = max(max_val, interaction[i])
+    for val in interaction
+        @fastmath max_val = ifelse(val > max_val, val, max_val)
     end
     interaction .-= max_val
-    LoopVectorization.@turbo for i in eachindex(interaction)
-        interaction[i] = exp(interaction[i])
-    end
+    broadcast!(exp, interaction, interaction)
     interaction .*= 1.0f0 / sum(interaction)
 end
 
 function membership_mval_generator(m_value::Int)
     return (interaction::AbstractVector{Float32}) -> begin
-        LoopVectorization.@turbo for i in eachindex(interaction)
-            # shorthand
+        @fastmath @inbounds @simd for i in eachindex(interaction)
             distance = abs(1.0f0 - interaction[i]) + EPSILON_EXEMPLARBASEDNN
             interaction[i] = (1.0f0 / distance) ^ m_value
         end
@@ -140,13 +137,11 @@ end
 # There will be difference for crossover, I should check how to do it properly
 function activation_softmax!(interaction::AbstractVector{Float32})
     max_val = typemin(Float32)
-    LoopVectorization.@turbo for i in eachindex(interaction)
-        max_val = max(max_val, interaction[i])
+    for val in interaction
+        @fastmath max_val = ifelse(val > max_val, val, max_val)
     end
     interaction .-= max_val
-    LoopVectorization.@turbo for i in eachindex(interaction)
-        interaction[i] = exp(interaction[i])
-    end
+    broadcast!(exp, interaction, interaction)
     interaction .*= 1.0f0 / sum(interaction)
 end
 

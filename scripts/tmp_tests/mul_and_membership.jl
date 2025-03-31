@@ -1,6 +1,8 @@
 module MulAndMembership
 
+using BenchmarkTools
 import Distances
+using LoopVectorization
 
 function test_membership()
     rand_values = (rand(10, 10) .- 0.5) .* 2
@@ -59,7 +61,66 @@ function softmax!(x::Matrix)
     end
 end
 
+function max_speed_test()
+    vector = rand(Float32, 1000)
+
+    println("\n\n\nStarting max speed test")
+    println("Vector size: $(length(vector))")
+
+    println("Library function")
+    display(@benchmark maximum($vector))
+    println("Custom function")
+    display(@benchmark custom_maximum($vector))
+end
+
+function custom_maximum(vector::Vector{Float32})
+    max_val = typemin(Float32)
+    # for val in vector
+    #     max_val = ifelse(val > max_val, val, max_val)
+    # end
+
+    @inbounds for i in eachindex(vector)
+        @fastmath max_val = ifelse(vector[i] > max_val, vector[i], max_val)
+    end
+
+    # @turbo for i in eachindex(vector)
+    #     max_val = ifelse(vector[i] > max_val, vector[i], max_val)
+    # end
+    return max_val
+end
+
+function mval_test()
+    vector = rand(Float32, 9)
+    println("Vector size: $(length(vector))")
+    println("LoopVectorization")
+    display(@benchmark loop_vec_mval($vector, Val(2)))
+    println("Custom")
+    display(@benchmark normal_mval($vector, Val(2)))
+end
+
+function loop_vec_mval(vector::Vector{Float32}, ::Val{MVAL}) where {MVAL}
+    # LoopVectorization.@turbo for i in eachindex(vector)
+    #     distance = abs(1.0f0 - vector[i]) + EPSILON_EXEMPLARBASEDNN
+    #     vector[i] = (1.0f0 / distance) ^ mval
+    # end
+    LoopVectorization.@turbo for i in eachindex(vector)
+        distance = abs(1.0f0 - vector[i]) + Float32(1e-6)
+        vector[i] = (1.0f0 / distance) ^ MVAL
+    end
+    vector .*= 1.0f0 / sum(vector)
+end
+
+function normal_mval(vector::Vector{Float32}, ::Val{MVAL}) where {MVAL}
+    @fastmath @inbounds @simd for i in eachindex(vector)
+        distance = abs(1.0f0 - vector[i]) + Float32(1e-6)
+        vector[i] = (1.0f0 / distance) ^ MVAL
+    end
+    vector .*= 1.0f0 / sum(vector)
+end
+
+
 end
 
 import .MulAndMembership
-MulAndMembership.test_membership()
+MulAndMembership.mval_test()
+# MulAndMembership.test_membership()

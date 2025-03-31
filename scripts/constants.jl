@@ -216,7 +216,7 @@ CONSTANTS_DICT = Dict(
                 :activation_function=>:none,
             ),
         ),
-        :individuals_n => 100,
+        :individuals_n => 50,
         :initial_genes_mode => :std,  # :scale or :softmax
         :new_individual_each_n_epochs => 1,
         :new_individual_genes => :rand,

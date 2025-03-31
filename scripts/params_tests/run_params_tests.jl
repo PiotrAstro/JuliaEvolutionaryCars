@@ -86,13 +86,13 @@ How to set TESTED_VALUES:
 # we will change these values globally for all tests
 CONSTANTS_DICT[:run_config] = Dict(
     :max_generations => 10_000_000,  # 200
-    :max_evaluations => 600_000,  # 1_000_000
+    :max_evaluations => 1_000_000,  # 1_000_000
     :log => false,
     :visualize_each_n_epochs => 0,
 )
 
 # Number of run tests per each combination of tested values
-CASES_PER_TEST = 8
+CASES_PER_TEST = 14
 
 LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_" * timestamp)  # running test from scratch
 # LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_2024-12-27_12-31-13")  # running test from some start_position - it will recognize already done cases
@@ -113,7 +113,6 @@ TESTED_VALUES = [
         Dict(
             :ContinuousStatesGroupingSimpleGA => Dict(
                 :env_wrapper => Dict(
-                    :n_clusters => [20, 40],
                     :exemplar_nn=>[
                         Dict(
                             :interaction_method=>:cosine,
@@ -135,7 +134,7 @@ TESTED_VALUES = [
                         )
                     ),
                     :autoencoder_dict => Dict(
-                        :mmd_weight => [0.0, 0.03], 
+                        :mmd_weight => [0.0, 0.01, 0.1], 
                     ),
                 ),
                 :cross => Dict(
