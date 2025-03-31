@@ -202,7 +202,7 @@ end
 Changes values in destination_dict to values from source_dict.
 destination is e..g. copy of onfig file, source is one of the special dicts
 """
-function change_dict_value!(destination_dict::Dict{Symbol, <:Any}, source_dict::Dict{Symbol, Any})
+function change_dict_value!(destination_dict::Dict{Symbol, <:Any}, source_dict::Dict{Symbol, <:Any})
     for (key, value) in source_dict
         if isa(value, Dict)
             change_dict_value!(destination_dict[key], value)

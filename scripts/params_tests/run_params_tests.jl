@@ -92,7 +92,7 @@ CONSTANTS_DICT[:run_config] = Dict(
 )
 
 # Number of run tests per each combination of tested values
-CASES_PER_TEST = 10
+CASES_PER_TEST = 8
 
 LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_" * timestamp)  # running test from scratch
 # LOGS_DIR = joinpath(pwd(), "log", "parameters_tests_2024-12-27_12-31-13")  # running test from some start_position - it will recognize already done cases
