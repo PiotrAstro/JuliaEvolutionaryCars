@@ -114,29 +114,29 @@ TESTED_VALUES = [
             :ContinuousStatesGroupingSimpleGA => Dict(
                 :env_wrapper => Dict(
                     :n_clusters => [20, 40],
-                ),
-                :exemplar_nn=>[
-                    Dict(
-                        :interaction_method=>:cosine,
-                        :membership_normalization=>:mval_2,
+                    :exemplar_nn=>[
+                        Dict(
+                            :interaction_method=>:cosine,
+                            :membership_normalization=>:mval_2,
+                        ),
+                        Dict(
+                            :interaction_method=>:mul,
+                            :membership_normalization=>:softmax,
+                        ),
+                    ],
+                    :decoder_dict => Dict(
+                        :kwargs => Dict(
+                            :dropout => [0.0],
+                        )
                     ),
-                    Dict(
-                        :interaction_method=>:mul,
-                        :membership_normalization=>:softmax,
+                    :encoder_dict => Dict(
+                        :kwargs => Dict(
+                            :dropout => [0.0],
+                        )
                     ),
-                ],
-                :decoder_dict => Dict(
-                    :kwargs => Dict(
-                        :dropout => [0.0],
-                    )
-                ),
-                :encoder_dict => Dict(
-                    :kwargs => Dict(
-                        :dropout => [0.0],
-                    )
-                ),
-                :autoencoder_dict => Dict(
-                    :mmd_weight => [0.0, 0.03], 
+                    :autoencoder_dict => Dict(
+                        :mmd_weight => [0.0, 0.03], 
+                    ),
                 ),
                 :cross => Dict(
                     :genes_combinations => [:flat, :tree_up], # :tree_up or :tree_down or :flat or :all
@@ -151,29 +151,29 @@ TESTED_VALUES = [
             :ContinuousStatesGroupingSimpleGA => Dict(
                 :env_wrapper => Dict(
                     :n_clusters => [20, 40],
-                ),
-                :exemplar_nn=>[
-                    Dict(
-                        :interaction_method=>:cosine,
-                        :membership_normalization=>:mval_2,
+                    :exemplar_nn=>[
+                        Dict(
+                            :interaction_method=>:cosine,
+                            :membership_normalization=>:mval_2,
+                        ),
+                        Dict(
+                            :interaction_method=>:mul,
+                            :membership_normalization=>:softmax,
+                        ),
+                    ],
+                    :decoder_dict => Dict(
+                        :kwargs => Dict(
+                            :dropout => [0.3],
+                        )
                     ),
-                    Dict(
-                        :interaction_method=>:mul,
-                        :membership_normalization=>:softmax,
+                    :encoder_dict => Dict(
+                        :kwargs => Dict(
+                            :dropout => [0.3],
+                        )
                     ),
-                ],
-                :decoder_dict => Dict(
-                    :kwargs => Dict(
-                        :dropout => [0.3],
-                    )
-                ),
-                :encoder_dict => Dict(
-                    :kwargs => Dict(
-                        :dropout => [0.3],
-                    )
-                ),
-                :autoencoder_dict => Dict(
-                    :mmd_weight => [0.0, 0.03], 
+                    :autoencoder_dict => Dict(
+                        :mmd_weight => [0.0, 0.03], 
+                    ),
                 ),
                 :cross => Dict(
                     :genes_combinations => [:flat, :tree_up], # :tree_up or :tree_down or :flat or :all
