@@ -50,6 +50,7 @@ function learn!(
     encoder = get_Flux_representation(nn.encoder)
     decoder = get_Flux_representation(nn.decoder)
     chained = nn.chained
+    Flux.testmode!(chained, :auto)
 
     # Set up the optimizer and optimizer state
     # (params, _) = Flux.setup(encoder, decoder)

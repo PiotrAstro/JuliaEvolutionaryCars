@@ -61,6 +61,7 @@ function learn!(
     verbose::Bool = false
 )
     nn_internal = get_Flux_representation(nn)
+    Flux.testmode!(nn_internal, :auto)
     nn_loss = get_loss(nn)
 
     opt_settings = Optimisers.AdamW(learning_rate)

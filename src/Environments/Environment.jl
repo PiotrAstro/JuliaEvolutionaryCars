@@ -12,7 +12,7 @@ export AbstractStateSequence, get_length, copy_nth_state, get_sequence_with_ids,
 # INTERNAL - internal concrete type, environment will receive it for reaction, e.g. Vector{Float32} or Array{Float32, 3} for rgb images
 abstract type AbstractStateSequence{INTERNAL} end
 
-# AbstractStateSequence should have the same type in return
+# AbstractStateSequence should have the same type in return, it should take some iterable object
 function (::AbstractStateSequence{INTERNAL})(states::AbstractVector{INTERNAL}) :: AbstractStateSequence{INTERNAL} where {INTERNAL}
     throw("unimplemented")
 end
@@ -110,8 +110,24 @@ function copy(env::AbstractEnvironment)
     throw("unimplemented")
 end
 
+"""
+A thread safe structure to store run statistics.
+- Frames are single observations of the environment (those received by Agents)
+- Evaluations are number of times get_trajectory_rewards! or get_trajectory_data! was called
+- Trajectories are number opf trajectories that were generated or could be (so e.g. for get_trajectory_rewards! with 5 environments it will be 5)
 
-
+Total vs Collected
+- Total are from get_trajectory_rewards! + get_trajectory_data! calls
+- Collected are from get_trajectory_data! only
+"""
+@kwdef struct RunStatistics
+    total_frames::Threads.Atomic{Int} = Threads.Atomic{Int}(0)
+    total_evaluations::Threads.Atomic{Int} = Threads.Atomic{Int}(0)
+    total_trajectories::Threads.Atomic{Int} = Threads.Atomic{Int}(0)
+    collected_frames::Threads.Atomic{Int} = Threads.Atomic{Int}(0)
+    collected_evaluations::Threads.Atomic{Int} = Threads.Atomic{Int}(0)
+    collected_trajectories::Threads.Atomic{Int} = Threads.Atomic{Int}(0)
+end
 
 # using BenchmarkTools
 # import Profile
@@ -124,6 +140,7 @@ Get the rewards of the trajectory of the environments using the neural network. 
 function get_trajectory_rewards!(
         envs::Vector{E},
         neural_network::NeuralNetwork.AbstractNeuralNetwork;
+        run_statistics::Union{Nothing, RunStatistics} = nothing,
         reset::Bool = true
     ) :: Vector{Float64} where {INTERNAL, ASSEQ<:AbstractStateSequence{INTERNAL}, E<:AbstractEnvironment{ASSEQ}}
     rewards = zeros(Float64, length(envs))
@@ -135,6 +152,7 @@ function get_trajectory_rewards!(
     end
 
     envs_alive = [(env, i) for (i, env) in enumerate(envs) if is_alive(env)]
+    trajectories_n = length(envs_alive)
 
     # states = ASSEQ([get_state(env) for (env, _) in envs_alive])
     # actions = NeuralNetwork.predict(neural_network, get_nn_input(states))
@@ -150,6 +168,8 @@ function get_trajectory_rewards!(
     # PProf.pprof(;webport=2137)
     # throw("fdsfdsvsdf")
 
+    frames_n = 0
+
     while length(envs_alive) > 0
         states = ASSEQ([get_state(env) for (env, _) in envs_alive])
         actions = NeuralNetwork.predict(neural_network, get_nn_input(states))
@@ -157,6 +177,7 @@ function get_trajectory_rewards!(
         while i <= length(envs_alive)
             (env, j) = envs_alive[i]
             rewards[j] += react!(env, view(actions, :, i))
+            frames_n += 1
             if !is_alive(env)
                 deleteat!(envs_alive, i)
                 actions = actions[:, 1:end .!= i]
@@ -164,6 +185,12 @@ function get_trajectory_rewards!(
                 i += 1
             end
         end
+    end
+
+    if run_statistics !== nothing
+        Threads.atomic_add!(run_statistics.total_frames, frames_n)
+        Threads.atomic_add!(run_statistics.total_evaluations, 1)
+        Threads.atomic_add!(run_statistics.total_trajectories, trajectories_n)
     end
 
     return rewards
@@ -175,6 +202,7 @@ Get the rewards, states and actions of the trajectory of the environments using 
 function get_trajectory_data!(
         envs::Vector{E},
         neural_network::NeuralNetwork.AbstractNeuralNetwork,
+        run_statistics::Union{Nothing, RunStatistics} = nothing;
         reset::Bool = true
     ) :: Vector{Trajectory{ASSEQ}} where {INTERNAL, ASSEQ<:AbstractStateSequence{INTERNAL}, E<:AbstractEnvironment{ASSEQ}}
     trajectory_data = Vector{Tuple{Vector{Float64}, Vector{INTERNAL}, Vector{Vector{Float32}}}}()
@@ -186,6 +214,8 @@ function get_trajectory_data!(
         push!(trajectory_data, (Vector{Float64}(), Vector{INTERNAL}(), Vector{Vector{Float32}}()))
     end
     envs_alive = [(env, i) for (i, env) in enumerate(envs) if is_alive(env)]
+    trajectory_n = length(envs_alive)
+    frames_n = 0
 
     while length(envs_alive) > 0
         states = ASSEQ([get_state(env) for (env, _) in envs_alive])
@@ -195,6 +225,9 @@ function get_trajectory_data!(
             (env, j) = envs_alive[i]
             current_action = actions[:, i]
             reward = react!(env, current_action)
+
+            frames_n += 1
+
             push!(trajectory_data[j][1], reward)
             push!(trajectory_data[j][2], copy_nth_state(states, i))
             push!(trajectory_data[j][3], current_action)
@@ -208,6 +241,16 @@ function get_trajectory_data!(
             end
         end
     end
+
+    if run_statistics !== nothing
+        Threads.atomic_add!(run_statistics.total_frames, frames_n)
+        Threads.atomic_add!(run_statistics.total_evaluations, 1)
+        Threads.atomic_add!(run_statistics.total_trajectories, trajectory_n)
+        Threads.atomic_add!(run_statistics.collected_frames, frames_n)
+        Threads.atomic_add!(run_statistics.collected_evaluations, 1)
+        Threads.atomic_add!(run_statistics.collected_trajectories, trajectory_n)
+    end
+
     return [Trajectory(ASSEQ(states), hcat(actions...), rewards) for (rewards, states, actions) in trajectory_data]
 end
 

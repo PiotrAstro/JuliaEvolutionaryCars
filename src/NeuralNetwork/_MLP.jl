@@ -43,7 +43,6 @@ function MLP_NN(;
     loss_function = _get_loss_function(loss)
     
     if input_activation_function != :none
-        push!(layers, Flux.Dropout(dropout))
         push!(layers, _get_activation_function(input_activation_function)[1])
     end
 

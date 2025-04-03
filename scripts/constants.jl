@@ -191,7 +191,7 @@ CONSTANTS_DICT = Dict(
                     :hidden_neurons => 32,  # 64
                     :dropout => 0.0,  # 0.5
                     :activation_function => :relu,  # :relu
-                    :input_activation_function => :relu,  # shouldnt it be :none?
+                    :input_activation_function => :none,  # shouldnt it be :none?
                     :last_activation_function => :none, # was :none
                     :loss => :mse
                 )
@@ -385,7 +385,7 @@ CONSTANTS_DICT = Dict(
                 :input_size => 10,
                 :output_size => 9,  # 6 # 3 # 9
                 :hidden_layers => 2,
-                :hidden_neurons => 32,  # was 64
+                :hidden_neurons => 64,  # was 64
                 :dropout => 0.0,
                 :activation_function => :relu,  # :relu
                 :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],

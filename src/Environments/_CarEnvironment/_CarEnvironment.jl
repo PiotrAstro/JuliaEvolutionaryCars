@@ -4,7 +4,7 @@ struct CarSequence <: AbstractStateSequence{Vector{Float32}}
     states::Matrix{Float32}
 end
 
-function CarSequence(states::Vector{Vector{Float32}})
+function CarSequence(states::AbstractVector{Vector{Float32}}) :: CarSequence
     states_matrix = reduce(hcat, states)
     return CarSequence(states_matrix)
 end
