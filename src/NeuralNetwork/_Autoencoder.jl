@@ -37,7 +37,6 @@ function get_neural_network(name::Val{:Autoencoder})
 end
 
 function predict(nn::Autoencoder, X::AbstractStateSequence) :: Array{Float32}
-    # return Flux.testmode!(nn.layers(X))
     internal = get_nn_input(X)
     encoded = predict(nn.encoder, internal)
     decoded = predict(nn.decoder, encoded)

@@ -39,19 +39,22 @@ Get activation function from symbol
     
 Returns function and information if it should be applied element-wise(True), and to whole array(False).
 """
-function _get_activation_function(name::Symbol)::Function
+function _get_activation_function(name::Symbol)::Tuple{Function, Bool}
     if name == :relu
-        return Lux.relu
+        return Lux.relu, true  # element-wise, can be in layer
     elseif name == :sigmoid
-        return Lux.sigmoid
+        return Lux.sigmoid, true  # element-wise, can be in layer
     elseif name == :tanh
-        return Lux.tanh_fast
+        return Lux.tanh_fast, true  # element-wise, can be in layer
     elseif name == :none
-        return identity
+        return identity, true  # element-wise, can be in layer
+    elseif name == :softmax
+        return Lux.softmax, false  # applies to whole array, must be outside layer
     else
         throw("Activation function not implemented")
     end
 end
+
 
 """
 Get loss function from symbol
@@ -63,7 +66,7 @@ Get loss function from symbol
 """
 function _get_loss_function(name::Symbol)
     if name == :crossentropy
-        return Lux.CrossEntropyLoss(; logits=Val(true))
+        return Lux.CrossEntropyLoss(; logits=Val(false))  # it means that we should use softmax before
     elseif name == :mse
         return Lux.MSELoss()
     elseif name == :mae

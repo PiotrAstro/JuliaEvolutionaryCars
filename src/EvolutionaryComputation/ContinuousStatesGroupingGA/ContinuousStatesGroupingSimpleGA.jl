@@ -286,7 +286,7 @@ mutable struct ContinuousStatesGroupingSimpleGA_Algorithm <: AbstractOptimizerMo
     population::Vector{Individual}
     best_individual::Individual
     current_env_wrapper::EnvironmentWrapper.EnvironmentWrapperStruct
-    total_evaluations::Int
+    run_statistics::Environment.RunStatistics
     fihc::Dict
     cross::Dict
     initial_genes_mode::Symbol
@@ -312,13 +312,16 @@ function ContinuousStatesGroupingSimpleGA_Algorithm(;
     new_individual_each_n_epochs::Int,
     new_individual_genes::Symbol,
 )
+    run_statistics = Environment.RunStatistics()
     environment_type = Environment.get_environment(environment)
     environments = [(environment_type)(;environment_kwarg...) for environment_kwarg in environment_kwargs]
     visualization_env = (environment_type)(;environment_visualization_kwargs...)
     
 
     env_wrapper_struct, _ = EnvironmentWrapper.EnvironmentWrapperStruct(
-        environments;
+        environments,
+        run_statistics
+        ;
         env_wrapper...
     )
 
@@ -339,7 +342,7 @@ function ContinuousStatesGroupingSimpleGA_Algorithm(;
         individuals,
         best_individual,
         env_wrapper_struct,
-        0,
+        run_statistics,
         fihc,
         cross,
         initial_genes_mode,
@@ -369,7 +372,9 @@ function AbstractOptimizerModule.run!(csgs::ContinuousStatesGroupingSimpleGA_Alg
     list_with_results = Vector{Tuple}()
 
     for generation in 1:max_generations
-        if csgs.total_evaluations >= max_evaluations
+        statistics = Environment.get_statistics(csgs.run_statistics)
+
+        if statistics.total_evaluations - statistics.collected_evaluations >= max_evaluations
             break
         end
 
@@ -378,41 +383,28 @@ function AbstractOptimizerModule.run!(csgs::ContinuousStatesGroupingSimpleGA_Alg
         start_time = time()
 
         individuals_copy_for_crossover = [individual_copy(ind) for ind in csgs.population]
-        if generation % csgs.new_individual_each_n_epochs == 0
-            new_env_wrapper = Threads.@spawn EnvironmentWrapper.create_new_based_on(
-            # new_env_wrapper = EnvironmentWrapper.create_new_based_on(
-                csgs.current_env_wrapper,
-                [
-                    (1.0, get_flattened_trajectories(individuals_copy_for_crossover)),
-                ]
-            )
-        end
 
-        new_individuals_evals = [(Threads.@spawn run_one_individual_generation(ind, individuals_copy_for_crossover)) for ind in csgs.population]
-        new_individuals_evals = [run_one_individual_generation(ind, individuals_copy_for_crossover) for ind in csgs.population]
-        for i in eachindex(csgs.population)
-            # csgs.total_evaluations += new_individuals_evals[i]
-            csgs.total_evaluations += fetch(new_individuals_evals[i])
-        end
+        # just to get names
+        new_env_wrap = csgs.current_env_wrapper
+        new_individual = csgs.population[1]
 
+        should_add_individual = generation % csgs.new_individual_each_n_epochs == 0
+        start_from_n = ifelse(should_add_individual, 0, 1)
+        Threads.@threads :dynamic for i in start_from_n:length(csgs.population)
+            if i == 0
+                new_env_wrap, new_individual = create_new_env_wrap_and_individual(csgs, individuals_copy_for_crossover)
+            else
+                run_one_individual_generation!(csgs.population[i], individuals_copy_for_crossover)
+            end
+        end
         best_ind_arg = argmax(get_fitness!.(csgs.population))
         csgs.best_individual = individual_copy(csgs.population[best_ind_arg])
 
-        if generation % csgs.new_individual_each_n_epochs == 0
-            # csgs.current_env_wrapper, _ = new_env_wrapper
-            csgs.current_env_wrapper, _ = fetch(new_env_wrapper)
+        if should_add_individual
+            csgs.current_env_wrapper = new_env_wrap
             # put random individual at random place different from best individual
             random_ind = rand(collect(eachindex(csgs.population))[eachindex(csgs.population) .!= best_ind_arg])
-            new_individual = Individual(csgs.current_env_wrapper, csgs.cross, csgs.fihc, csgs.initial_genes_mode, csgs.verbose)
-            if csgs.new_individual_genes == :best
-                copy_genes!(new_individual, csgs.best_individual)
-            elseif csgs.new_individual_genes == :rand
-                # pass
-            else
-                throw(ArgumentError("Unknown new_individual_genes: $(csgs.new_individual_genes)"))
-            end
             csgs.population[random_ind] = new_individual
-            get_fitness!(csgs.population[random_ind])
         end
 
         end_time = time()
@@ -421,26 +413,30 @@ function AbstractOptimizerModule.run!(csgs::ContinuousStatesGroupingSimpleGA_Alg
         #     Ind.visualize(p3.best_individual, p3.visualization_env, p3.visualization_kwargs)
         # end
 
+        statistics = Environment.get_statistics(csgs.run_statistics)
+        distinct_evaluations = statistics.total_evaluations - statistics.collected_evaluations
+        distinct_frames = statistics.total_frames - statistics.collected_frames
+
         best_fitness = get_fitness!(csgs.best_individual)
         fitnesses = get_fitness!.(csgs.population)
         quantiles_values = Statistics.quantile(fitnesses, quantiles)
         if log
             mean_fitness = Statistics.mean(fitnesses)
             elapsed_time = end_time - start_time
-            Logging.@info "\n\n\n\n\n\nGeneration $generation\nTotal evaluations: $(csgs.total_evaluations)\n" *
+            Logging.@info "\n\n\n\n\n\nGeneration $generation\nTotal evaluations: $distinct_evaluations\n" *
             Printf.@sprintf("elapsed_time: %.2f s\nbest_fitness: %.2f\nmean_fitness: %.2f", elapsed_time, best_fitness, mean_fitness) *
             "quantiles:   $(join([(Printf.@sprintf "%.2f: %.2f" quantile fitness) for (quantile, fitness) in zip(quantiles, quantiles_values)], "   "))\n"
         end
         
         push!(
             list_with_results,
-            (generation, csgs.total_evaluations, best_fitness, quantiles_values...)
+            (generation, distinct_evaluations, distinct_frames, best_fitness, quantiles_values...)
         )
     end
 
     data_frame = DataFrames.DataFrame(
         list_with_results,
-        [:generation, :total_evaluations, :best_fitness, percentiles_names...]
+        [:generation, :total_evaluations, :total_frames, :best_fitness, percentiles_names...]
     )
     return data_frame
 end
@@ -456,7 +452,29 @@ end
 # function crossover_tmp(ind2, other2)
 #     crossover!(individual_copy(ind2), other2)
 # end
-function run_one_individual_generation(ind::Individual, other::Vector{Individual})::Int
+
+function create_new_env_wrap_and_individual(csgs::ContinuousStatesGroupingSimpleGA_Algorithm, individuals_copy_for_crossover::Vector{Individual})::Tuple{EnvironmentWrapper.EnvironmentWrapperStruct, Individual}
+    new_env_wrapper, _ = EnvironmentWrapper.create_new_based_on(
+        csgs.current_env_wrapper,
+        [
+            (1.0, get_flattened_trajectories(csgs.population)),
+        ]
+    )
+    new_individual = Individual(new_env_wrapper, csgs.cross, csgs.fihc, csgs.initial_genes_mode, csgs.verbose)
+
+    if csgs.new_individual_genes == :best
+        copy_genes!(new_individual, csgs.best_individual)
+    elseif csgs.new_individual_genes == :rand
+        # pass
+    else
+        throw(ArgumentError("Unknown new_individual_genes: $(csgs.new_individual_genes)"))
+    end
+
+    get_trajectories!(new_individual)
+    return new_env_wrapper, new_individual
+end
+
+function run_one_individual_generation!(ind::Individual, other::Vector{Individual})
     # println("\n\n\nTrajs:")
     # display(BenchmarkTools.@benchmark get_trajectories_tmp($ind))
     # println("\n\nFIHC:")
@@ -470,7 +488,6 @@ function run_one_individual_generation(ind::Individual, other::Vector{Individual
     evaluations += FIHC!(ind)
     evaluations += ifelse(ind._trajectories_actual, 0, 1)
     get_trajectories!(ind)
-    return evaluations
 end
 
 

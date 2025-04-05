@@ -11,7 +11,7 @@ import Random
 import DataFrames
 
 # tmp
-import Flux
+import Lux
 
 export EvolutionaryMutatePopulationAlgorithm
 
@@ -74,18 +74,27 @@ end
 function mutate(ind::Individual, mutation_rate::Float64) :: Individual
     get_fitness(ind)
     new_individual = copy(ind)
-    params = NeuralNetwork.copy_parameters(new_individual.neural_network)
-    
-    for param in params
-        param .+= randn(Float32, size(param)) .* mutation_rate
-    end
 
+    params = NeuralNetwork.copy_parameters(new_individual.neural_network)
+    mutate_traverse!(params, mutation_rate)
     NeuralNetwork.set_parameters!(new_individual.neural_network, params)
 
     # NeuralNetwork.set_parameters!(new_individual.neural_network, params)
     new_individual._is_fitness_calculated = false
     get_fitness(new_individual)
     return new_individual
+end
+
+function mutate_traverse!(params::NamedTuple, mutation_rate::Float64)
+    for value in values(params)
+        if value isa NamedTuple
+            mutate_traverse!(value, mutation_rate)
+        elseif value isa AbstractArray
+            value .+= randn(Float32, size(value)) .* mutation_rate
+        elseif value isa Number
+            value .+= randn(Float32) * mutation_rate
+        end
+    end
 end
 
 function local_search(ind::Individual) :: Individual
@@ -108,10 +117,10 @@ function local_search(ind::Individual) :: Individual
         random_actions = actions[:, random_index]
 
         random_actions .+= randn(Float32, size(random_actions)) .* 0.1
-        random_actions = vcat(Flux.softmax(random_actions[1:3, :]), Flux.softmax(random_actions[4:6, :])) #(random_actions .- minimum(random_actions, dims=1)) ./ (maximum(random_actions, dims=1) .- minimum(random_actions, dims=1))
+        random_actions = vcat(Lux.softmax(random_actions[1:3, :]), Lux.softmax(random_actions[4:6, :])) #(random_actions .- minimum(random_actions, dims=1)) ./ (maximum(random_actions, dims=1) .- minimum(random_actions, dims=1))
         
         previous_params = NeuralNetwork.get_parameters(new_individual.neural_network)
-        NeuralNetwork.learn!(new_individual.neural_network, random_states, random_actions, Flux.kldivergence; epochs=10, learning_rate=0.001)
+        NeuralNetwork.learn!(new_individual.neural_network, random_states, random_actions, Lux.kldivergence; epochs=10, learning_rate=0.001)
         
         trajectories_new = Environment.get_trajectory_data!(new_individual.environments, new_individual.neural_network)
         new_fitness = sum([trajectory.rewards_sum for trajectory in trajectories_new])

@@ -37,6 +37,7 @@ mutable struct EnvironmentWrapperStruct
     _verbose::Bool
     _initial_space_explorers_n::Int
     _struct_memory::Union{StructMemory, Nothing}
+    _run_statistics::Environment.RunStatistics
 end
 
 
@@ -45,7 +46,10 @@ end
 # Public functions
 
 function EnvironmentWrapperStruct(
-        envs::Vector{<:Environment.AbstractEnvironment}; encoder_dict::Dict{Symbol,Any},
+        envs::Vector{<:Environment.AbstractEnvironment},
+        run_statistics::Environment.RunStatistics=Environment.RunStatistics(),
+
+        ; encoder_dict::Dict{Symbol,Any},
         decoder_dict::Dict{Symbol,Any},
         autoencoder_dict::Dict{Symbol,<:Any},
         initial_space_explorers_n::Int,
@@ -83,7 +87,7 @@ function EnvironmentWrapperStruct(
         NeuralNetwork.Random_NN(action_n) for _ in 1:initial_space_explorers_n
     ]
     # states collection
-    trajectories = _collect_trajectories(envs, NNs)
+    trajectories = _collect_trajectories(envs, NNs, run_statistics)
     states = _combine_states_from_trajectories([(1.0, trajectories)], max_states_considered)
     NeuralNetwork.learn!(autoencoder, states; verbose=verbose)
 
@@ -164,7 +168,8 @@ function EnvironmentWrapperStruct(
             _create_time_distance_tree,
             verbose,
             initial_space_explorers_n,
-            struct_memory
+            struct_memory,
+            run_statistics
         ),
         states
     )
@@ -184,7 +189,7 @@ function random_reinitialize_exemplars!(env_wrap::EnvironmentWrapperStruct, n_cl
         NeuralNetwork.Random_NN(action_n) for _ in 1:env_wrap._initial_space_explorers_n
     ]
     # states collection
-    trajectories = _collect_trajectories(env_wrap._envs, NNs)
+    trajectories = _collect_trajectories(env_wrap._envs, NNs, env_wrap._run_statistics)
     states = _combine_states_from_trajectories([(1.0, trajectories)], env_wrap._max_states_considered)
 
     env_wrap._n_clusters = n_clusters
@@ -211,7 +216,7 @@ end
 returns Tuple{Vector{Trajectory}, TreeNode}
 """
 function create_time_distance_tree(env_wrap::EnvironmentWrapperStruct, translation::Matrix{Float32})
-    trajectories = _collect_trajectories(env_wrap._envs, [get_full_NN(env_wrap, translation)])
+    trajectories = _collect_trajectories(env_wrap._envs, [get_full_NN(env_wrap, translation)], env_wrap._run_statistics)
     states_in_trajectories = [trajectory.states for trajectory in trajectories]
     full_nn = get_full_NN(env_wrap, translation)
     memberships_by_trajectory = [NeuralNetwork.membership(full_nn, states_one_traj) for states_one_traj in states_in_trajectories]
@@ -219,7 +224,7 @@ function create_time_distance_tree(env_wrap::EnvironmentWrapperStruct, translati
 end
 
 function get_trajectories(env_wrap::EnvironmentWrapperStruct, translation::Matrix{Float32})
-    return _collect_trajectories(env_wrap._envs, [get_full_NN(env_wrap, translation)])
+    return _collect_trajectories(env_wrap._envs, [get_full_NN(env_wrap, translation)], env_wrap._run_statistics)
 end
 
 function copy(env_wrap::EnvironmentWrapperStruct)::EnvironmentWrapperStruct
@@ -249,7 +254,8 @@ function copy(env_wrap::EnvironmentWrapperStruct)::EnvironmentWrapperStruct
         env_wrap._create_time_distance_tree,
         env_wrap._verbose,
         env_wrap._initial_space_explorers_n,
-        struct_memory_copy
+        struct_memory_copy,
+        env_wrap._run_statistics
     )
 end
 
@@ -296,7 +302,7 @@ function get_fitness(env_wrap::EnvironmentWrapperStruct, translation::Matrix{Flo
     full_NN = get_full_NN(env_wrap, translation)
 
     envs_copies = [Environment.copy(env) for env in env_wrap._envs]
-    result = sum(Environment.get_trajectory_rewards!(envs_copies, full_NN))
+    result = sum(Environment.get_trajectory_rewards!(envs_copies, full_NN; run_statistics=env_wrap._run_statistics, reset=true))
 
     return result
 end
@@ -400,14 +406,14 @@ end
 # --------------------------------------------------------------------------------------------------
 # Private functions
 
-function _collect_trajectories(envs::Vector{E}, NNs::Vector{<:NeuralNetwork.AbstractNeuralNetwork})::Vector{Environment.Trajectory{SEQ}} where {SEQ<:NeuralNetwork.AbstractStateSequence,E<:Environment.AbstractEnvironment{SEQ}}
+function _collect_trajectories(envs::Vector{E}, NNs::Vector{<:NeuralNetwork.AbstractNeuralNetwork}, run_statistics::Environment.RunStatistics)::Vector{Environment.Trajectory{SEQ}} where {SEQ<:NeuralNetwork.AbstractStateSequence,E<:Environment.AbstractEnvironment{SEQ}}
     trajectories = Vector{Vector{Environment.Trajectory{SEQ}}}(undef, length(NNs))
 
     Threads.@threads for i in 1:length(NNs)
         # for i in 1:length(NNs)
         envs_copy = [Environment.copy(env) for env in envs]
         nn = NNs[i]
-        trajectories[i] = Environment.get_trajectory_data!(envs_copy, nn)
+        trajectories[i] = Environment.get_trajectory_data!(envs_copy, nn; run_statistics=run_statistics, reset=true)
     end
     trajectories_flat = reduce(vcat, trajectories)
     return trajectories_flat

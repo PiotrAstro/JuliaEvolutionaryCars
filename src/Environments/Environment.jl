@@ -90,6 +90,17 @@ Total vs Collected
     collected_trajectories::Threads.Atomic{Int} = Threads.Atomic{Int}(0)
 end
 
+function get_statistics(run_statistics::RunStatistics)
+    return (;
+        total_frames = run_statistics.total_frames[],
+        total_evaluations = run_statistics.total_evaluations[],
+        total_trajectories = run_statistics.total_trajectories[],
+        collected_frames = run_statistics.collected_frames[],
+        collected_evaluations = run_statistics.collected_evaluations[],
+        collected_trajectories = run_statistics.collected_trajectories[]
+    )
+end
+
 # using BenchmarkTools
 # import Profile
 # import PProf
@@ -162,8 +173,8 @@ Get the rewards, states and actions of the trajectory of the environments using 
 """
 function get_trajectory_data!(
         envs::Vector{E},
-        neural_network::NeuralNetwork.AbstractNeuralNetwork,
-        run_statistics::Union{Nothing, RunStatistics} = nothing;
+        neural_network::NeuralNetwork.AbstractNeuralNetwork;
+        run_statistics::Union{Nothing, RunStatistics} = nothing,
         reset::Bool = true
     ) :: Vector{Trajectory{ASSEQ}} where {INTERNAL, ASSEQ<:NeuralNetwork.AbstractStateSequence{INTERNAL}, E<:AbstractEnvironment{ASSEQ}}
     trajectory_data = Vector{Tuple{Vector{Float64}, Vector{INTERNAL}, Vector{Vector{Float32}}}}()

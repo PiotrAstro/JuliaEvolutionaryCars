@@ -4,13 +4,11 @@ module NeuralNetwork
 import Statistics
 import Lux
 import Random
-import IterTools
 import Optimisers
 import Distances
 import LinearAlgebra
 import StatsBase
 import Logging
-import ConcreteStructs
 using SimpleChains
 using LoopVectorization
 using Tullio

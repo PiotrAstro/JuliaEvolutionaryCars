@@ -13,7 +13,8 @@ Caching concerns:
 """
 We do not store lux parameters, cause we want to keep minimal memory footprint.
 """
-mutable struct MLP_NN{ML, MS, PS, SL, ST, F} <: AbstractNeuralNetwork
+mutable struct MLP_NN{CL, ML, MS, PS, SL, ST, F} <: AbstractNeuralNetwork
+    simple_chain_call_last::CL
     model_lux::ML
     model_simple::MS
     parameters_simple::PS
@@ -47,7 +48,7 @@ function MLP_NN(;
                 input_activation_function::Symbol=:none,
                 last_activation_function::Symbol=:none,  # previosly was Union{Symbol, Vector{Tuple{Symbol, Int}}, Function}
                 loss::Symbol = :mse)
-    activation = _get_activation_function(input_activation_function)
+    activation, in_layer = _get_activation_function(input_activation_function)
     loss_function = _get_loss_function(loss)
 
     lux_layers = []
@@ -56,10 +57,14 @@ function MLP_NN(;
     input_size_tmp = input_size
     # Hidden layers
     for i in 1:hidden_layers
-        layer = Lux.Dense(input_size_tmp => hidden_neurons, activation)
-        push!(lux_layers, layer)
-        push!(simplechains_layers, layer)
-        activation = _get_activation_function(activation_function)
+        if in_layer
+            layer = Lux.Dense(input_size_tmp => hidden_neurons, activation)
+            push!(lux_layers, layer)
+            push!(simplechains_layers, layer)
+        else
+            throw(ArgumentError("Activation function must be applied elementwise for not the last activation function"))
+        end
+        activation, in_layer = _get_activation_function(activation_function)
         input_size_tmp = hidden_neurons
 
         if dropout > 0.0
@@ -67,11 +72,18 @@ function MLP_NN(;
         end
     end
 
-    activation_last = _get_activation_function(last_activation_function)
-
-    layer = Lux.Dense(input_size_tmp => output_size, activation_last)
-    push!(lux_layers, layer)
-    push!(simplechains_layers, layer)
+    activation_last, in_layer = _get_activation_function(last_activation_function)
+    simple_chain_call_last = identity
+    if in_layer
+        layer = Lux.Dense(input_size_tmp => output_size, activation_last)
+        push!(lux_layers, layer)
+        push!(simplechains_layers, layer)
+    else
+        layer = Lux.Dense(input_size_tmp => output_size)
+        push!(lux_layers, layer, activation_last)
+        push!(simplechains_layers, layer)
+        simple_chain_call_last = activation_last
+    end
     
     model_lux = Lux.Chain(lux_layers...)
     model_simple_to_adapt = Lux.Chain(simplechains_layers...)
@@ -86,6 +98,7 @@ function MLP_NN(;
     # println("states mlp:")
     # display(st)
     mlp = MLP_NN(
+        simple_chain_call_last,
         model_lux,
         simple_model,
         ps_simple,
@@ -111,9 +124,8 @@ end
 end
 
 function predict(nn::MLP_NN, X::Matrix{Float32}) :: Matrix{Float32}
-    # return Flux.testmode!(nn.layers(X))
     y, _ = Lux.apply(nn.model_simple, X, nn.parameters_simple, nn.state_simple)
-    return y
+    return nn.simple_chain_call_last(y)
 
     # ----------------------------------------
     # Test if results are newly allocated
@@ -167,6 +179,7 @@ end
 
 function copy(nn::MLP_NN) :: MLP_NN
     return MLP_NN(
+        nn.simple_chain_call_last,
         nn.model_lux,
         nn.model_simple,
         deepcopy(nn.parameters_simple),

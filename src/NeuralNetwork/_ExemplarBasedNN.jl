@@ -204,8 +204,8 @@ function get_loss(nn::ExemplarBasedNN) :: Function
     return get_loss(nn.encoder)
 end
 
-function get_Flux_representation(nn::ExemplarBasedNN)
-    return get_Flux_representation(nn.encoder)
+function get_lux_representation(nn::ExemplarBasedNN)
+    return get_lux_representation(nn.encoder)
 end
 
 # ------------------------------------------------------------------------------------------
