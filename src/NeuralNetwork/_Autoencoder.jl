@@ -1,106 +1,138 @@
 export Autoencoder
 
-struct Autoencoder{E<:AbstractNeuralNetwork, D<:AbstractNeuralNetwork } <: AbstractNeuralNetwork
+struct Autoencoder{E<:AbstractNeuralNetwork, D<:AbstractNeuralNetwork, C} <: AbstractNeuralNetwork
     encoder::E
     decoder::D
-    chained::Flux.Chain
+    internal::C
     mmd_weight::Float64
     learning_rate::Float64
+    weight_decay::Float64
 end
+
 
 function Autoencoder(
         encoder::E,
         decoder::D;
         mmd_weight::Float64,
-        learning_rate::Float64
+        learning_rate::Float64,
+        weight_decay::Float64=0.0
     ) where {E<:AbstractNeuralNetwork, D<:AbstractNeuralNetwork}
-    return Autoencoder{E, D}(encoder, decoder, Flux.Chain(get_Flux_representation(encoder), get_Flux_representation(decoder)), mmd_weight, learning_rate)
+    internal = Lux.Chain(
+        encoder=get_lux_representation(encoder), 
+        decoder=get_lux_representation(decoder)
+    )
+
+    return Autoencoder(
+        encoder,
+        decoder,
+        internal,
+        mmd_weight,
+        learning_rate,
+        weight_decay
+    )
 end
 
 function get_neural_network(name::Val{:Autoencoder})
     return Autoencoder
 end
 
+function predict(nn::Autoencoder, X::AbstractStateSequence) :: Array{Float32}
+    # return Flux.testmode!(nn.layers(X))
+    internal = get_nn_input(X)
+    encoded = predict(nn.encoder, internal)
+    decoded = predict(nn.decoder, encoded)
+    return decoded
+end
+
 function get_loss(nn::Autoencoder) :: Function
     return get_loss(nn.decoder)
 end
 
-function get_Flux_representation(nn::Autoencoder)
-    return nn.chained
-end
-
-function predict(nn::Autoencoder, X::Array{Float32}) :: Array{Float32}
-    # return Flux.testmode!(nn.layers(X))
-    return nn.chained(X)
-end
-
 function copy(nn::Autoencoder)
-    return Autoencoder(copy(nn.encoder), copy(nn.decoder); mmd_weight=nn.mmd_weight, learning_rate=nn.learning_rate)
+    return Autoencoder(
+        copy(nn.encoder),
+        copy(nn.decoder),
+        nn.internal,
+        nn.mmd_weight,
+        nn.learning_rate,
+        nn.weight_decay
+    )
 end
 
 function learn!(
     nn::Autoencoder,
-    X::Array{Float32},
-    Y::Array{Float32};
+    X::ASSEQ;
     epochs::Int = 10,
     batch_size::Int = 256,
     verbose::Bool = false
-)
+) where {ASSEQ<:AbstractStateSequence}
     nn_loss = get_loss(nn)
-    encoder = get_Flux_representation(nn.encoder)
-    decoder = get_Flux_representation(nn.decoder)
-    chained = nn.chained
-    Flux.testmode!(chained, :auto)
+    ps = (;
+        encoder=copy_parameters(nn.encoder),
+        decoder=copy_parameters(nn.decoder)
+    )
+    st = (;
+        encoder=copy_state(nn.encoder),
+        decoder=copy_state(nn.decoder)
+    )
+    st = Lux.trainmode(st)
 
     # Set up the optimizer and optimizer state
-    # (params, _) = Flux.setup(encoder, decoder)
-    optimiser_encoder = Optimisers.AdamW(nn.learning_rate)
-    optimiser_state = Flux.setup(optimiser_encoder, chained)
+    optimiser_encoder = Optimisers.AdamW(;eta=nn.learning_rate, lambda=nn.weight_decay)
+    train_state = Lux.Training.TrainState(nn.internal, ps, st, optimiser_encoder)
+    ad = Lux.AutoZygote()
+    loss_fn = (model, ps, st, x) -> custom_loss(model, ps, st, nn_loss, nn.mmd_weight, x)
 
     # shuffle x and y the same way
-    perm = Random.randperm(size(X, 2))
-    X = X[:, perm]
-    Y = Y[:, perm]
-
-    batches = [
-        (
-        X[:, i: (i+batch_size-1 <= size(X, 2) ? i+batch_size-1 : end)],
-        Y[:, i: (i+batch_size-1 <= size(Y, 2) ? i+batch_size-1 : end)]
-        ) for i in 1:batch_size:size(X, 2)
-    ]
+    all_inputs = nothing
+    batches = prepare_batches(X, batch_size)
 
     for epoch in 1:epochs
-        for (x, y) in batches
-            # Compute gradients
-            grads = Flux.gradient((ch) -> custom_loss(ch[1], ch[2], nn_loss, nn.mmd_weight, x, y), chained)
-            # Update the model parameters and optimiser state
-            Flux.update!(optimiser_state, chained, grads[1])
+        for x in batches
+            (_, loss, _, train_state) = Lux.Training.single_train_step!(
+                ad, loss_fn, x, train_state
+            )
         end
 
         # print loss
         if verbose
-            loss_combined_value = Statistics.mean(custom_loss(encoder, decoder, nn_loss, nn.mmd_weight, X, Y))
-            loss_reconstruction_value = Statistics.mean(nn_loss(predict(nn, X), Y))
+            if isnothing(all_inputs)
+                all_inputs = get_nn_input(X)
+            end
+            st_ = Lux.testmode(st)
+            loss_combined_value, _ = custom_loss(nn.internal, ps, st_, nn_loss, nn.mmd_weight, all_inputs)
+            predicted, _ = Lux.apply(nn.internal, all_inputs, ps, st_)
+            loss_reconstruction_value = nn_loss(predicted, all_inputs)
             Logging.@info "Epoch: $epoch, Loss combined: $loss_combined_value, Loss reconstruction: $loss_reconstruction_value\n"
         end
     end
+
+    st = Lux.testmode(train_state.states)
+    set_parameters!(nn.encoder, train_state.parameters.encoder)
+    set_parameters!(nn.decoder, train_state.parameters.decoder)
+    set_state!(nn.encoder, st.encoder)
+    set_state!(nn.decoder, st.decoder)
 end
 
 # Loss Function with Regularization
-function custom_loss(encoder, decoder, base_loss, mmd_weight, x, y)
-    z = encoder(x)
-    x_hat = decoder(z)
+function custom_loss(model, ps, st, base_loss, mmd_weight, x)
+    z, st_encoder = Lux.apply(model.encoder, x, ps.encoder, st.encoder)
+    x_hat, st_decoder = Lux.apply(model.decoder, z, ps.decoder, st.decoder)
+    st = (;
+        encoder=st_encoder,
+        decoder=st_decoder
+    )
     # Reconstruction loss
-    recon_loss = base_loss(x_hat, y)
+    recon_loss = base_loss(x_hat, x)
     # MMD regularization
     z_prior = randn(Float32, size(z))
 
     if mmd_weight == 0.0
-        return recon_loss
+        return recon_loss, st, nothing
     else
         mmd_loss = mmd_div(z, z_prior)
         # Total loss
-        return recon_loss + mmd_weight * mmd_loss
+        return (recon_loss + mmd_weight * mmd_loss), st, nothing
     end
 end
 

@@ -4,57 +4,18 @@ module Environment
 import ..NeuralNetwork
 
 export AbstractEnvironment, get_safe_data, load_safe_data!, copy, reset!, react!, get_state, get_action_size, is_alive, get_trajectory_data!, get_trajectory_rewards!, get_environment, prepare_environments_kwargs, visualize!
-export AbstractStateSequence, get_length, copy_nth_state, get_sequence_with_ids, remove_nth_state, get_nn_input
-
-# ------------------------------------------------------------------------------------------------
-# state sequences managers
-
-# INTERNAL - internal concrete type, environment will receive it for reaction, e.g. Vector{Float32} or Array{Float32, 3} for rgb images
-abstract type AbstractStateSequence{INTERNAL} end
-
-# AbstractStateSequence should have the same type in return, it should take some iterable object
-function (::AbstractStateSequence{INTERNAL})(states::AbstractVector{INTERNAL}) :: AbstractStateSequence{INTERNAL} where {INTERNAL}
-    throw("unimplemented")
-end
-
-# AbstractStateSequence should have the same type in return
-function (::AbstractStateSequence{INTERNAL})(seqs::AbstractVector{AbstractStateSequence{INTERNAL}}) :: AbstractStateSequence{INTERNAL} where {INTERNAL}
-    throw("unimplemented")
-end
-
-function get_length(seq::ASSEQ) :: Int where {ASSEQ<:AbstractStateSequence}
-    throw("unimplemented")
-end
-
-function copy_nth_state(seq::ASSEQ, n::Int) :: INTERNAL where {INTERNAL, ASSEQ<:AbstractStateSequence{INTERNAL}} 
-    throw("unimplemented")
-end
-
-function get_sequence_with_ids(seq::ASSEQ, ids::AbstractVector{Int}) :: ASSEQ where {ASSEQ<:AbstractStateSequence}
-    throw("unimplemented")
-end
-
-# It shouldnt change the original sequence
-function remove_nth_state(seq::ASSEQ, n::Int) :: ASSEQ where {ASSEQ<:AbstractStateSequence}
-    throw("unimplemented")
-end
-
-function get_nn_input(seq::ASSEQ) where {ASSEQ<:AbstractStateSequence}
-    throw("unimplemented")
-end
-
 # ------------------------------------------------------------------------------------------------
 
-abstract type AbstractEnvironment{ASSEQ <: AbstractStateSequence} end
+abstract type AbstractEnvironment{ASSEQ <: NeuralNetwork.AbstractStateSequence} end
 
-struct Trajectory{ASSEQ<:AbstractStateSequence}
+struct Trajectory{ASSEQ<:NeuralNetwork.AbstractStateSequence}
     states::ASSEQ
     actions::Matrix{Float32}
     rewards::Vector{Float64}
     rewards_sum::Float64
 end
 
-function Trajectory(states::ASSEQ, actions::Matrix{Float32}, rewards::Vector{Float64}) where {ASSEQ<:AbstractStateSequence}
+function Trajectory(states::ASSEQ, actions::Matrix{Float32}, rewards::Vector{Float64}) where {ASSEQ<:NeuralNetwork.AbstractStateSequence}
     rewards_sum = sum(rewards)
     return Trajectory{ASSEQ}(states, actions, rewards, rewards_sum)
 end
@@ -62,7 +23,7 @@ end
 """
 This one is used as holder only for states, other parts are not valid
 """
-function Trajectory(states::ASSEQ) where {ASSEQ<:AbstractStateSequence}
+function Trajectory(states::ASSEQ) where {ASSEQ<:NeuralNetwork.AbstractStateSequence}
     return Trajectory{ASSEQ}(states, Matrix{Float32}(undef, 0, 0), Vector{Float64}(), 0.0)
 end
 
@@ -98,7 +59,7 @@ function react!(env::AbstractEnvironment, actions::AbstractVector{Float32}) :: F
     throw("unimplemented")
 end
 
-function get_state(env::AbstractEnvironment{ASSEQ}) :: INTERNAL where {INTERNAL, ASSEQ<:AbstractStateSequence{INTERNAL}}
+function get_state(env::AbstractEnvironment{ASSEQ}) :: INTERNAL where {INTERNAL, ASSEQ<:NeuralNetwork.AbstractStateSequence{INTERNAL}}
     throw("unimplemented")
 end
 
@@ -142,7 +103,7 @@ function get_trajectory_rewards!(
         neural_network::NeuralNetwork.AbstractNeuralNetwork;
         run_statistics::Union{Nothing, RunStatistics} = nothing,
         reset::Bool = true
-    ) :: Vector{Float64} where {INTERNAL, ASSEQ<:AbstractStateSequence{INTERNAL}, E<:AbstractEnvironment{ASSEQ}}
+    ) :: Vector{Float64} where {INTERNAL, ASSEQ<:NeuralNetwork.AbstractStateSequence{INTERNAL}, E<:AbstractEnvironment{ASSEQ}}
     rewards = zeros(Float64, length(envs))
 
     if reset
@@ -172,7 +133,7 @@ function get_trajectory_rewards!(
 
     while length(envs_alive) > 0
         states = ASSEQ([get_state(env) for (env, _) in envs_alive])
-        actions = NeuralNetwork.predict(neural_network, get_nn_input(states))
+        actions = NeuralNetwork.predict(neural_network, states)
         i = 1
         while i <= length(envs_alive)
             (env, j) = envs_alive[i]
@@ -204,7 +165,7 @@ function get_trajectory_data!(
         neural_network::NeuralNetwork.AbstractNeuralNetwork,
         run_statistics::Union{Nothing, RunStatistics} = nothing;
         reset::Bool = true
-    ) :: Vector{Trajectory{ASSEQ}} where {INTERNAL, ASSEQ<:AbstractStateSequence{INTERNAL}, E<:AbstractEnvironment{ASSEQ}}
+    ) :: Vector{Trajectory{ASSEQ}} where {INTERNAL, ASSEQ<:NeuralNetwork.AbstractStateSequence{INTERNAL}, E<:AbstractEnvironment{ASSEQ}}
     trajectory_data = Vector{Tuple{Vector{Float64}, Vector{INTERNAL}, Vector{Vector{Float32}}}}()
     for env in envs
         if reset
@@ -219,7 +180,7 @@ function get_trajectory_data!(
 
     while length(envs_alive) > 0
         states = ASSEQ([get_state(env) for (env, _) in envs_alive])
-        actions = NeuralNetwork.predict(neural_network, get_nn_input(states))
+        actions = NeuralNetwork.predict(neural_network, states)
         i = 1
         while i <= length(envs_alive)
             (env, j) = envs_alive[i]
@@ -229,12 +190,12 @@ function get_trajectory_data!(
             frames_n += 1
 
             push!(trajectory_data[j][1], reward)
-            push!(trajectory_data[j][2], copy_nth_state(states, i))
+            push!(trajectory_data[j][2], NeuralNetwork.copy_nth_state(states, i))
             push!(trajectory_data[j][3], current_action)
 
             if !is_alive(env)
                 deleteat!(envs_alive, i)
-                states = remove_nth_state(states, i)
+                states = NeuralNetwork.remove_nth_state(states, i)
                 actions = actions[:, 1:end .!= i]
             else
                 i += 1

@@ -74,11 +74,13 @@ end
 function mutate(ind::Individual, mutation_rate::Float64) :: Individual
     get_fitness(ind)
     new_individual = copy(ind)
-    params = NeuralNetwork.get_parameters(new_individual.neural_network)
+    params = NeuralNetwork.copy_parameters(new_individual.neural_network)
     
     for param in params
         param .+= randn(Float32, size(param)) .* mutation_rate
     end
+
+    NeuralNetwork.set_parameters!(new_individual.neural_network, params)
 
     # NeuralNetwork.set_parameters!(new_individual.neural_network, params)
     new_individual._is_fitness_calculated = false

@@ -23,7 +23,7 @@ mutable struct EnvironmentWrapperStruct
     _decoder::NeuralNetwork.AbstractNeuralNetwork
     _autoencoder::NeuralNetwork.AbstractNeuralNetwork
     _encoded_exemplars::Matrix{Float32}
-    _raw_exemplars::Environment.AbstractStateSequence
+    _raw_exemplars::NeuralNetwork.AbstractStateSequence
     _similarity_tree::StatesGrouping.TreeNode
     _max_states_considered::Int
     _fuzzy_logic_of_n_closest::Int
@@ -295,7 +295,7 @@ end
 # --------------------------------------------------------------------------------------------------
 # Private functions
 
-function _collect_trajectories(envs::Vector{E}, NNs::Vector{<:NeuralNetwork.AbstractNeuralNetwork}) :: Vector{Environment.Trajectory{SEQ}} where {SEQ<:Environment.AbstractStateSequence, E<:Environment.AbstractEnvironment{SEQ}}
+function _collect_trajectories(envs::Vector{E}, NNs::Vector{<:NeuralNetwork.AbstractNeuralNetwork}) :: Vector{Environment.Trajectory{SEQ}} where {SEQ<:NeuralNetwork.AbstractStateSequence, E<:Environment.AbstractEnvironment{SEQ}}
     trajectories = Vector{Vector{Environment.Trajectory{SEQ}}}(undef, length(NNs))
 
     Threads.@threads for i in 1:length(NNs)
@@ -308,7 +308,7 @@ function _collect_trajectories(envs::Vector{E}, NNs::Vector{<:NeuralNetwork.Abst
     return trajectories_flat
 end
 
-function _combine_states_from_trajectories(trajectories_and_percentages::Vector{Tuple{Float64, Vector{Environment.Trajectory{SEQ}}}}, pick_states_n::Int) :: SEQ where {SEQ<:Environment.AbstractStateSequence}
+function _combine_states_from_trajectories(trajectories_and_percentages::Vector{Tuple{Float64, Vector{Environment.Trajectory{SEQ}}}}, pick_states_n::Int) :: SEQ where {SEQ<:NeuralNetwork.AbstractStateSequence}
     @assert sum([percentage for (percentage, _) in trajectories_and_percentages]) ≈ 1.0
     states_to_combine = Vector{SEQ}()
 

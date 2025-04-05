@@ -16,7 +16,7 @@ export EnvironmentWrapperStruct, get_action_size, get_groups_number, get_fitness
 
 mutable struct StructMemory
     _distance_membership_levels::Vector{Vector{Vector{Float32}}}
-    _raw_exemplars::Environment.AbstractStateSequence
+    _raw_exemplars::NeuralNetwork.AbstractStateSequence
     _decoder::NeuralNetwork.AbstractNeuralNetwork
     _autoencoder::NeuralNetwork.AbstractNeuralNetwork
 end
@@ -85,14 +85,13 @@ function EnvironmentWrapperStruct(
     # states collection
     trajectories = _collect_trajectories(envs, NNs)
     states = _combine_states_from_trajectories([(1.0, trajectories)], max_states_considered)
-    states_nn_input = Environment.get_nn_input(states)
-    NeuralNetwork.learn!(autoencoder, states_nn_input, states_nn_input; verbose=verbose)
+    NeuralNetwork.learn!(autoencoder, states; verbose=verbose)
 
     if verbose
         Logging.@info "Autoencoder trained"
     end
 
-    encoded_states = NeuralNetwork.predict(encoder, states_nn_input)
+    encoded_states = NeuralNetwork.predict(encoder, states)
     exemplars_ids, _ = StatesGrouping.get_exemplars(
         encoded_states,
         n_clusters;
@@ -107,7 +106,7 @@ function EnvironmentWrapperStruct(
         distance_metric=distance_metric,
         method=distance_membership_levels_method
     )
-    states_exeplars = Environment.get_sequence_with_ids(states, exemplars_ids)
+    states_exeplars = NeuralNetwork.get_sequence_with_ids(states, exemplars_ids)
 
     # ---------------------------------------------
     # tmp stuff
@@ -189,7 +188,7 @@ function random_reinitialize_exemplars!(env_wrap::EnvironmentWrapperStruct, n_cl
     states = _combine_states_from_trajectories([(1.0, trajectories)], env_wrap._max_states_considered)
 
     env_wrap._n_clusters = n_clusters
-    states_nn_input = Environment.get_nn_input(states)
+    states_nn_input = states
     encoded_states = NeuralNetwork.predict(env_wrap._encoder, states_nn_input)
     exemplars_ids, _ = StatesGrouping.get_exemplars(
         encoded_states,
@@ -205,7 +204,7 @@ function random_reinitialize_exemplars!(env_wrap::EnvironmentWrapperStruct, n_cl
         distance_metric=env_wrap._distance_metric,
         method=env_wrap._distance_membership_levels_method
     )
-    env_wrap._struct_memory._raw_exemplars = Environment.get_sequence_with_ids(states, exemplars_ids)
+    env_wrap._struct_memory._raw_exemplars = NeuralNetwork.get_sequence_with_ids(states, exemplars_ids)
 end
 
 """
@@ -215,7 +214,7 @@ function create_time_distance_tree(env_wrap::EnvironmentWrapperStruct, translati
     trajectories = _collect_trajectories(env_wrap._envs, [get_full_NN(env_wrap, translation)])
     states_in_trajectories = [trajectory.states for trajectory in trajectories]
     full_nn = get_full_NN(env_wrap, translation)
-    memberships_by_trajectory = [NeuralNetwork.membership(full_nn, Environment.get_nn_input(states_one_traj)) for states_one_traj in states_in_trajectories]
+    memberships_by_trajectory = [NeuralNetwork.membership(full_nn, states_one_traj) for states_one_traj in states_in_trajectories]
     return trajectories, env_wrap._create_time_distance_tree(memberships_by_trajectory, env_wrap._hclust_time)
 end
 
@@ -333,14 +332,13 @@ function create_new_based_on(
     new_env_wrapper = copy(env_wrap)
 
     new_states = _combine_states_from_trajectories(trajectories_and_percentages_casted, new_env_wrapper._max_states_considered)
-    new_states_nn_input = Environment.get_nn_input(new_states)
-    NeuralNetwork.learn!(new_env_wrapper._struct_memory._autoencoder, new_states_nn_input, new_states_nn_input; verbose=new_env_wrapper._verbose)
+    NeuralNetwork.learn!(new_env_wrapper._struct_memory._autoencoder, new_states; verbose=new_env_wrapper._verbose)
 
     if env_wrap._verbose
         Logging.@info "Autoencoder retrained"
     end
 
-    new_encoded_states = NeuralNetwork.predict(new_env_wrapper._encoder, new_states_nn_input)
+    new_encoded_states = NeuralNetwork.predict(new_env_wrapper._encoder, new_states)
 
     # # get new exemplars, states and newly encoded states
     new_exemplars_ids, _ = StatesGrouping.get_exemplars(new_encoded_states, new_n_clusters; distance_metric=env_wrap._distance_metric, exemplars_clustering=env_wrap._exemplars_clustering, hclust_distance=env_wrap._hclust_distance)
@@ -351,7 +349,7 @@ function create_new_based_on(
         distance_metric=env_wrap._distance_metric,
         method=env_wrap._distance_membership_levels_method
     )
-    new_raw_exemplars = Environment.get_sequence_with_ids(new_states, new_exemplars_ids)
+    new_raw_exemplars = NeuralNetwork.get_sequence_with_ids(new_states, new_exemplars_ids)
 
     new_env_wrapper._encoded_exemplars = new_exemplars
     new_env_wrapper._struct_memory._raw_exemplars = new_raw_exemplars
@@ -370,8 +368,8 @@ function translate(
     # create NN
 
     from_full_NN = get_full_NN(from_env_wrap, from_translation)
-    to_raw_exemplars = Environment.get_sequence_with_ids(to_env_wrap._struct_memory._raw_exemplars, to_genes_indices)
-    return NeuralNetwork.predict(from_full_NN, Environment.get_nn_input(to_raw_exemplars))
+    to_raw_exemplars = NeuralNetwork.get_sequence_with_ids(to_env_wrap._struct_memory._raw_exemplars, to_genes_indices)
+    return NeuralNetwork.predict(from_full_NN, to_raw_exemplars)
 end
 
 function get_full_NN(env_wrap::EnvironmentWrapperStruct, translation::Matrix{Float32})
@@ -402,7 +400,7 @@ end
 # --------------------------------------------------------------------------------------------------
 # Private functions
 
-function _collect_trajectories(envs::Vector{E}, NNs::Vector{<:NeuralNetwork.AbstractNeuralNetwork})::Vector{Environment.Trajectory{SEQ}} where {SEQ<:Environment.AbstractStateSequence,E<:Environment.AbstractEnvironment{SEQ}}
+function _collect_trajectories(envs::Vector{E}, NNs::Vector{<:NeuralNetwork.AbstractNeuralNetwork})::Vector{Environment.Trajectory{SEQ}} where {SEQ<:NeuralNetwork.AbstractStateSequence,E<:Environment.AbstractEnvironment{SEQ}}
     trajectories = Vector{Vector{Environment.Trajectory{SEQ}}}(undef, length(NNs))
 
     Threads.@threads for i in 1:length(NNs)
@@ -415,18 +413,31 @@ function _collect_trajectories(envs::Vector{E}, NNs::Vector{<:NeuralNetwork.Abst
     return trajectories_flat
 end
 
-function _combine_states_from_trajectories(trajectories_and_percentages::Vector{Tuple{Float64,Vector{Environment.Trajectory{SEQ}}}}, pick_states_n::Int)::SEQ where {SEQ<:Environment.AbstractStateSequence}
+function _combine_states_from_trajectories(trajectories_and_percentages::Vector{Tuple{Float64,Vector{Environment.Trajectory{SEQ}}}}, pick_states_n::Int)::SEQ where {SEQ<:NeuralNetwork.AbstractStateSequence}
     @assert sum([percentage for (percentage, _) in trajectories_and_percentages]) ≈ 1.0
     states_to_combine = Vector{SEQ}()
 
     for (percentage, trajectories) in trajectories_and_percentages
         states_to_pick_n = Int(round(percentage * pick_states_n))
-        states_total_n = sum([Environment.get_length(trajectory.states) for trajectory in trajectories])
+        states_total_n = sum([NeuralNetwork.get_length(trajectory.states) for trajectory in trajectories])
         states_to_pick_n = min(states_to_pick_n, states_total_n)
 
-        states_local_combined = SEQ([trajectory.states for trajectory in trajectories])
         states_to_pick = rand(1:states_total_n, states_to_pick_n)
-        states_local_combined = Environment.get_sequence_with_ids(states_local_combined, states_to_pick)
+        sequences = Vector{SEQ}()
+
+        from_number = 1
+        for i in eachindex(trajectories)
+            trajectory = trajectories[i]
+            states_one_traj = trajectory.states
+            to_number = from_number + NeuralNetwork.get_length(states_one_traj) - 1
+            states_to_pick_local = collect(filter(x -> x >= from_number && x <= to_number, states_to_pick))
+            states_to_pick_local .-= from_number - 1
+            states_one_traj = NeuralNetwork.get_sequence_with_ids(states_one_traj, states_to_pick_local)
+            push!(sequences, states_one_traj)
+            from_number = to_number + 1
+        end
+
+        states_local_combined = SEQ(sequences)
         push!(states_to_combine, states_local_combined)
     end
     states_combined = SEQ(states_to_combine)

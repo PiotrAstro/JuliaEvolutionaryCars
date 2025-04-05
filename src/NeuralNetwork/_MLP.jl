@@ -1,15 +1,25 @@
 export MLP_NN
 
-struct MLP_NN{C<:Flux.Chain, F} <: AbstractNeuralNetwork
-    layers::C
+"""
+THis is very specific implementation designed for fast inference.
+It uses SimpleChains.jl for inference and outputs lux model for training.
+
+Caching concerns:
+- SimpleChains.jl uses a lot of caching, even output is cached. Therefore, to freely manipulate the output, I should add this:
+    adaptor = Lux.ToSimpleChainsAdaptor((SimpleChains.static(input_size),), true)  # this true is crucial! it will create new array
+- tests suggest that these allocations are somehow thread safe, so I can use them in parallel.
+"""
+
+"""
+We do not store lux parameters, cause we want to keep minimal memory footprint.
+"""
+mutable struct MLP_NN{ML, MS, PS, SL, ST, F} <: AbstractNeuralNetwork
+    model_lux::ML
+    model_simple::MS
+    parameters_simple::PS
+    state_lux::SL
+    state_simple::ST
     loss::F
-end
-
-function MLP_NN(layers::Vector{MLP_NN}) :: MLP_NN
-    layers_new = Flux.Chain([layer.layers for layer in layers]...)
-    loss = layers[end].loss
-
-    return MLP_NN(layers_new, loss)
 end
 
 function get_neural_network(name::Val{:MLP_NN})
@@ -35,144 +45,151 @@ function MLP_NN(;
                 dropout::Float64=0.0,
                 activation_function::Symbol=:relu,
                 input_activation_function::Symbol=:none,
-                last_activation_function::Union{Symbol, Function}=:none,  # previosly was Union{Symbol, Vector{Tuple{Symbol, Int}}, Function}
+                last_activation_function::Symbol=:none,  # previosly was Union{Symbol, Vector{Tuple{Symbol, Int}}, Function}
                 loss::Symbol = :mse)
-    layers = []
-    activation = _get_activation_function(activation_function)[1]
-
+    activation = _get_activation_function(input_activation_function)
     loss_function = _get_loss_function(loss)
-    
-    if input_activation_function != :none
-        push!(layers, _get_activation_function(input_activation_function)[1])
-    end
+
+    lux_layers = []
+    simplechains_layers = []
 
     input_size_tmp = input_size
     # Hidden layers
     for i in 1:hidden_layers
-        push!(layers, Flux.Dense(input_size_tmp, hidden_neurons, activation))
+        layer = Lux.Dense(input_size_tmp => hidden_neurons, activation)
+        push!(lux_layers, layer)
+        push!(simplechains_layers, layer)
+        activation = _get_activation_function(activation_function)
         input_size_tmp = hidden_neurons
 
         if dropout > 0.0
-            push!(layers, Flux.Dropout(dropout))
+            push!(lux_layers, Lux.Dropout(dropout))
         end
     end
-    if typeof(last_activation_function) <: Symbol
-        activation_last_tmp = _get_activation_function(last_activation_function)
-        if activation_last_tmp[2]
-            push!(layers, Flux.Dense(input_size_tmp, output_size, activation_last_tmp[1]))
-        else
-            push!(layers, Flux.Dense(input_size_tmp, output_size))
-            push!(layers, activation_last_tmp[1])
-        end
-    elseif typeof(last_activation_function) <: Function
-        push!(layers, Flux.Dense(hidden_neurons, output_size))
-        push!(layers, last_activation_function)
-    end
+
+    activation_last = _get_activation_function(last_activation_function)
+
+    layer = Lux.Dense(input_size_tmp => output_size, activation_last)
+    push!(lux_layers, layer)
+    push!(simplechains_layers, layer)
     
-    return MLP_NN(Flux.Chain(layers...), loss_function)
+    model_lux = Lux.Chain(lux_layers...)
+    model_simple_to_adapt = Lux.Chain(simplechains_layers...)
+
+    adaptor = Lux.ToSimpleChainsAdaptor((SimpleChains.static(input_size),), true)
+    simple_model = adaptor(model_simple_to_adapt)
+
+    ps, st = Lux.setup(Random.Xoshiro(rand(Int)), model_lux)
+    st = Lux.testmode(st)
+
+    ps_simple, st_simple = Lux.setup(Random.default_rng(rand(Int)), simple_model)
+    # println("states mlp:")
+    # display(st)
+    mlp = MLP_NN(
+        model_lux,
+        simple_model,
+        ps_simple,
+        st,
+        st_simple,
+        loss_function
+    )
+    set_parameters!(mlp, ps)
+    return mlp
 end
 
 function get_loss(nn::MLP_NN) :: Function
     return nn.loss
 end
 
-function get_Flux_representation(nn::MLP_NN)
-    return nn.layers
+function get_lux_representation(nn::MLP_NN)
+    return nn.model_lux
+end
+
+
+@inline function predict(nn::MLP_NN, X::AbstractStateSequence{Vector{Float32}}) :: Matrix{Float32}
+    return predict(nn, get_nn_input(X))
 end
 
 function predict(nn::MLP_NN, X::Matrix{Float32}) :: Matrix{Float32}
     # return Flux.testmode!(nn.layers(X))
-    return nn.layers(X)
+    y, _ = Lux.apply(nn.model_simple, X, nn.parameters_simple, nn.state_simple)
+    return y
+
+    # ----------------------------------------
+    # Test if results are newly allocated
+    # y_next, _ = Lux.apply(nn.model_simple, X, nn.parameters_simple, nn.state_simple)
+    # y[:, 1] .= 0.0f0
+    # display(y)
+    # display(y_next)
+
+    # -----------------------------------------
+    # Test f calculations are thread safe
+    # g = 0.0f0
+    # inputs = [X .* i for i in 1:8]
+    # outputs_normal = Vector{Any}(undef, 8)
+    # for i in 1:8
+    #     for _ in 1:1000
+    #         y_local, _ = Lux.apply(nn.model_simple, inputs[i], nn.parameters_simple, nn.state_simple)
+    #         g = y_local[1, 1]
+    #         outputs_normal[i] = y_local
+    #     end
+    # end
+    # println("now consecutive")
+    # outputs = Vector{Any}(undef, 8)
+    # # copies = [(deepcopy(nn.model_simple), deepcopy(inputs[i]), deepcopy(nn.state_simple)) for i in 1:8]
+    # Threads.@threads for i in 1:8
+    #     # model_copy, input_copy, state_copy = copies[i]
+    #     model_copy, input_copy, state_copy = nn.model_simple, inputs[i], nn.state_simple
+    #     for _ in 1:1000
+    #         y_local, _ = Lux.apply(model_copy, input_copy, nn.parameters_simple, state_copy)
+    #         g = y_local[1, 1]
+    #         outputs[i] = y_local
+    #     end
+    # end
+    # for i in 1:8
+    #     println("\n\n")
+    #     display(outputs[i])
+    #     display(outputs_normal[i])
+    # end
+    # throw(g)
+
+
+    # ----------------------------------------------------
+    # Test if params translation works between Lux and SimpleChains
+    # copied_params = copy_parameters(nn)
+    # y_lux, _ = Lux.apply(nn.model_lux, X, copied_params, nn.state_lux)
+    # test similarity of output values
+    # Test.@test isapprox(y, y_lux; atol=1e-5, rtol=1e-5)
+    # display(y_lux)
+    # display(y)
+    return y
 end
 
 function copy(nn::MLP_NN) :: MLP_NN
-    return MLP_NN(deepcopy(nn.layers), nn.loss)
+    return MLP_NN(
+        nn.model_lux,
+        nn.model_simple,
+        deepcopy(nn.parameters_simple),
+        deepcopy(nn.state_lux),
+        deepcopy(nn.state_simple),
+        nn.loss
+    )
 end
 
-function get_parameters(nn::MLP_NN)
-    return Flux.params(nn.layers)
-end
-# --------------------------------------------------------------------------------
-# protected functions
-
-# function _generate_activation_function_code(activations::Vector{Tuple{Symbol, Int}}) :: Expr
-#     # Generate start and end indices based on segment lengths
-#     splits = [num for (_, num) in activations]
-#     starts = Vector{Int}(undef, length(splits))
-#     ends = Vector{Int}(undef, length(splits))
-#     start_tmp = 1
-
-#     for i in eachindex(splits)
-#         starts[i] = start_tmp
-#         start_tmp += splits[i]
-#         ends[i] = start_tmp - 1
-#     end
-
-#     # Get activation function info
-#     activations_info = [_get_activation_function(activation) for (activation, _) in activations]
-
-#     # Construct the final expressions
-#     final_expressions = [
-#         dot ? :($(activation).(view(x, $(starts[i]):$(ends[i]), :))) : :($(activation)(view(x, $(starts[i]):$(ends[i]), :)))
-#         # dot ? :($(activation).(x[$(starts[i]):$(ends[i]), :])) : :($(activation)(x[$(starts[i]):$(ends[i]), :]))
-#         for (i, (activation, dot)) in enumerate(activations_info)
-#     ]
-
-#     # Construct the function code
-#     code = :(x -> vcat($(final_expressions...)))
-
-#     return code
-# end
-
-# Memoization.@memoize Dict function _generate_activation_function(activations::Vector{Tuple{Symbol, Int}}) :: Function  # I might remove Dict - it will be a bit faster, but will be based on === not on ==
-#     f = eval(_generate_activation_function_code(activations))
-#     return f
-
-#     # IMPORTANT: lines below should be uncommented for world age problem, but they also make zygote not work
-    
-#     # final_activation = (x) -> Base.invokelatest(f, x)
-#     # return final_activation
-# end
-
-"""
-Get activation function from symbol
-    
-Returns function and information if it should be applied element-wise(True), and to whole array(False).
-"""
-function _get_activation_function(name::Symbol)::Tuple{Function, Bool}
-    if name == :relu
-        return (Flux.relu, true)
-    elseif name == :sigmoid
-        return (Flux.sigmoid, true)
-    elseif name == :tanh
-        return (Flux.tanh, true)
-    elseif name == :softmax
-        return (Flux.softmax, false)
-    elseif name == :none
-        return (identity, false)
-    else
-        throw("Activation function not implemented")
-    end
+function copy_parameters(nn::MLP_NN)
+    example_parameters, _ = Lux.setup(Random.Xoshiro(0), nn.model_lux)
+    _copy_params!(example_parameters, nn.parameters_simple.params)
+    return example_parameters
 end
 
-"""
-Get loss function from symbol
+function set_parameters!(nn::MLP_NN, params)
+    _set_params!(nn.parameters_simple.params, params)
+end
 
-    Available values:
-    - :crossentropy
-    - :mse
-    - :mae
-"""
-function _get_loss_function(name::Symbol)
-    if name == :crossentropy
-        return Flux.crossentropy
-    elseif name == :mse
-        return Flux.mse
-    elseif name == :mae
-        return Flux.mae
-    elseif name == :kldivergence
-        return Flux.kldivergence
-    else
-        throw("Loss function not implemented")
-    end
+function copy_state(nn::MLP_NN)
+    return deepcopy(nn.state_lux)
+end
+
+function set_state!(nn::MLP_NN, state)
+    nn.state_lux = Lux.testmode(state)
 end

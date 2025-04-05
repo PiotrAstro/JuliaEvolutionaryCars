@@ -176,7 +176,7 @@ CONSTANTS_DICT = Dict(
                     :output_size => 16,  # 16
                     :hidden_layers => 2,
                     :hidden_neurons => 32,  # 32
-                    :dropout => 0.0,  # 0.5
+                    :dropout => 0.1,  # 0.5
                     :activation_function => :relu,  # :relu
                     :input_activation_function => :none,
                     :last_activation_function => :none
@@ -189,7 +189,7 @@ CONSTANTS_DICT = Dict(
                     :output_size => 10,  # it should be 10, 9 is for normal learning
                     :hidden_layers => 2,  # was 1
                     :hidden_neurons => 32,  # 64
-                    :dropout => 0.0,  # 0.5
+                    :dropout => 0.1,  # 0.5
                     :activation_function => :relu,  # :relu
                     :input_activation_function => :none,  # shouldnt it be :none?
                     :last_activation_function => :none, # was :none
@@ -198,7 +198,8 @@ CONSTANTS_DICT = Dict(
             ),
             :autoencoder_dict => Dict(
                 :mmd_weight => 0.0,  # turns out it might be beneficial to set it to 0.01, so maybe in the future compare e.g. 0.0, 0.01, 0.1
-                :learning_rate => 0.001
+                :learning_rate => 0.001,
+                :weight_decay => 0.0
             ),
             :initial_space_explorers_n => 30,
             :max_states_considered => 10_000,
