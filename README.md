@@ -43,7 +43,7 @@ I even created my own Neural Network framework in Cython, along with some Cython
 ## Dependencies
 
 The project uses several key Julia packages:
-- **Machine Learning**: Flux.jl for neural networks
+- **Machine Learning**: Lux.jl with SimpleChains.jl for neural networks
 - **Optimization**: MKL for optimized linear algebra
 - **Data Processing**: DataFrames.jl, CSV.jl
 - **Visualization**: Plots.jl, StatsPlots.jl

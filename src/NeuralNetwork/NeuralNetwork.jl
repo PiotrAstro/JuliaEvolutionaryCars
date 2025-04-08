@@ -12,11 +12,11 @@ import Logging
 using SimpleChains
 using LoopVectorization
 using Tullio
-# import SimilaritySearch
 
 export AbstractNeuralNetwork, predict, learn!, copy, get_neural_network, get_lux_representation, get_loss, copy_parameters, set_parameters!, copy_state, set_state!
 
-# concrete implementation should have fist parametric type to be a number of dimensions
+# -------------------------------------------------------
+# basic neural network interface
 abstract type AbstractNeuralNetwork end
 
 function get_neural_network(name::Val{T}) where T
@@ -27,40 +27,60 @@ function predict(nn::AbstractNeuralNetwork, X) :: Array{Float32}
     throw("not implemented")
 end
 
-function get_lux_representation(nn::AbstractNeuralNetwork)
-    throw("not implemented")
-end
-
-function get_loss(nn::AbstractNeuralNetwork) :: Function
-    throw("not implemented")
-end
-
 function copy(nn::AbstractNeuralNetwork) :: AbstractNeuralNetwork
     throw("not implemented")
 end
 
-function copy_parameters(nn::AbstractNeuralNetwork)
+# --------------------------------------------------------
+# interface for trainable neural networks - they should support Lux.jl
+# internaly they might use SimpleChains.jl, but interface is Lux.jl
+abstract type AbstractTrainableNeuralNetwork <: AbstractNeuralNetwork end
+
+# shoucnt it have learn! function?
+
+function get_lux_representation(nn::AbstractTrainableNeuralNetwork)
     throw("not implemented")
 end
 
-function set_parameters!(nn::AbstractNeuralNetwork, params)
+function learn!(nn::AbstractTrainableNeuralNetwork, X, Y; kwargs...)
     throw("not implemented")
 end
 
-function set_state!(nn::AbstractNeuralNetwork, state)
+function get_loss(nn::AbstractTrainableNeuralNetwork) :: Function
     throw("not implemented")
 end
 
-function copy_state(nn::AbstractNeuralNetwork)
+function copy_parameters(nn::AbstractTrainableNeuralNetwork)
     throw("not implemented")
 end
+
+function set_parameters!(nn::AbstractTrainableNeuralNetwork, params)
+    throw("not implemented")
+end
+
+function set_state!(nn::AbstractTrainableNeuralNetwork, state)
+    throw("not implemented")
+end
+
+function copy_state(nn::AbstractTrainableNeuralNetwork)
+    throw("not implemented")
+end
+
+# ---------------------------------------------------------
+# interface for functions usable for environment inference
+abstract type AbstractAgentNeuralNetwork <: AbstractNeuralNetwork end
+
+function predict(nn::AbstractAgentNeuralNetwork, ASSEQ) :: Matrix{Float32} where {ASSEQ<:AbstractStateSequence}
+    throw("not implemented")
+end
+
+# ----------------------------------------------------------
+# this one is mostly used as encoder for autoencoder
+abstract type AbstractTrainableAgentNeuralNetwork <: Union{AbstractAgentNeuralNetwork, AbstractTrainableNeuralNetwork} end
 
 # -------------------------------------------------------
 # end interface
 
-# Dummy Neural Network, used for manual testing in visual environments
-export DummyNN
-struct DummyNN <: AbstractNeuralNetwork end
 # -------------------------------------------------------
 # import concrete implementations
 

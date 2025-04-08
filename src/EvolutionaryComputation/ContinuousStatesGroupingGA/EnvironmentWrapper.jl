@@ -17,14 +17,14 @@ export EnvironmentWrapperStruct, get_action_size, get_groups_number, get_fitness
 mutable struct StructMemory
     _distance_membership_levels::Vector{Vector{Vector{Float32}}}
     _raw_exemplars::NeuralNetwork.AbstractStateSequence
-    _decoder::NeuralNetwork.AbstractNeuralNetwork
-    _autoencoder::NeuralNetwork.AbstractNeuralNetwork
+    _decoder::NeuralNetwork.AbstractTrainableNeuralNetwork
+    _autoencoder::NeuralNetwork.Autoencoder
 end
 
 mutable struct EnvironmentWrapperStruct
     _envs::Vector{<:Environment.AbstractEnvironment}
     _n_clusters::Int
-    _encoder::NeuralNetwork.AbstractNeuralNetwork
+    _encoder::NeuralNetwork.AbstractTrainableAgentNeuralNetwork
     _encoded_exemplars::Matrix{Float32}
     _distance_membership_levels_method::Symbol
     _max_states_considered::Int
@@ -406,7 +406,7 @@ end
 # --------------------------------------------------------------------------------------------------
 # Private functions
 
-function _collect_trajectories(envs::Vector{E}, NNs::Vector{<:NeuralNetwork.AbstractNeuralNetwork}, run_statistics::Environment.RunStatistics)::Vector{Environment.Trajectory{SEQ}} where {SEQ<:NeuralNetwork.AbstractStateSequence,E<:Environment.AbstractEnvironment{SEQ}}
+function _collect_trajectories(envs::Vector{E}, NNs::Vector{<:NeuralNetwork.AbstractAgentNeuralNetwork}, run_statistics::Environment.RunStatistics)::Vector{Environment.Trajectory{SEQ}} where {SEQ<:NeuralNetwork.AbstractStateSequence,E<:Environment.AbstractEnvironment{SEQ}}
     trajectories = Vector{Vector{Environment.Trajectory{SEQ}}}(undef, length(NNs))
 
     Threads.@threads for i in 1:length(NNs)

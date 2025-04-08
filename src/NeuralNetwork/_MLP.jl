@@ -13,7 +13,7 @@ Caching concerns:
 """
 We do not store lux parameters, cause we want to keep minimal memory footprint.
 """
-mutable struct MLP_NN{CL, ML, MS, PS, SL, ST, F} <: AbstractNeuralNetwork
+mutable struct MLP_NN{CL, ML, MS, PS, SL, ST, F} <: AbstractTrainableAgentNeuralNetwork
     simple_chain_call_last::CL
     model_lux::ML
     model_simple::MS
@@ -205,4 +205,12 @@ end
 
 function set_state!(nn::MLP_NN, state)
     nn.state_lux = Lux.testmode(state)
+end
+
+"""
+In general, MLP should support this function because of interface it implements.
+But cutrrently I do not use it, so it is not implemented yet.
+"""
+function learn!(nn::MLP_NN, X::Union{MatrixASSEQ, Matrix{Float32}}, Y::Matrix{Float32})
+    throw("not implemented")
 end

@@ -1,4 +1,48 @@
 # --------------------------------------------------------------------------------
+# Some math utils
+
+global const EPSILON_F32::Float32 = Float32(1e-7)
+
+function normalize_unit(x::Matrix{Float32}) :: Matrix{Float32}
+    copied = Base.copy(x)
+    normalize_unit!(copied)
+    return copied
+end
+
+function normalize_unit!(x::Matrix{Float32})
+    # for col in eachcol(x)
+    #     LinearAlgebra.normalize!(col)
+    # end
+    for col_ind in axes(x, 2)
+        sum_squared = 0.0f0
+        @turbo for row_ind in axes(x, 1)
+            sum_squared += x[row_ind, col_ind] ^ 2
+        end
+        sum_squared = 1.0f0 / sqrt(sum_squared)
+        @turbo for row_ind in axes(x, 1)
+            x[row_ind, col_ind] *= sum_squared
+        end
+    end
+end
+
+function normalize_std(x::Matrix{Float32}) :: Matrix{Float32}
+    copied = Base.copy(x)
+    normalize_std!(copied)
+    return copied
+end
+
+function normalize_std!(x::Matrix{Float32})
+    for col in eachcol(x)
+        mean = Statistics.mean(col)
+        col .-= mean
+        std = Statistics.std(col)
+        col .*= 1.0f0 / std
+    end
+end
+
+
+
+# --------------------------------------------------------------------------------
 # functions to change from SimpleChains to Lux and vice versa
 
 

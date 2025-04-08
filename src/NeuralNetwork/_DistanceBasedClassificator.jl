@@ -5,7 +5,7 @@ DistanceBasedClassificator
 encoded exemplars have (number of exemplars, features) shape
 translation is a vector of size number of exemplars
 """
-struct DistanceBasedClassificator{M<:Val, N <: AbstractNeuralNetwork, F<:Function, F2<:Function} <: AbstractNeuralNetwork
+struct DistanceBasedClassificator{M<:Val, N <: AbstractAgentNeuralNetwork, F<:Function, F2<:Function} <: AbstractAgentNeuralNetwork
     encoder::N
     encoded_exemplars::Matrix{Float32}
     translation::Matrix{Float32}
@@ -111,16 +111,6 @@ function predict_all(nn::DistanceBasedClassificator{Val{M_INT}}, distances::Matr
     return result_matrix
 end
 
-global const EPSILON::Float32 = Float32(1e-6)
-
-function get_loss(nn::DistanceBasedClassificator) :: Function
-    return get_loss(nn.encoder)
-end
-
-function get_lux_representation(nn::DistanceBasedClassificator)
-    return get_lux_representation(nn.encoder)
-end
-
 # using BenchmarkTools
 function predict(nn::DistanceBasedClassificator, X)::Matrix{Float32}
     # # encoded_x = predict(nn.encoder, X)
@@ -202,7 +192,7 @@ function distance_cosine!(exemplars::Matrix{Float32}, encoded_x::Matrix{Float32}
     distances = exemplars * encoded_x
     @inbounds @fastmath for i in eachindex(distances)
         val = 1.0f0 - distances[i]
-        distances[i] = ifelse(val < EPSILON, EPSILON, val)
+        distances[i] = ifelse(val < EPSILON_F32, EPSILON_F32, val)
     end
     return distances
 end
@@ -211,7 +201,7 @@ function distance_euclidean(exemplars::Matrix{Float32}, encoded_x::Matrix{Float3
     # distances = Distances.pairwise(Distances.Euclidean(), nn.encoded_exemplars, encoded_x)
     @tullio threads=false distances[i,j] := (exemplars[k,i] - encoded_x[k,j])^2 |> sqrt;
     @inbounds @simd for i in eachindex(distances)
-        distances[i] = ifelse(distances[i] < EPSILON, EPSILON, distances[i])
+        distances[i] = ifelse(distances[i] < EPSILON_F32, EPSILON_F32, distances[i])
     end
     return distances
 end
@@ -220,33 +210,9 @@ function distance_cityblock(exemplars::Matrix{Float32}, encoded_x::Matrix{Float3
     # distances = Distances.pairwise(Distances.Cityblock(), nn.encoded_exemplars, encoded_x)
     @tullio threads=false distances[i,j] := abs(exemplars[k,i] - encoded_x[k,j]);
     @inbounds @simd for i in eachindex(distances)
-        distances[i] = ifelse(distances[i] < EPSILON, EPSILON, distances[i])
+        distances[i] = ifelse(distances[i] < EPSILON_F32, EPSILON_F32, distances[i])
     end
     return distances
-end
-
-# ------------------------------------------------------------------------------------------
-
-function normalize_unit(x::Matrix{Float32}) :: Matrix{Float32}
-    copied = Base.copy(x)
-    normalize_unit!(copied)
-    return copied
-end
-
-function normalize_unit!(x::Matrix{Float32})
-    # for col in eachcol(x)
-    #     LinearAlgebra.normalize!(col)
-    # end
-    for col_ind in axes(x, 2)
-        sum_squared = 0.0f0
-        @turbo for row_ind in axes(x, 1)
-            sum_squared += x[row_ind, col_ind] ^ 2
-        end
-        sum_squared = 1.0f0 / sqrt(sum_squared)
-        @turbo for row_ind in axes(x, 1)
-            x[row_ind, col_ind] *= sum_squared
-        end
-    end
 end
 
 # ------------------------------------------------------------------------------------------

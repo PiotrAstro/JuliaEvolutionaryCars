@@ -41,12 +41,12 @@ end
 Returns some generator
 things in this generator are ready to put them into neural network
 """
-function prepare_batches(seqs::ASSEQ, batch_size::Int; permute::Bool=true) where {ASSEQ<:AbstractStateSequence}
+function prepare_batches(seqs::ASSEQ, batch_size::Int; permutation::Union{Nothing, AbstractVector{Int}}=nothing) where {ASSEQ<:AbstractStateSequence}
     throw("unimplemented")
 end
 
 # ---------------------------------------------------------------------------------------
-# Replace the struct definition and its implementations
+# MatrixASSEQ - for simple 1d data, it is matrix, cause we add batch dimension to it
 struct MatrixASSEQ <: AbstractStateSequence{Vector{Float32}}
     states::Matrix{Float32}
 end
@@ -82,13 +82,14 @@ function get_nn_input(seq::MatrixASSEQ)
     return seq.states
 end
 
-function prepare_batches(seqs::MatrixASSEQ, batch_size::Int; permute::Bool=true)
+function prepare_batches(seqs::MatrixASSEQ, batch_size::Int; permutation::Union{Nothing, AbstractVector{Int}}=nothing)
     X = seqs.states
-    if permute
-        perm = Random.randperm(size(X, 2))
+    if !isnothing(permutation)
         X = X[:, perm]
     end
     columns_n = size(X, 2)
+
+    # I should think about changing it to view
     batches = (
         X[ :, i: (i+batch_size-1 <= columns_n ? (i+batch_size-1) : columns_n)]
             for i in 1:batch_size:columns_n

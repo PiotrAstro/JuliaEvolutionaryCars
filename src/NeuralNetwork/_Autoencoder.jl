@@ -1,6 +1,6 @@
 export Autoencoder
 
-struct Autoencoder{E<:AbstractNeuralNetwork, D<:AbstractNeuralNetwork, C} <: AbstractNeuralNetwork
+struct Autoencoder{E<:AbstractTrainableAgentNeuralNetwork, D<:AbstractTrainableNeuralNetwork, C} <: AbstractTrainableNeuralNetwork
     encoder::E
     decoder::D
     internal::C
@@ -16,7 +16,7 @@ function Autoencoder(
         mmd_weight::Float64,
         learning_rate::Float64,
         weight_decay::Float64=0.0
-    ) where {E<:AbstractNeuralNetwork, D<:AbstractNeuralNetwork}
+    ) where {E<:AbstractNeuralNetwork, D<:AbstractTrainableNeuralNetwork}
     internal = Lux.Chain(
         encoder=get_lux_representation(encoder), 
         decoder=get_lux_representation(decoder)
@@ -36,15 +36,11 @@ function get_neural_network(name::Val{:Autoencoder})
     return Autoencoder
 end
 
-function predict(nn::Autoencoder, X::AbstractStateSequence) :: Array{Float32}
+function predict(nn::Autoencoder, X::ASSEQ) :: ASSEQ where {ASSEQ<:AbstractStateSequence}
     internal = get_nn_input(X)
     encoded = predict(nn.encoder, internal)
     decoded = predict(nn.decoder, encoded)
-    return decoded
-end
-
-function get_loss(nn::Autoencoder) :: Function
-    return get_loss(nn.decoder)
+    return ASSEQ(decoded)
 end
 
 function copy(nn::Autoencoder)
@@ -65,7 +61,7 @@ function learn!(
     batch_size::Int = 256,
     verbose::Bool = false
 ) where {ASSEQ<:AbstractStateSequence}
-    nn_loss = get_loss(nn)
+    nn_loss = get_loss(nn.decoder)
     ps = (;
         encoder=copy_parameters(nn.encoder),
         decoder=copy_parameters(nn.decoder)
@@ -84,7 +80,8 @@ function learn!(
 
     # shuffle x and y the same way
     all_inputs = nothing
-    batches = prepare_batches(X, batch_size)
+    permutation = Random.randperm(get_length(X))
+    batches = prepare_batches(X, batch_size, permutation=permutation)
 
     for epoch in 1:epochs
         for x in batches
@@ -160,3 +157,31 @@ function gaussian_kernel(
         ) ./ ρ^2 ./ size(x, 1)
     )
 end # function
+
+# -----------------------------------------------------------------------------
+# other interface functions
+function get_loss(nn::Autoencoder) :: Function
+    return nn.decoder.loss
+end
+
+function get_lux_representation(nn::Autoencoder)
+    return nn.internal
+end
+
+function copy_parameters(nn::Autoencoder)
+    return (encoder=copy_parameters(nn.encoder), decoder=copy_parameters(nn.decoder))
+end
+
+function set_parameters!(nn::Autoencoder, params)
+    set_parameters!(nn.encoder, params.encoder)
+    set_parameters!(nn.decoder, params.decoder)
+end
+
+function copy_state(nn::Autoencoder)
+    return (encoder=copy_state(nn.encoder), decoder=copy_state(nn.decoder))
+end
+
+function set_state!(nn::Autoencoder, state)
+    set_state!(nn.encoder, state.encoder)
+    set_state!(nn.decoder, state.decoder)
+end

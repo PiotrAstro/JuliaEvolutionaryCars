@@ -35,7 +35,7 @@ function get_environment(environment::Val{T}) where T
 end
 
 "Doesnt reset environment afterwards, real implementation will have some kwargs"
-function visualize!(env::AbstractEnvironment, model::NeuralNetwork.AbstractNeuralNetwork, reset::Bool = true;)
+function visualize!(env::AbstractEnvironment, model::NeuralNetwork.AbstractAgentNeuralNetwork, reset::Bool = true;)
     throw("unimplemented")
 end
 
@@ -75,11 +75,15 @@ end
 A thread safe structure to store run statistics.
 - Frames are single observations of the environment (those received by Agents)
 - Evaluations are number of times get_trajectory_rewards! or get_trajectory_data! was called
-- Trajectories are number opf trajectories that were generated or could be (so e.g. for get_trajectory_rewards! with 5 environments it will be 5)
+- Trajectories are number of trajectories that were generated or could be (so e.g. for get_trajectory_rewards! with 5 environments it will be 5)
 
 Total vs Collected
 - Total are from get_trajectory_rewards! + get_trajectory_data! calls
 - Collected are from get_trajectory_data! only
+
+Important!
+- structure is implementation detail, you should just pass it to get_trajectory_rewards! and get_trajectory_data! functions
+- get results using get_statistics function
 """
 @kwdef struct RunStatistics
     total_frames::Threads.Atomic{Int} = Threads.Atomic{Int}(0)
@@ -111,7 +115,7 @@ Get the rewards of the trajectory of the environments using the neural network. 
 """
 function get_trajectory_rewards!(
         envs::Vector{E},
-        neural_network::NeuralNetwork.AbstractNeuralNetwork;
+        neural_network::NeuralNetwork.AbstractAgentNeuralNetwork;
         run_statistics::Union{Nothing, RunStatistics} = nothing,
         reset::Bool = true
     ) :: Vector{Float64} where {INTERNAL, ASSEQ<:NeuralNetwork.AbstractStateSequence{INTERNAL}, E<:AbstractEnvironment{ASSEQ}}
@@ -173,7 +177,7 @@ Get the rewards, states and actions of the trajectory of the environments using 
 """
 function get_trajectory_data!(
         envs::Vector{E},
-        neural_network::NeuralNetwork.AbstractNeuralNetwork;
+        neural_network::NeuralNetwork.AbstractAgentNeuralNetwork;
         run_statistics::Union{Nothing, RunStatistics} = nothing,
         reset::Bool = true
     ) :: Vector{Trajectory{ASSEQ}} where {INTERNAL, ASSEQ<:NeuralNetwork.AbstractStateSequence{INTERNAL}, E<:AbstractEnvironment{ASSEQ}}
@@ -223,7 +227,7 @@ function get_trajectory_data!(
         Threads.atomic_add!(run_statistics.collected_trajectories, trajectory_n)
     end
 
-    return [Trajectory(ASSEQ(states), hcat(actions...), rewards) for (rewards, states, actions) in trajectory_data]
+    return [Trajectory(ASSEQ(states), reduce(hcat, actions), rewards) for (rewards, states, actions) in trajectory_data]
 end
 
 

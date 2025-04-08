@@ -1,13 +1,11 @@
 export DistanceBasedClassificator, membership, encoded_membership, get_states_number
 
-global const EPSILON_EXEMPLARBASEDNN::Float32 = Float32(1e-6)
-
 """
 DistanceBasedClassificator
 encoded exemplars have (number of exemplars, features) shape
 translation is a vector of size number of exemplars
 """
-struct ExemplarBasedNN{N <: AbstractNeuralNetwork, FUNI, FUNM, FUNA} <: AbstractNeuralNetwork
+struct ExemplarBasedNN{N <: AbstractAgentNeuralNetwork, FUNI, FUNM, FUNA} <: AbstractAgentNeuralNetwork
     encoder::N
     encoded_exemplars::Matrix{Float32}
     translation::Matrix{Float32}
@@ -124,7 +122,7 @@ end
 function membership_mval_generator(m_value::Int)
     return (interaction::AbstractVector{Float32}) -> begin
         @fastmath @inbounds @simd for i in eachindex(interaction)
-            distance = abs(1.0f0 - interaction[i]) + EPSILON_EXEMPLARBASEDNN
+            distance = abs(1.0f0 - interaction[i]) + EPSILON_F32
             interaction[i] = (1.0f0 / distance) ^ m_value
         end
         interaction .*= 1.0f0 / sum(interaction)
@@ -190,7 +188,7 @@ function _encoded_membership!(nn::ExemplarBasedNN, encoded_x::Matrix{Float32})::
     return interaction_matrix
 end
 
-function get_states_number(nn::DistanceBasedClassificator)
+function get_states_number(nn::ExemplarBasedNN)
     return nn.states_n
 end
 
@@ -198,51 +196,4 @@ end
 # Other interface functions
 function get_neural_network(name::Val{:ExemplarBasedNN})
     return ExemplarBasedNN
-end
-
-function get_loss(nn::ExemplarBasedNN) :: Function
-    return get_loss(nn.encoder)
-end
-
-function get_lux_representation(nn::ExemplarBasedNN)
-    return get_lux_representation(nn.encoder)
-end
-
-# ------------------------------------------------------------------------------------------
-# Utils
-function normalize_unit(x::Matrix{Float32}) :: Matrix{Float32}
-    copied = Base.copy(x)
-    normalize_unit!(copied)
-    return copied
-end
-
-function normalize_unit!(x::Matrix{Float32})
-    # for col in eachcol(x)
-    #     LinearAlgebra.normalize!(col)
-    # end
-    for col_ind in axes(x, 2)
-        sum_squared = 0.0f0
-        @turbo for row_ind in axes(x, 1)
-            sum_squared += x[row_ind, col_ind] ^ 2
-        end
-        sum_squared = 1.0f0 / sqrt(sum_squared)
-        @turbo for row_ind in axes(x, 1)
-            x[row_ind, col_ind] *= sum_squared
-        end
-    end
-end
-
-function normalize_std(x::Matrix{Float32}) :: Matrix{Float32}
-    copied = Base.copy(x)
-    normalize_std!(copied)
-    return copied
-end
-
-function normalize_std!(x::Matrix{Float32})
-    for col in eachcol(x)
-        mean = Statistics.mean(col)
-        col .-= mean
-        std = Statistics.std(col)
-        col .*= 1.0f0 / std
-    end
 end
