@@ -18,7 +18,7 @@ function normalize_unit!(x::Matrix{Float32})
         @turbo for row_ind in axes(x, 1)
             sum_squared += x[row_ind, col_ind] ^ 2
         end
-        sum_squared = 1.0f0 / sqrt(sum_squared)
+        @fastmath sum_squared = 1.0f0 / sqrt(sum_squared)
         @turbo for row_ind in axes(x, 1)
             x[row_ind, col_ind] *= sum_squared
         end
@@ -32,7 +32,7 @@ function normalize_std(x::Matrix{Float32}) :: Matrix{Float32}
 end
 
 function normalize_std!(x::Matrix{Float32})
-    for col in eachcol(x)
+    @fastmath for col in eachcol(x)
         mean = Statistics.mean(col)
         col .-= mean
         std = Statistics.std(col)
@@ -40,6 +40,15 @@ function normalize_std!(x::Matrix{Float32})
     end
 end
 
+function softmax!(x::AbstractVector{Float32})
+    max_val = typemin(Float32)
+    for val in x
+        @fastmath max_val = ifelse(val > max_val, val, max_val)
+    end
+    @fastmath x .-= max_val
+    @fastmath broadcast!(exp, x, x)
+    @fastmath x .*= 1.0f0 / sum(x)
+end
 
 
 # --------------------------------------------------------------------------------

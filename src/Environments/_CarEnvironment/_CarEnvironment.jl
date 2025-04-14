@@ -231,15 +231,19 @@ function _does_collide_at_position(env::BasicCarEnvironment, x::Float64, y::Floa
     return _does_collide_at_position_faster(env, x + 0.5, y + 0.5)
 end
 
-function _does_collide_at_position_faster(env::BasicCarEnvironment, x::Float64, y::Float64) :: Bool
+@inline function _does_collide_at_position_faster(env::BasicCarEnvironment, x::Float64, y::Float64) :: Bool
     x_check = unsafe_trunc(Int, x)  # we assume that x and y are not inf or nan
     y_check = unsafe_trunc(Int, y)
 
     if x_check < 1 || x_check > size(env.map, 2) || y_check < 1 || y_check > size(env.map, 1)
         return true
     end
+
     return @inbounds env.map[y_check, x_check]
 end
+
+const INITIAL_RAY_STEP = 25.0
+const STEP_MULTIPLIER = 0.2  # should be below 1.0
 
 function _get_ray_distance(env::BasicCarEnvironment, angle::Float64) :: Float64
     x = env.x + 0.5
@@ -248,15 +252,34 @@ function _get_ray_distance(env::BasicCarEnvironment, angle::Float64) :: Float64
     cos_angle = cos(angle)
     sin_angle = sin(angle)
     max_distance = env.ray_input_clip * env.rays_distances_scale_factor
-    while distance < max_distance
-        x += cos_angle
-        y -= sin_angle
-        distance += 1.0
+
+    x_prev = x
+    y_prev = y
+    step_course = INITIAL_RAY_STEP
+
+    while true
+        @fastmath x += cos_angle * step_course
+        @fastmath y -= sin_angle * step_course
+        @fastmath distance += step_course
         if _does_collide_at_position_faster(env, x, y)
-            return distance
+            if step_course == 1.0
+                return distance
+            end
+
+            distance -= step_course
+            x = x_prev
+            y = y_prev
+            
+            @fastmath step_course = max(round(step_course * STEP_MULTIPLIER), 1.0)
+        else
+            x_prev = x
+            y_prev = y
+        end
+
+        if distance > max_distance
+            return max_distance
         end
     end
-    return distance
 end
 
 # include visualization function

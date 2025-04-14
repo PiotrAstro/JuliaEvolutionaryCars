@@ -5,7 +5,7 @@ DistanceBasedClassificator
 encoded exemplars have (number of exemplars, features) shape
 translation is a vector of size number of exemplars
 """
-struct ExemplarBasedNN{N <: AbstractAgentNeuralNetwork, FUNI, FUNM, FUNA} <: AbstractAgentNeuralNetwork
+struct ExemplarBasedNN{N <: Union{AbstractAgentNeuralNetwork, AbstractTrainableAgentNeuralNetwork}, FUNI, FUNM, FUNA} <: AbstractAgentNeuralNetwork
     encoder::N
     encoded_exemplars::Matrix{Float32}
     translation::Matrix{Float32}
@@ -23,6 +23,7 @@ struct ExemplarBasedNN{N <: AbstractAgentNeuralNetwork, FUNI, FUNM, FUNA} <: Abs
         activation_function::Symbol,
     ) where N
         states_n = size(encoded_exemplars, 2)
+        
         if interaction_method == :cosine
             encoded_exemplars = normalize_unit(encoded_exemplars)
             interaction_function! = interaction_cosine!
@@ -103,20 +104,16 @@ function membership_unit!(interaction::AbstractVector{Float32})
 end
 
 function membership_norm!(interaction::AbstractVector{Float32})
-    mean = Statistics.mean(interaction)
-    interaction .-= mean
-    std = Statistics.std(interaction)
-    interaction .*= 1.0f0 / std
+    @fastmath begin
+        mean = Statistics.mean(interaction)
+        interaction .-= mean
+        std = Statistics.std(interaction)
+        interaction .*= 1.0f0 / std
+    end
 end
 
 function membership_softmax!(interaction::AbstractVector{Float32})
-    max_val = typemin(Float32)
-    for val in interaction
-        @fastmath max_val = ifelse(val > max_val, val, max_val)
-    end
-    interaction .-= max_val
-    broadcast!(exp, interaction, interaction)
-    interaction .*= 1.0f0 / sum(interaction)
+    softmax!(interaction)
 end
 
 function membership_mval_generator(m_value::Int)
@@ -134,13 +131,7 @@ end
 # They do not change anything for simple max choosing
 # There will be difference for crossover, I should check how to do it properly
 function activation_softmax!(interaction::AbstractVector{Float32})
-    max_val = typemin(Float32)
-    for val in interaction
-        @fastmath max_val = ifelse(val > max_val, val, max_val)
-    end
-    interaction .-= max_val
-    broadcast!(exp, interaction, interaction)
-    interaction .*= 1.0f0 / sum(interaction)
+    softmax!(interaction)
 end
 
 function activation_none(interaction::AbstractVector{Float32})
@@ -197,3 +188,7 @@ end
 function get_neural_network(name::Val{:ExemplarBasedNN})
     return ExemplarBasedNN
 end
+
+# -------------------------------------------------------------------------------------------
+# some utils
+

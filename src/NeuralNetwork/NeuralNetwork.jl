@@ -1,6 +1,10 @@
 
 module NeuralNetwork
 
+using LoopVectorization
+using Tullio
+import SimpleChains
+import Zygote
 import Statistics
 import Lux
 import Random
@@ -9,11 +13,12 @@ import Distances
 import LinearAlgebra
 import StatsBase
 import Logging
-using SimpleChains
-using LoopVectorization
-using Tullio
 
 export AbstractNeuralNetwork, predict, learn!, copy, get_neural_network, get_lux_representation, get_loss, copy_parameters, set_parameters!, copy_state, set_state!
+
+# general things, important for further imports
+include("_ASSEQ.jl")
+include("_utils.jl")
 
 # -------------------------------------------------------
 # basic neural network interface
@@ -70,23 +75,25 @@ end
 # interface for functions usable for environment inference
 abstract type AbstractAgentNeuralNetwork <: AbstractNeuralNetwork end
 
-function predict(nn::AbstractAgentNeuralNetwork, ASSEQ) :: Matrix{Float32} where {ASSEQ<:AbstractStateSequence}
+# Should support ASSEQ
+function predict(nn::AbstractAgentNeuralNetwork, ASSEQ) :: Matrix{Float32}
     throw("not implemented")
 end
 
 # ----------------------------------------------------------
 # this one is mostly used as encoder for autoencoder
-abstract type AbstractTrainableAgentNeuralNetwork <: Union{AbstractAgentNeuralNetwork, AbstractTrainableNeuralNetwork} end
+abstract type AbstractTrainableAgentNeuralNetwork <: AbstractTrainableNeuralNetwork end
+
+# Should support ASSEQ
+function predict(nn::AbstractTrainableAgentNeuralNetwork, ASSEQ) :: Matrix{Float32}
+    throw("not implemented")
+end
 
 # -------------------------------------------------------
 # end interface
 
 # -------------------------------------------------------
 # import concrete implementations
-
-# general things, important for further imports
-include("_ASSEQ.jl")
-include("_utils.jl")
 
 # other neural networks
 include("_MLP.jl")

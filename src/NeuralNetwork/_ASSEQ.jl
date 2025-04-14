@@ -56,7 +56,7 @@ function MatrixASSEQ(states::AbstractVector{Vector{Float32}}) :: MatrixASSEQ
     return MatrixASSEQ(states_matrix)
 end
 
-function MatrixASSEQ(seqs::Vector{MatrixASSEQ}) :: MatrixASSEQ
+function MatrixASSEQ(seqs::AbstractVector{MatrixASSEQ}) :: MatrixASSEQ
     states = reduce(hcat, [seq.states for seq in seqs])
     return MatrixASSEQ(states)
 end
@@ -85,7 +85,7 @@ end
 function prepare_batches(seqs::MatrixASSEQ, batch_size::Int; permutation::Union{Nothing, AbstractVector{Int}}=nothing)
     X = seqs.states
     if !isnothing(permutation)
-        X = X[:, perm]
+        X = X[:, permutation]
     end
     columns_n = size(X, 2)
 

@@ -91,7 +91,7 @@ function MLP_NN(;
     adaptor = Lux.ToSimpleChainsAdaptor((SimpleChains.static(input_size),), true)
     simple_model = adaptor(model_simple_to_adapt)
 
-    ps, st = Lux.setup(Random.Xoshiro(rand(Int)), model_lux)
+    ps, st = Lux.setup(Random.default_rng(rand(Int)), model_lux)
     st = Lux.testmode(st)
 
     ps_simple, st_simple = Lux.setup(Random.default_rng(rand(Int)), simple_model)
@@ -119,7 +119,7 @@ function get_lux_representation(nn::MLP_NN)
 end
 
 
-@inline function predict(nn::MLP_NN, X::AbstractStateSequence{Vector{Float32}}) :: Matrix{Float32}
+function predict(nn::MLP_NN, X::MatrixASSEQ) :: Matrix{Float32}
     return predict(nn, get_nn_input(X))
 end
 

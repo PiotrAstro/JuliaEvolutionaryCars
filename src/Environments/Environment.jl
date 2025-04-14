@@ -108,6 +108,13 @@ end
 # using BenchmarkTools
 # import Profile
 # import PProf
+# b_states(envs_alive, ASSEQ) = ASSEQ([get_state(env) for (env, _) in envs_alive])
+# function b_states_just_calc(envs_alive)
+#     for (env, _) in envs_alive
+#         get_state(env)
+#     end
+# end
+
 
 # Some general functions, not interface functions
 """
@@ -130,18 +137,32 @@ function get_trajectory_rewards!(
     envs_alive = [(env, i) for (i, env) in enumerate(envs) if is_alive(env)]
     trajectories_n = length(envs_alive)
 
+    # benchmarks:
     # states = ASSEQ([get_state(env) for (env, _) in envs_alive])
-    # actions = NeuralNetwork.predict(neural_network, get_nn_input(states))
-    # b = @benchmark ($ASSEQ)([get_state(env) for (env, _) in ($envs_alive)])
+    # actions = NeuralNetwork.predict(neural_network, states)
+    # println("ASSEQ creation:")
+    # b = @benchmark b_states($envs_alive, $ASSEQ)
     # display(b)
-    # b = @benchmark NeuralNetwork.predict($neural_network, get_nn_input($states))
+
+    # println("ASSEQ just calc:")
+    # b = @benchmark b_states_just_calc($envs_alive)
     # display(b)
-    # Profile.clear()
-    # Profile.@profile for i in 1:100000
-    #     states = ASSEQ([get_state(env) for (env, _) in envs_alive])
-    #     actions = NeuralNetwork.predict(neural_network, get_nn_input(states))
-    # end
-    # PProf.pprof(;webport=2137)
+
+    # env_tmp = envs_alive[1][1]
+    # actions_view = view(actions, :, 1)
+    # b = @benchmark react!($env_tmp, $actions_view)
+    # println("react! creation:")
+    # display(b)
+
+    # println("NeuralNetwork predict:")
+    # b = @benchmark NeuralNetwork.predict($neural_network, $states)
+    # display(b)
+    # # Profile.clear()
+    # # Profile.@profile for i in 1:100000
+    # #     states = ASSEQ([get_state(env) for (env, _) in envs_alive])
+    # #     actions = NeuralNetwork.predict(neural_network, get_nn_input(states))
+    # # end
+    # # PProf.pprof(;webport=2137)
     # throw("fdsfdsvsdf")
 
     frames_n = 0

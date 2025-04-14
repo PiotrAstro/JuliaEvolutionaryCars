@@ -5,7 +5,7 @@ DistanceBasedClassificator
 encoded exemplars have (number of exemplars, features) shape
 translation is a vector of size number of exemplars
 """
-struct DistanceBasedClassificator{M<:Val, N <: AbstractAgentNeuralNetwork, F<:Function, F2<:Function} <: AbstractAgentNeuralNetwork
+struct DistanceBasedClassificator{M<:Val, N <: Union{AbstractAgentNeuralNetwork, AbstractTrainableAgentNeuralNetwork}, F<:Function, F2<:Function} <: AbstractAgentNeuralNetwork
     encoder::N
     encoded_exemplars::Matrix{Float32}
     translation::Matrix{Float32}
