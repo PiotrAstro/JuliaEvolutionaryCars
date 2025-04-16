@@ -11,6 +11,9 @@ import .PAM
 include("Clustering/FCM.jl")
 import .FCM
 
+include("Clustering/BanditPAM.jl")
+import .BanditPAM
+
 include("StatesGrouping/StatesGrouping.jl")
 import .StatesGrouping
 

@@ -15,7 +15,6 @@ export EnvironmentWrapperStruct, get_action_size, get_groups_number, get_fitness
 # Structs
 
 mutable struct StructMemory
-    _distance_membership_levels::Vector{Vector{Vector{Float32}}}
     _raw_exemplars::NeuralNetwork.AbstractStateSequence
     _decoder::NeuralNetwork.AbstractTrainableNeuralNetwork
     _autoencoder::NeuralNetwork.Autoencoder
@@ -26,14 +25,10 @@ mutable struct EnvironmentWrapperStruct
     _n_clusters::Int
     _encoder::NeuralNetwork.AbstractTrainableAgentNeuralNetwork
     _encoded_exemplars::Matrix{Float32}
-    _distance_membership_levels_method::Symbol
     _max_states_considered::Int
     _distance_metric::Symbol  # :euclidean or :cosine or :cityblock
     _exemplars_clustering::Symbol  # :genieclust or :pam or :kmedoids
-    _hclust_distance::Symbol  # :ward or :single or :complete or :average
-    _hclust_time::Symbol  # :ward or :single or :complete or :average
     _exemplar_nn_dict
-    _create_time_distance_tree
     _verbose::Bool
     _initial_space_explorers_n::Int
     _struct_memory::Union{StructMemory, Nothing}
@@ -49,33 +44,23 @@ function EnvironmentWrapperStruct(
         envs::Vector{<:Environment.AbstractEnvironment},
         run_statistics::Environment.RunStatistics=Environment.RunStatistics(),
 
-        ; encoder_dict::Dict{Symbol,Any},
+        ;
+        
+        encoder_dict::Dict{Symbol,Any},
         decoder_dict::Dict{Symbol,Any},
         autoencoder_dict::Dict{Symbol,<:Any},
         initial_space_explorers_n::Int,
         max_states_considered::Int,
         n_clusters::Int,
         distance_metric::Symbol=:cosine,
-        exemplars_clustering::Symbol=:genieclust,
-        distance_membership_levels_method::Symbol=:hclust_complete,
-        hclust_distance::Symbol=:ward,
-        hclust_time::Symbol=:ward,
-        time_distance_tree::Symbol=:mine,  # :mine or :markov
         exemplar_nn=Dict(
             :interaction_method=>:cosine,
             :membership_normalization=>:softmax,
             :activation_function=>:softmax,
         ),
+        exemplars_clustering::Symbol=:pam,
         verbose::Bool=false
     )
-    if time_distance_tree == :mine
-        _create_time_distance_tree = StatesGrouping.create_time_distance_tree_mine
-    elseif time_distance_tree == :markov
-        _create_time_distance_tree = StatesGrouping.create_time_distance_tree_markov_fundamental
-    else
-        throw(ArgumentError("time_distance_tree must be :mine or :markov"))
-    end
-
     encoder = NeuralNetwork.get_neural_network(encoder_dict[:name])(; encoder_dict[:kwargs]...)
     decoder = NeuralNetwork.get_neural_network(decoder_dict[:name])(; decoder_dict[:kwargs]...)
     autoencoder = NeuralNetwork.Autoencoder(encoder, decoder; autoencoder_dict...)
@@ -83,9 +68,8 @@ function EnvironmentWrapperStruct(
     # initial state space exploration
     # random NNs creation
     action_n = Environment.get_action_size(envs[1])
-    NNs = [
-        NeuralNetwork.Random_NN(action_n) for _ in 1:initial_space_explorers_n
-    ]
+    NNs = [NeuralNetwork.Random_NN(action_n) for _ in 1:initial_space_explorers_n]
+    
     # states collection
     trajectories = _collect_trajectories(envs, NNs, run_statistics)
     states = _combine_states_from_trajectories([(1.0, trajectories)], max_states_considered)
@@ -96,21 +80,14 @@ function EnvironmentWrapperStruct(
     end
 
     encoded_states = NeuralNetwork.predict(encoder, states)
-    exemplars_ids, _ = StatesGrouping.get_exemplars(
+    exemplars_ids = StatesGrouping.get_exemplars(
         encoded_states,
         n_clusters;
         distance_metric=distance_metric,
-        exemplars_clustering=exemplars_clustering,
-        hclust_distance=hclust_distance
-    )
-    encoded_exemplars = encoded_states[:, exemplars_ids]
-    distance_membership_levels = StatesGrouping.distance_membership_levels(
-        encoded_states,
-        encoded_exemplars; 
-        distance_metric=distance_metric,
-        method=distance_membership_levels_method
+        exemplars_clustering=exemplars_clustering
     )
     states_exeplars = NeuralNetwork.get_sequence_with_ids(states, exemplars_ids)
+    encoded_exemplars = encoded_states[:, exemplars_ids]
 
     # ---------------------------------------------
     # tmp stuff
@@ -147,7 +124,6 @@ function EnvironmentWrapperStruct(
     end
 
     struct_memory = StructMemory(
-        distance_membership_levels,
         states_exeplars,
         decoder,
         autoencoder,
@@ -158,14 +134,10 @@ function EnvironmentWrapperStruct(
             n_clusters,
             encoder,
             encoded_exemplars,
-            distance_membership_levels_method,
             max_states_considered,
             distance_metric,
             exemplars_clustering,
-            hclust_distance,
-            hclust_time,
             exemplar_nn,
-            _create_time_distance_tree,
             verbose,
             initial_space_explorers_n,
             struct_memory,
@@ -195,36 +167,58 @@ function random_reinitialize_exemplars!(env_wrap::EnvironmentWrapperStruct, n_cl
     env_wrap._n_clusters = n_clusters
     states_nn_input = states
     encoded_states = NeuralNetwork.predict(env_wrap._encoder, states_nn_input)
-    exemplars_ids, _ = StatesGrouping.get_exemplars(
+    exemplars_ids = StatesGrouping.get_exemplars(
         encoded_states,
         n_clusters;
         distance_metric=env_wrap._distance_metric,
-        exemplars_clustering=env_wrap._exemplars_clustering,
-        hclust_distance=env_wrap._hclust_distance
+        exemplars_clustering=env_wrap._exemplars_clustering
     )
     env_wrap._encoded_exemplars = encoded_states[:, exemplars_ids]
-    env_wrap._struct_memory._distance_membership_levels = StatesGrouping.distance_membership_levels(
-        encoded_states,
-        env_wrap._encoded_exemplars; 
-        distance_metric=env_wrap._distance_metric,
-        method=env_wrap._distance_membership_levels_method
-    )
     env_wrap._struct_memory._raw_exemplars = NeuralNetwork.get_sequence_with_ids(states, exemplars_ids)
-end
-
-"""
-returns Tuple{Vector{Trajectory}, TreeNode}
-"""
-function create_time_distance_tree(env_wrap::EnvironmentWrapperStruct, translation::Matrix{Float32})
-    trajectories = _collect_trajectories(env_wrap._envs, [get_full_NN(env_wrap, translation)], env_wrap._run_statistics)
-    states_in_trajectories = [trajectory.states for trajectory in trajectories]
-    full_nn = get_full_NN(env_wrap, translation)
-    memberships_by_trajectory = [NeuralNetwork.membership(full_nn, states_one_traj) for states_one_traj in states_in_trajectories]
-    return trajectories, env_wrap._create_time_distance_tree(memberships_by_trajectory, env_wrap._hclust_time)
 end
 
 function get_trajectories(env_wrap::EnvironmentWrapperStruct, translation::Matrix{Float32})
     return _collect_trajectories(env_wrap._envs, [get_full_NN(env_wrap, translation)], env_wrap._run_statistics)
+end
+
+function get_levels_time(
+        env_wrap::EnvironmentWrapperStruct,
+        translation::Matrix{Float32},
+        method::Symbol,
+        combine_method::Symbol,
+        hclust::Symbol;
+        trajectories::Union{Nothing, Vector{<:Environment.Trajectory{SEQ}}}=nothing
+    )::Vector{Vector{Vector{Int}}} where {SEQ<:NeuralNetwork.AbstractStateSequence}
+    if isnothing(trajectories)
+        trajectories = get_trajectories(env_wrap, translation)
+    end
+    
+    full_nn = get_full_NN(env_wrap, translation)
+    states_in_trajectories = [trajectory.states for trajectory in trajectories]
+    memberships_by_trajectory = [NeuralNetwork.membership(full_nn, states_one_traj) for states_one_traj in states_in_trajectories]
+    tree = StatesGrouping.get_time_distance_tree(
+        memberships_by_trajectory,
+        method=method,
+        hclust_time=hclust
+    )
+    levels = StatesGrouping.get_levels(tree, combine_method)
+
+    return levels
+end
+
+function get_levels_latent(
+    env_wrap::EnvironmentWrapperStruct,
+    combine_method::Symbol,
+    hclust::Symbol
+)::Vector{Vector{Vector{Int}}}
+    
+    tree = StatesGrouping.get_latent_distance_tree(
+        env_wrap._encoded_exemplars,
+        distance_metric=env_wrap._distance_metric,
+        hclust_latent=hclust
+    )
+    levels = StatesGrouping.get_levels(tree, combine_method)
+    return levels
 end
 
 function copy(env_wrap::EnvironmentWrapperStruct)::EnvironmentWrapperStruct
@@ -233,7 +227,6 @@ function copy(env_wrap::EnvironmentWrapperStruct)::EnvironmentWrapperStruct
     encoder_copy = autoencoder_copy.encoder
     decoder_copy = autoencoder_copy.decoder
     struct_memory_copy = StructMemory(
-        env_wrap._struct_memory._distance_membership_levels,
         env_wrap._struct_memory._raw_exemplars,
         decoder_copy,
         autoencoder_copy,
@@ -244,50 +237,15 @@ function copy(env_wrap::EnvironmentWrapperStruct)::EnvironmentWrapperStruct
         env_wrap._n_clusters,
         encoder_copy,
         env_wrap._encoded_exemplars,
-        env_wrap._distance_membership_levels_method,
         env_wrap._max_states_considered,
         env_wrap._distance_metric,
         env_wrap._exemplars_clustering,
-        env_wrap._hclust_distance,
-        env_wrap._hclust_time,
         env_wrap._exemplar_nn_dict,
-        env_wrap._create_time_distance_tree,
         env_wrap._verbose,
         env_wrap._initial_space_explorers_n,
         struct_memory_copy,
         env_wrap._run_statistics
     )
-end
-
-
-"""
-It normalizes genes by making it non negative and sum to 0
-opposed to normalize_genes_min_0! if input is e.g. 0.2 0.4 0.4 it will stay the same
-"""
-function normalize_genes!(genes::Matrix{Float32})
-    for col in eachcol(genes)
-        min_value = minimum(col)
-        if min_value < 0
-            col .+= abs(min_value)
-        end
-        col ./= sum(col)
-    end
-end
-
-"""
-It normalizes genes by subtracting smallest value from each col and then subtracting by sum
-if input is e.g. 0.2 0.4 0.4 it will be normalized to 0 0.5 0.5
-"""
-function normalize_genes_min_0!(genes::Matrix{Float32})
-    for col in eachcol(genes)
-        normalize_genes_min_0!(col)
-    end
-end
-
-function normalize_genes_min_0!(gene::AbstractVector{Float32})
-    min_value = minimum(gene)
-    gene .-= min_value
-    gene ./= sum(gene)
 end
 
 function get_action_size(env_wrap::EnvironmentWrapperStruct)::Int
@@ -306,7 +264,6 @@ function get_fitness(env_wrap::EnvironmentWrapperStruct, translation::Matrix{Flo
 
     return result
 end
-
 
 """
 Create new env_wrapper based on the trajectories and percentages of them.
@@ -347,19 +304,12 @@ function create_new_based_on(
     new_encoded_states = NeuralNetwork.predict(new_env_wrapper._encoder, new_states)
 
     # # get new exemplars, states and newly encoded states
-    new_exemplars_ids, _ = StatesGrouping.get_exemplars(new_encoded_states, new_n_clusters; distance_metric=env_wrap._distance_metric, exemplars_clustering=env_wrap._exemplars_clustering, hclust_distance=env_wrap._hclust_distance)
+    new_exemplars_ids = StatesGrouping.get_exemplars(new_encoded_states, new_n_clusters; distance_metric=env_wrap._distance_metric, exemplars_clustering=env_wrap._exemplars_clustering)
     new_exemplars = new_encoded_states[:, new_exemplars_ids]
-    new_distance_membership_levels = StatesGrouping.distance_membership_levels(
-        new_encoded_states,
-        new_exemplars; 
-        distance_metric=env_wrap._distance_metric,
-        method=env_wrap._distance_membership_levels_method
-    )
     new_raw_exemplars = NeuralNetwork.get_sequence_with_ids(new_states, new_exemplars_ids)
 
     new_env_wrapper._encoded_exemplars = new_exemplars
     new_env_wrapper._struct_memory._raw_exemplars = new_raw_exemplars
-    new_env_wrapper._struct_memory._distance_membership_levels = new_distance_membership_levels
     new_env_wrapper._n_clusters = new_n_clusters
 
     return new_env_wrapper, new_states

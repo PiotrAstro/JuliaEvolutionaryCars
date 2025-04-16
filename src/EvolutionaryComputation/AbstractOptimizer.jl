@@ -32,14 +32,20 @@ end
 include("EvolutionaryMutatePopulation/EvolutionaryMutatePopulation.jl")
 import .EvolutionaryMutatePopulaiton
 
-include("StatesGroupingGA/StatesGroupingGA.jl")
-import .StatesGroupingGA
+# this one is currently depracated
+# include("StatesGroupingGA/StatesGroupingGA.jl")
+# import .StatesGroupingGA
 
-include("ContinuousStatesGroupingGA/ContinuousStatesGroupingP3.jl")
-import .ContinuousStatesGroupingP3
+# this one is currently depracated
+# include("ContinuousStatesGroupingGA/ContinuousStatesGroupingP3.jl")
+# import .ContinuousStatesGroupingP3
 
-include("ContinuousStatesGroupingGA/ContinuousStatesGroupingSimpleGA.jl")
-import .ContinuousStatesGroupingSimpleGA
+# this one is also depracated!
+# include("ContinuousStatesGroupingGA/ContinuousStatesGroupingSimpleGA.jl")
+# import .ContinuousStatesGroupingSimpleGA
+
+include("ContinuousStatesGroupingGA/ContinuousStatesGroupingDE.jl")
+import .ContinuousStatesGroupingDE
 
 end # module AbstractOptimizerModule
  

@@ -96,6 +96,76 @@ CONSTANTS_DICT = Dict(
 
     # ------------------------------------------------------------------------------------
     # method specific staff
+
+
+    :ContinuousStatesGroupingDE => Dict(
+        :env_wrapper => Dict(
+            :encoder_dict => Dict(
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 10,
+                    :output_size => 16,  # 16
+                    :hidden_layers => 2,
+                    :hidden_neurons => 32,  # 32
+                    :dropout => 0.0,  # 0.5
+                    :activation_function => :relu,  # :relu
+                    :input_activation_function => :none,
+                    :last_activation_function => :none
+                )
+            ),
+            :decoder_dict => Dict(
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 16,  # 16
+                    :output_size => 10,  # it should be 10, 9 is for normal learning
+                    :hidden_layers => 2,  # was 1
+                    :hidden_neurons => 32,  # 64
+                    :dropout => 0.0,  # 0.5
+                    :activation_function => :relu,  # :relu
+                    :input_activation_function => :none,  # shouldnt it be :none?
+                    :last_activation_function => :none, # was :none
+                    :loss => :mse
+                )
+            ),
+            :autoencoder_dict => Dict(
+                :mmd_weight => 0.0,  # turns out it might be beneficial to set it to 0.01, so maybe in the future compare e.g. 0.0, 0.01, 0.1
+                :learning_rate => 0.001,  # 0.001
+                :weight_decay => 0.0
+            ),
+            :initial_space_explorers_n => 30,
+            :max_states_considered => 10_000,
+            :n_clusters => 20,  # 40 and 200 works very well, should try different values
+            :verbose => false,
+            :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock, after some initial tests it should definatelly be cosine!
+            :exemplars_clustering => :pam,  # :genie or :kmedoids or :pam
+            :exemplar_nn=>Dict(
+                :interaction_method=>:cosine,
+                :membership_normalization=>:mval_2,
+                :activation_function=>:none,
+            ),
+        ),
+        :individuals_n => 50,
+        :new_individual_each_n_epochs => 1,
+        :new_individual_genes => :rand,  # :rand or :best
+        :individual_config => Dict(
+            :initial_genes_mode => :std,
+            :norm_genes => :std,
+            :levels_mode => :time_markov,  # all, flat, time_markov, time_mine, latent
+            :levels_hclust => :average,  # :ward or :single or :complete or :average
+            :levels_construct_mode => :equal_up,  # equal_up, equal_down, priority_up, priority_down
+            :base_mode => :best, # :best or :rand or :self
+            :mask_mode => :per_gene,  # :per_gene or :per_value
+            :cross_n_times => 1,  # how many times to cross genes per one generation
+            :cross_f => 0.8,
+            :cross_prob => 1.0
+        ),
+    ),
+
+
+
+
+
+
     :ContinuousStatesGroupingP3 => Dict(
         :env_wrapper => Dict(
             :encoder_dict => Dict(
@@ -387,113 +457,6 @@ CONSTANTS_DICT = Dict(
                 :output_size => 9,  # 6 # 3 # 9
                 :hidden_layers => 2,
                 :hidden_neurons => 64,  # was 64
-                :dropout => 0.0,
-                :activation_function => :relu,  # :relu
-                :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
-                :loss => :kldivergence
-            )
-        ),
-    ),
-    :Evolutionary_Mutate_Population_Original => Dict(
-        :population => 5000,
-        :best_base_N => 100,
-        :max_evaluations => 100000,
-        :max_generations => 1000,
-        :mutation_controller => Dict(
-            :name => :Mut_One,
-            :kwargs => Dict(
-                :mutation_factor => 0.1,
-                :use_children => false
-            )
-        ),
-        :n_threads => 8,
-        :save_logs_every_n_epochs => 50,
-        :logs_path => raw"C:\Piotr\AIProjects\Evolutionary_Cars\logs",
-        :neural_network => Dict(
-            :name => :MLP_NN,
-            :kwargs => Dict(
-                :input_size => 10,
-                :output_size => 9,  # 6 # 3 # 9
-                :hidden_layers => 2,
-                :hidden_neurons => 64,  # 64
-                :dropout => 0.0,
-                :activation_function => :relu,  # :relu
-                :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
-                :loss => :kldivergence
-            )
-        ),
-    ),
-    :GESMR => Dict(
-        :population => 100,
-        :epochs => 400,
-        :k_groups => 10,
-        :mut_range => (0.08, 0.1),
-        :individual_ratio_breed => 0.5,
-        :mutation_ratio_breed => 0.5,
-        :mutation_ratio_mutate => 0.5,
-        :max_threads => 8,
-        :save_logs_every_n_epochs => 5,
-        :logs_path => raw"C:\Piotr\AIProjects\Evolutionary_Cars\logs",
-        :neural_network => Dict(
-            :name => :MLP_NN,
-            :kwargs => Dict(
-                :input_size => 10,
-                :output_size => 9,  # 6 # 3 # 9
-                :hidden_layers => 2,
-                :hidden_neurons => 64,  # 64
-                :dropout => 0.0,
-                :activation_function => :relu,  # :relu
-                :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
-                :loss => :kldivergence
-            )
-        ),
-    ),
-
-    :Param_Les_Ev_Mut_Pop => Dict(
-        :epochs => 10000,
-        :mutation_controller => Dict(
-            :name => :Mut_Prob,
-            :kwargs => Dict(
-                :mem_size => 10,
-                :initial_mut_fact_range => (0.05, 0.15),  # (0.001, 0.2)
-                :survival_rate => 0.01,
-                :learning_rate => 0.1
-            )
-        ),
-        :max_threads => 22,
-        :save_logs_every_n_epochs => 300,
-        :logs_path => raw"C:\Piotr\AIProjects\Evolutionary_Cars\logs",
-        :neural_network => Dict(
-            :name => :MLP_NN,
-            :kwargs => Dict(
-                :input_size => 10,
-                :output_size => 9,  # 6 # 3 # 9
-                :hidden_layers => 2,
-                :hidden_neurons => 64,  # 64
-                :dropout => 0.0,
-                :activation_function => :relu,  # :relu
-                :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
-                :loss => :kldivergence
-            )
-        ),
-    ),
-    
-    :Evolutionary_Strategy => Dict(
-        :permutations => 1000,
-        :max_evaluations => 100000,
-        :epochs => 10000,
-        :sigma_change => 0.01,
-        :learning_rate => 0.1,
-        :save_logs_every_n_epochs => 20,
-        :max_threads => 0,
-        :logs_path => raw"C:\Piotr\AIProjects\Evolutionary_Cars\logs",
-        :neural_network => Dict(
-            :name => :MLP_NN,
-            :kwargs => Dict(
-                :input_size => 10,
-                :output_size => 9,  # 6 # 3 # 9
-                :hidden_layers => 2,
-                :hidden_neurons => 64,  # 64
                 :dropout => 0.0,
                 :activation_function => :relu,  # :relu
                 :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
