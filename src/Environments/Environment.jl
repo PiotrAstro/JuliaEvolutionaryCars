@@ -122,7 +122,7 @@ Get the rewards of the trajectory of the environments using the neural network. 
 """
 function get_trajectory_rewards!(
         envs::Vector{E},
-        neural_network::NeuralNetwork.AbstractAgentNeuralNetwork;
+        neural_network::Union{NeuralNetwork.AbstractAgentNeuralNetwork, NeuralNetwork.AbstractTrainableAgentNeuralNetwork};
         run_statistics::Union{Nothing, RunStatistics} = nothing,
         reset::Bool = true
     ) :: Vector{Float64} where {INTERNAL, ASSEQ<:NeuralNetwork.AbstractStateSequence{INTERNAL}, E<:AbstractEnvironment{ASSEQ}}
@@ -198,7 +198,7 @@ Get the rewards, states and actions of the trajectory of the environments using 
 """
 function get_trajectory_data!(
         envs::Vector{E},
-        neural_network::NeuralNetwork.AbstractAgentNeuralNetwork;
+        neural_network::Union{NeuralNetwork.AbstractAgentNeuralNetwork, NeuralNetwork.AbstractTrainableAgentNeuralNetwork};
         run_statistics::Union{Nothing, RunStatistics} = nothing,
         reset::Bool = true
     ) :: Vector{Trajectory{ASSEQ}} where {INTERNAL, ASSEQ<:NeuralNetwork.AbstractStateSequence{INTERNAL}, E<:AbstractEnvironment{ASSEQ}}

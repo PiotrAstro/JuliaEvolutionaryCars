@@ -1,5 +1,7 @@
 export DistanceBasedClassificator, membership, encoded_membership, get_states_number
 
+const MVAL_GENERATOR_CACHE = Dict{Symbol, Function}()
+
 """
 DistanceBasedClassificator
 encoded exemplars have (number of exemplars, features) shape
@@ -44,9 +46,21 @@ struct ExemplarBasedNN{N <: Union{AbstractAgentNeuralNetwork, AbstractTrainableA
             membership_normalization! = membership_norm!
         elseif membership_normalization == :softmax
             membership_normalization! = membership_softmax!
+        elseif haskey(MVAL_GENERATOR_CACHE, membership_normalization)
+            membership_normalization! = MVAL_GENERATOR_CACHE[membership_normalization]
         elseif occursin("mval", String(membership_normalization))
-            m_value = parse(Int, split(String(membership_normalization), "_")[2])
-            membership_normalization! = membership_mval_generator(m_value)
+            mval = split(String(membership_normalization), "_")[2:end]
+            mval_first = parse(Int, mval[1])
+            mval_final = mval_first
+            if length(mval) > 1
+                mval_second = parse(Int, mval[2])
+                if mval_second > 9
+                    throw(ArgumentError("MVAL second value is too high: $mval_second"))
+                end
+                mval_final = Float32(mval_first) + Float32(mval_second) / 10.0f0
+            end
+            membership_normalization! = membership_mval_generator(mval_final)
+            MVAL_GENERATOR_CACHE[membership_normalization] = membership_normalization!
         else
             throw(ArgumentError("Unknown membership normalization: $membership_normalization"))
         end
@@ -116,7 +130,7 @@ function membership_softmax!(interaction::AbstractVector{Float32})
     softmax!(interaction)
 end
 
-function membership_mval_generator(m_value::Int)
+function membership_mval_generator(m_value::Union{Int, Float32})
     return (interaction::AbstractVector{Float32}) -> begin
         @fastmath @inbounds @simd for i in eachindex(interaction)
             distance = abs(1.0f0 - interaction[i]) + EPSILON_F32

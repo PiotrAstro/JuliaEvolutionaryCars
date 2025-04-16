@@ -140,7 +140,7 @@ CONSTANTS_DICT = Dict(
             :exemplars_clustering => :pam,  # :genie or :kmedoids or :pam
             :exemplar_nn=>Dict(
                 :interaction_method=>:cosine,
-                :membership_normalization=>:mval_2,
+                :membership_normalization=>:mval_2,  # can be either mval_2 for 2 Int type or mval_1_5 for 1.5 Float32
                 :activation_function=>:none,
             ),
         ),
@@ -160,6 +160,51 @@ CONSTANTS_DICT = Dict(
             :cross_prob => 1.0
         ),
     ),
+
+    :Evolutionary_Mutate_Population => Dict(
+        :population_size => 100, # 400
+        :mutation_rate => 0.05,
+        # :mutation_controller => Dict(
+        #     :name => :Mut_One,
+        #     :kwargs => Dict(
+        #         :mutation_factor => 0.1,
+        #         :use_children => false
+        #     )
+        # ),
+        # :save_logs_every_n_epochs => 50,
+        # :logs_path => raw"logs"
+        :neural_network_data => Dict(
+            :name => :MLP_NN,
+            :kwargs => Dict(
+                :input_size => 10,
+                :output_size => 9,  # 6 # 3 # 9
+                :hidden_layers => 2,
+                :hidden_neurons => 64,  # was 64
+                :dropout => 0.0,
+                :activation_function => :relu,  # :relu
+                :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
+                :loss => :kldivergence
+            )
+        ),
+    ),
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # -------------------------------------------------------------------------------------
+    # Old, depracated methods
+    # -------------------------------------------------------------------------------------
 
 
 
@@ -428,35 +473,6 @@ CONSTANTS_DICT = Dict(
                 :output_size => 9,  # 6 # 3 # 9
                 :hidden_layers => 2,
                 :hidden_neurons => 64,  # 64
-                :dropout => 0.0,
-                :activation_function => :relu,  # :relu
-                :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
-                :loss => :kldivergence
-            )
-        ),
-    ),
-
-    :Evolutionary_Mutate_Population => Dict(
-        :population_size => 100, # 400
-        # :max_evaluations => 100000,
-        # :max_generations => 1000,
-        :mutation_rate => 0.05,
-        # :mutation_controller => Dict(
-        #     :name => :Mut_One,
-        #     :kwargs => Dict(
-        #         :mutation_factor => 0.1,
-        #         :use_children => false
-        #     )
-        # ),
-        # :save_logs_every_n_epochs => 50,
-        # :logs_path => raw"logs"
-        :neural_network_data => Dict(
-            :name => :MLP_NN,
-            :kwargs => Dict(
-                :input_size => 10,
-                :output_size => 9,  # 6 # 3 # 9
-                :hidden_layers => 2,
-                :hidden_neurons => 64,  # was 64
                 :dropout => 0.0,
                 :activation_function => :relu,  # :relu
                 :last_activation_function => :softmax,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],

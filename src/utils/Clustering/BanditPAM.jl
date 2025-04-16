@@ -1,3 +1,8 @@
+
+"""
+BanditPAM ++
+based on the paper: https://arxiv.org/pdf/2310.18844
+"""
 module BanditPAM
 
 import LinearAlgebra
