@@ -300,8 +300,8 @@ function ContinuousStatesGroupingDE_Algorithm(;
 
     individuals = [Individual(env_wrapper_struct, individual_config) for _ in 1:individuals_n]
     # best_individual = individuals[1]
-    Threads.@threads for ind in individuals
-    # for ind in individuals
+    # Threads.@threads for ind in individuals
+    for ind in individuals
         ind.env_wrapper = EnvironmentWrapper.copy(env_wrapper_struct)
         EnvironmentWrapper.random_reinitialize_exemplars!(ind.env_wrapper)
         get_trajectories!(ind)

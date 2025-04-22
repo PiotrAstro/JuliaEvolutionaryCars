@@ -92,7 +92,7 @@ CONSTANTS_DICT[:run_config] = Dict(
 )
 
 # Number of run tests per each combination of tested values
-CASES_PER_TEST = 14
+CASES_PER_TEST = 20
 
 LOGS_DIR = joinpath(pwd(), "log", "parTest_" * timestamp)  # running test from scratch
 # LOGS_DIR = joinpath(pwd(), "log", "parTest_2024-12-27_12-31-13")  # running test from some start_position - it will recognize already done cases
@@ -109,75 +109,14 @@ TESTED_VALUES = [
         ),
     ),
     (
-        :ContinuousStatesGroupingSimpleGA,
+        :ContinuousStatesGroupingDE,
         Dict(
-            :ContinuousStatesGroupingSimpleGA => Dict(
+            :ContinuousStatesGroupingDE => Dict(
                 :env_wrapper => Dict(
-                    :exemplar_nn=>[
-                        Dict(
-                            :interaction_method=>:cosine,
-                            :membership_normalization=>:mval_2,
-                        ),
-                        Dict(
-                            :interaction_method=>:mul,
-                            :membership_normalization=>:softmax,
-                        ),
-                    ],
-                    :decoder_dict => Dict(
-                        :kwargs => Dict(
-                            :dropout => [0.0],
-                        )
-                    ),
-                    :encoder_dict => Dict(
-                        :kwargs => Dict(
-                            :dropout => [0.0],
-                        )
-                    ),
-                    :autoencoder_dict => Dict(
-                        :mmd_weight => [0.0, 0.01, 0.1], 
-                    ),
-                ),
-                :cross => Dict(
-                    :genes_combinations => [:flat, :tree_up], # :tree_up or :tree_down or :flat or :all
-                    :f_value => [0.4, 0.8],
-                ),
-            ),
-        ),
-    ),
-    (
-        :ContinuousStatesGroupingSimpleGA,
-        Dict(
-            :ContinuousStatesGroupingSimpleGA => Dict(
-                :env_wrapper => Dict(
+                    :exemplars_clustering => [:genie, :pam, :my_pam_random, :my_pam_best, :kmedoids, :k_means_medoids],
                     :n_clusters => [20, 40],
-                    :exemplar_nn=>[
-                        Dict(
-                            :interaction_method=>:cosine,
-                            :membership_normalization=>:mval_2,
-                        ),
-                        Dict(
-                            :interaction_method=>:mul,
-                            :membership_normalization=>:softmax,
-                        ),
-                    ],
-                    :decoder_dict => Dict(
-                        :kwargs => Dict(
-                            :dropout => [0.3],
-                        )
-                    ),
-                    :encoder_dict => Dict(
-                        :kwargs => Dict(
-                            :dropout => [0.3],
-                        )
-                    ),
-                    :autoencoder_dict => Dict(
-                        :mmd_weight => [0.0, 0.03], 
-                    ),
                 ),
-                :cross => Dict(
-                    :genes_combinations => [:flat, :tree_up], # :tree_up or :tree_down or :flat or :all
-                    :f_value => [0.4, 0.8],
-                ),
+                :individuals_n => [50, 150],
             ),
         ),
     ),

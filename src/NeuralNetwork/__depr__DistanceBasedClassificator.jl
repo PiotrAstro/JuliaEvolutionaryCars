@@ -1,5 +1,8 @@
 export DistanceBasedClassificator, membership, encoded_membership, get_states_number
 
+
+
+
 """
 DistanceBasedClassificator
 encoded exemplars have (number of exemplars, features) shape

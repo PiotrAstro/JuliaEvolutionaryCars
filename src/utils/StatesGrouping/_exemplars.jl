@@ -3,6 +3,7 @@
 # getting exemplars
 # ------------------------------------------------------------------------------------------
 # import Plots
+# import InteractiveUtils
 # import Profile
 # import PProf
 function get_exemplars(
@@ -10,89 +11,121 @@ function get_exemplars(
     n_clusters::Int;
     distance_metric::Symbol, # :cosine or :euclidean or cityblock
     exemplars_clustering::Symbol, # :genie or :pam or :kmedoids
-) :: Vector{Int}
-if distance_metric == :cosine
-    distance_premetric = Distances.CosineDist()
-elseif distance_metric == :euclidean
-    distance_premetric = Distances.Euclidean()
-elseif distance_metric == :cityblock
-    distance_premetric = Distances.Cityblock()
-elseif distance_metric == :mul
-    distance_premetric = MulDistance()
-elseif distance_metric == :mul_weighted
-    distance_premetric = MulWeightedDistance()
-elseif distance_metric == :mul_norm
-    distance_premetric = MulNormDistance()
-else
-    throw(ArgumentError("Unknown distance metric: $distance_metric"))
-end
+)::Vector{Int}
+    if distance_metric == :cosine
+        distance_premetric = Distances.CosineDist()
+    elseif distance_metric == :euclidean
+        distance_premetric = Distances.Euclidean()
+    elseif distance_metric == :cityblock
+        distance_premetric = Distances.Cityblock()
+    elseif distance_metric == :mul
+        distance_premetric = MulDistance()
+    elseif distance_metric == :mul_weighted
+        distance_premetric = MulWeightedDistance()
+    elseif distance_metric == :mul_norm
+        distance_premetric = MulNormDistance()
+    else
+        throw(ArgumentError("Unknown distance metric: $distance_metric"))
+    end
 
-if exemplars_clustering == :genie
-    return exemplars_genie(encoded_states, n_clusters, distance_premetric)
-elseif exemplars_clustering == :pam
-    return exemplars_pam(encoded_states, n_clusters, distance_premetric)
-elseif exemplars_clustering == :kmedoids
-    return exemplars_kmedoids(encoded_states, n_clusters, distance_premetric)
-elseif exemplars_clustering == :k_means_medoids
-    return exemplars_k_means_medoids(encoded_states, n_clusters, distance_premetric)
-# elseif exemplars_clustering == :fcm_rand
-#     return exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :rand)
-# elseif exemplars_clustering == :fcm_best
-#     return exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :best)
-# elseif exemplars_clustering == :fcm_best_rand
-#     return exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :best_rand)
-else
-    throw(ArgumentError("Unknown exemplars_clustering: $exemplars_clustering"))
-end
+    if exemplars_clustering == :genie
+        return exemplars_genie(encoded_states, n_clusters, distance_premetric)
+    elseif exemplars_clustering == :pam
+        return exemplars_pam(encoded_states, n_clusters, distance_premetric)
+    elseif exemplars_clustering == :my_pam_random
+        return exemplars_my_pam(encoded_states, n_clusters, distance_premetric, :random)
+    elseif exemplars_clustering == :my_pam_best
+        return exemplars_my_pam(encoded_states, n_clusters, distance_premetric, :best)
+    elseif exemplars_clustering == :kmedoids
+        return exemplars_kmedoids(encoded_states, n_clusters, distance_premetric)
+    elseif exemplars_clustering == :k_means_medoids
+        return exemplars_k_means_medoids(encoded_states, n_clusters, distance_premetric)
+    # elseif exemplars_clustering == :fcm_rand
+    #     return exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :rand)
+    # elseif exemplars_clustering == :fcm_best
+    #     return exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :best)
+    # elseif exemplars_clustering == :fcm_best_rand
+    #     return exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :best_rand)
+    else
+        throw(ArgumentError("Unknown exemplars_clustering: $exemplars_clustering"))
+    end
 
 
-# kmedoids = PyCall.pyimport("kmedoids")
+    # kmedoids = PyCall.pyimport("kmedoids")
 
-# @time begin
-#     distances = PyCall.PyObject(Distances.pairwise(distance_premetric, encoded_states)')
-#     exp_python = Vector{Int}(kmedoids.fasterpam(distances, n_clusters, max_iter=100, init="random", n_cpu=1).medoids)
-# end
+    # @time begin
+    #     distances = PyCall.PyObject(Distances.pairwise(distance_premetric, encoded_states)')
+    #     exp_python = Vector{Int}(kmedoids.fasterpam(distances, n_clusters, max_iter=100, init="random", n_cpu=1).medoids)
+    # end
 
-# Profile.clear()
-# Profile.@profile exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :rand)
-# PProf.pprof(;webport=2137)
-# throw("I guess I would like to end here after profile")
+    # Profile.clear()
+    # Profile.@profile exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :rand)
+    # PProf.pprof(;webport=2137)
+    # throw("I guess I would like to end here after profile")
 
-# smaller_encoded_states_for_compilation = encoded_states[:, 1:(2*n_clusters)]
-# exemplars_genie(smaller_encoded_states_for_compilation, n_clusters, distance_premetric)
-# exemplars_pam(smaller_encoded_states_for_compilation, n_clusters, distance_premetric, hclust_distance)
-# exemplars_kmedoids(smaller_encoded_states_for_compilation, n_clusters, distance_premetric, hclust_distance)
-# exemplars_k_means_medoids(smaller_encoded_states_for_compilation, n_clusters, distance_premetric, hclust_distance)
-# exemplars_fcm(smaller_encoded_states_for_compilation, n_clusters, distance_premetric, hclust_distance, mval, :rand)
-# exemplars_fcm(smaller_encoded_states_for_compilation, n_clusters, distance_premetric, hclust_distance, mval, :best)
-# exemplars_fcm(smaller_encoded_states_for_compilation, n_clusters, distance_premetric, hclust_distance, mval, :best_rand)
-# println("\n\nGenie:")
-# @time exp_genie, _ = exemplars_genie(encoded_states, n_clusters, distance_premetric)
-# println("\n\nPAM:")
-# @time exp_pam, _ = exemplars_pam(encoded_states, n_clusters, distance_premetric, hclust_distance)
-# println("\n\nKmedoids:")
-# @time exp_kmedoids, _ = exemplars_kmedoids(encoded_states, n_clusters, distance_premetric, hclust_distance)
-# println("\n\nK_means_medoids:")
-# @time exp_k_means_medoids, _ = exemplars_k_means_medoids(encoded_states, n_clusters, distance_premetric, hclust_distance)
-# println("\n\nFCM rand:")
-# @time exp_fcm_rand, _ = exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :rand)
-# println("\n\nFCM best:")
-# @time exp_fcm_best, _ = exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :best)
-# println("\n\nFCM best rand:")
-# @time exp_fcm_best_rand, _ = exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :best_rand)
+    # smaller_encoded_states_for_compilation = encoded_states[:, 1:(2*n_clusters)]
+    # exemplars_genie(smaller_encoded_states_for_compilation, n_clusters, distance_premetric)
+    # exemplars_pam(smaller_encoded_states_for_compilation, n_clusters, distance_premetric)
+    # exemplars_kmedoids(smaller_encoded_states_for_compilation, n_clusters, distance_premetric)
+    # exemplars_k_means_medoids(smaller_encoded_states_for_compilation, n_clusters, distance_premetric)
+    # exemplars_my_pam(smaller_encoded_states_for_compilation, n_clusters, distance_premetric)
+    # InteractiveUtils.@code_warntype exemplars_bandit_pam(smaller_encoded_states_for_compilation, n_clusters, distance_premetric)
 
-# println("n_clusters: $(n_clusters)\nn_states: $(size(encoded_states, 2))")
-# Plots.scatter(encoded_states[1, :], encoded_states[2, :], label="States", size=(1500, 1500), markerstrokewidth = 0.1, color=:aqua)
-# Plots.scatter!(encoded_states[1, exp_genie], encoded_states[2, exp_genie], label="Exemplars_genie", markerstrokewidth = 0.1; color=:red)
-# Plots.scatter!(encoded_states[1, exp_pam], encoded_states[2, exp_pam], label="Exemplars_pam", markerstrokewidth = 0.1, color=:pink)
-# Plots.scatter!(encoded_states[1, exp_kmedoids], encoded_states[2, exp_kmedoids], label="Exemplars_kmedoids", markerstrokewidth = 0.1, color=:purple)
-# Plots.scatter!(encoded_states[1, exp_k_means_medoids], encoded_states[2, exp_k_means_medoids], label="Exemplars_k_means_medoids", markerstrokewidth = 0.1, color=:blue)
-# # Plots.scatter!(encoded_states[1, exp_python], encoded_states[2, exp_python], label="Exemplars_python", markerstrokewidth = 0.1, color=:orange)
-# Plots.scatter!(encoded_states[1, exp_fcm_rand], encoded_states[2, exp_fcm_rand], label="Exemplars_fcm_rand", markerstrokewidth = 0.1, color=:green)
-# Plots.scatter!(encoded_states[1, exp_fcm_best], encoded_states[2, exp_fcm_best], label="Exemplars_fcm_best", markerstrokewidth = 0.1, color=:yellow)
-# Plots.scatter!(encoded_states[1, exp_fcm_best_rand], encoded_states[2, exp_fcm_best_rand], label="Exemplars_fcm_best_rand", markerstrokewidth = 0.1, color=:brown)
-# Plots.savefig("log/encoded_states_pam_genie_kmedoids_fcm.png")
-# throw("I guess I would like to end here")
+
+    # exemplars_fcm(smaller_encoded_states_for_compilation, n_clusters, distance_premetric, hclust_distance, mval, :rand)
+    # exemplars_fcm(smaller_encoded_states_for_compilation, n_clusters, distance_premetric, hclust_distance, mval, :best)
+    # exemplars_fcm(smaller_encoded_states_for_compilation, n_clusters, distance_premetric, hclust_distance, mval, :best_rand)
+
+
+    # println("\n\nGenie:")
+    # @time exp_genie = exemplars_genie(encoded_states, n_clusters, distance_premetric)
+    # println("\n\nLoss:", _loss(encoded_states, exp_genie, distance_premetric))
+
+    # println("\n\nPAM:")
+    # @time exp_pam = exemplars_pam(encoded_states, n_clusters, distance_premetric)
+    # println("\n\nLoss:", _loss(encoded_states, exp_pam, distance_premetric))
+
+    # println("\n\nKmedoids:")
+    # @time exp_kmedoids = exemplars_kmedoids(encoded_states, n_clusters, distance_premetric)
+    # println("\n\nLoss:", _loss(encoded_states, exp_kmedoids, distance_premetric))
+
+    # println("\n\nK_means_medoids:")
+    # @time exp_k_means_medoids = exemplars_k_means_medoids(encoded_states, n_clusters, distance_premetric)
+    # println("\n\nLoss:", _loss(encoded_states, exp_k_means_medoids, distance_premetric))
+
+    # println("\n\nMy PAM:")
+    # @time exp_my_pam = exemplars_my_pam(encoded_states, n_clusters, distance_premetric)
+    # println("\n\nLoss:", _loss(encoded_states, exp_my_pam, distance_premetric))
+
+    # Profile.clear()
+    # Profile.@profile begin
+    #     @time exp_my_pam = exemplars_my_pam(encoded_states, n_clusters, distance_premetric)
+    # end
+    # PProf.pprof(;webport=2137)
+
+
+    # println("\n\nFCM rand:")
+    # @time exp_fcm_rand, _ = exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :rand)
+    # println("\n\nFCM best:")
+    # @time exp_fcm_best, _ = exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :best)
+    # println("\n\nFCM best rand:")
+    # @time exp_fcm_best_rand, _ = exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :best_rand)
+
+    # println("n_clusters: $(n_clusters)\nn_states: $(size(encoded_states, 2))")
+    # Plots.scatter(encoded_states[1, :], encoded_states[2, :], label="States", size=(1500, 1500), markerstrokewidth = 0.1, color=:aqua)
+    # Plots.scatter!(encoded_states[1, exp_genie], encoded_states[2, exp_genie], label="Exemplars_genie", markerstrokewidth = 0.1; color=:red)
+    # Plots.scatter!(encoded_states[1, exp_pam], encoded_states[2, exp_pam], label="Exemplars_pam", markerstrokewidth = 0.1, color=:pink)
+    # Plots.scatter!(encoded_states[1, exp_kmedoids], encoded_states[2, exp_kmedoids], label="Exemplars_kmedoids", markerstrokewidth = 0.1, color=:purple)
+    # Plots.scatter!(encoded_states[1, exp_k_means_medoids], encoded_states[2, exp_k_means_medoids], label="Exemplars_k_means_medoids", markerstrokewidth = 0.1, color=:blue)
+    # Plots.scatter!(encoded_states[1, exp_my_pam], encoded_states[2, exp_my_pam], label="Exemplars_my_pam", markerstrokewidth = 0.1, color=:green)
+
+    # # Plots.scatter!(encoded_states[1, exp_python], encoded_states[2, exp_python], label="Exemplars_python", markerstrokewidth = 0.1, color=:orange)
+    # Plots.scatter!(encoded_states[1, exp_fcm_rand], encoded_states[2, exp_fcm_rand], label="Exemplars_fcm_rand", markerstrokewidth = 0.1, color=:green)
+    # Plots.scatter!(encoded_states[1, exp_fcm_best], encoded_states[2, exp_fcm_best], label="Exemplars_fcm_best", markerstrokewidth = 0.1, color=:yellow)
+    # Plots.scatter!(encoded_states[1, exp_fcm_best_rand], encoded_states[2, exp_fcm_best_rand], label="Exemplars_fcm_best_rand", markerstrokewidth = 0.1, color=:brown)
+    
+    # Plots.savefig("log/encoded_states_pam_genie_kmedoids_my_pam.png")
+    # throw("I guess I would like to end here")
 end
 
 
@@ -104,7 +137,7 @@ function exemplars_genie(
     encoded_states::Matrix{Float32},
     n_clusters::Int,
     distance_premetric::Distances.SemiMetric
-)::Tuple{Vector{Int},TreeNode}
+)::Vector{Int}
     merge_clusters = GenieClust.genie_clust(encoded_states; distance_callable=distance_premetric)
     tree = _create_exemplar_tree_number(merge_clusters, encoded_states, n_clusters, distance_premetric)
     exemplars = tree.elements
@@ -119,6 +152,25 @@ function exemplars_pam(
 
     distances = Distances.pairwise(distance_premetric, encoded_states)
     exemplars = PAM.faster_pam(distances, n_clusters)
+    return exemplars
+end
+
+# function exemplars_bandit_pam(
+#     encoded_states::Matrix{Float32},
+#     n_clusters::Int,
+#     distance_premetric::Distances.SemiMetric
+# )::Vector{Int}
+#     exemplars = BanditPAM.bandit_pam_pp(encoded_states, distance_premetric, n_clusters)
+#     return exemplars
+# end
+
+function exemplars_my_pam(
+    encoded_states::Matrix{Float32},
+    n_clusters::Int,
+    distance_premetric::Distances.SemiMetric,
+    candidates_method=:random
+)::Vector{Int}
+    exemplars = MyPAM.my_pam(encoded_states, distance_premetric, n_clusters, candidates_method=candidates_method)
     return exemplars
 end
 
@@ -175,6 +227,12 @@ end
 
 # ------------------------------------------------------------------------------------------
 # other functions
+
+function _loss(encoded_states::Matrix{Float32}, exemplars::Vector{Int}, distance_premetric::Distances.SemiMetric)::Float32
+    distances = Distances.pairwise(distance_premetric, encoded_states[:, exemplars])
+    loss = sum(distances)
+    return loss
+end
 
 # used in genie exemplars
 function _tree_elements_to_indicies(node::TreeNode, elements::Vector{Int})::TreeNode

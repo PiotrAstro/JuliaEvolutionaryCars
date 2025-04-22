@@ -15,6 +15,7 @@ import ..GenieClust
 import ..PAM
 import ..FCM
 import ..BanditPAM
+import ..MyPAM
 
 export get_exemplars, TreeNode, is_leaf, get_latent_distance_tree, get_time_distance_tree, get_levels
 

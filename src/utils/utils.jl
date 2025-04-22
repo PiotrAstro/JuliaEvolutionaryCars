@@ -1,6 +1,6 @@
 module Utils
 
-export GenieClust, PAM, FCM, StatesGrouping
+export GenieClust, PAM, FCM, BanditPAM, StatesGrouping
 
 include("Clustering/GenieClust.jl")
 import .GenieClust
@@ -13,6 +13,9 @@ import .FCM
 
 include("Clustering/BanditPAM.jl")
 import .BanditPAM
+
+include("Clustering/MyPAM.jl")
+import .MyPAM
 
 include("StatesGrouping/StatesGrouping.jl")
 import .StatesGrouping

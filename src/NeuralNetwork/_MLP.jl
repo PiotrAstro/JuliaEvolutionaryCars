@@ -135,30 +135,42 @@ function predict(nn::MLP_NN, X::Matrix{Float32}) :: Matrix{Float32}
     # display(y_next)
 
     # -----------------------------------------
-    # Test f calculations are thread safe
+    # Test if calculations are thread safe
     # g = 0.0f0
-    # inputs = [X .* i for i in 1:8]
-    # outputs_normal = Vector{Any}(undef, 8)
-    # for i in 1:8
+    # tasks_n = 20
+    # inputs = [X .* i for i in 1:tasks_n]
+    # parameters = [Lux.setup(Random.default_rng(rand(Int)), nn.model_simple)[1] for _ in 1:tasks_n]
+    # outputs_normal = Vector{Any}(undef, tasks_n)
+    # for i in 1:tasks_n
     #     for _ in 1:1000
-    #         y_local, _ = Lux.apply(nn.model_simple, inputs[i], nn.parameters_simple, nn.state_simple)
+    #         y_local, _ = Lux.apply(nn.model_simple, inputs[i], parameters[i], nn.state_simple)
     #         g = y_local[1, 1]
     #         outputs_normal[i] = y_local
     #     end
     # end
-    # println("now consecutive")
-    # outputs = Vector{Any}(undef, 8)
+    # println("now threaded")
+    # outputs = Vector{Any}(undef, tasks_n)
     # # copies = [(deepcopy(nn.model_simple), deepcopy(inputs[i]), deepcopy(nn.state_simple)) for i in 1:8]
-    # Threads.@threads for i in 1:8
+    # # Threads.@threads for i in 1:tasks_n
+    # #     # model_copy, input_copy, state_copy = copies[i]
+    # #     model_copy, input_copy, state_copy = nn.model_simple, inputs[i], nn.state_simple
+    # #     for _ in 1:1000
+    # #         y_local, _ = Lux.apply(model_copy, input_copy, nn.parameters_simple, state_copy)
+    # #         g = y_local[1, 1]
+    # #         outputs[i] = y_local
+    # #     end
+    # # end
+    # tasks = [Threads.@spawn begin
     #     # model_copy, input_copy, state_copy = copies[i]
     #     model_copy, input_copy, state_copy = nn.model_simple, inputs[i], nn.state_simple
     #     for _ in 1:1000
-    #         y_local, _ = Lux.apply(model_copy, input_copy, nn.parameters_simple, state_copy)
+    #         y_local, _ = Lux.apply(model_copy, input_copy, parameters[i], state_copy)
     #         g = y_local[1, 1]
     #         outputs[i] = y_local
     #     end
-    # end
-    # for i in 1:8
+    # end for i in 1:tasks_n]
+    # wait.(tasks)
+    # for i in 1:tasks_n
     #     println("\n\n")
     #     display(outputs[i])
     #     display(outputs_normal[i])

@@ -242,7 +242,7 @@ end
     return @inbounds env.map[y_check, x_check]
 end
 
-const INITIAL_RAY_STEP = 25.0
+const INITIAL_RAY_STEP = 5.0
 const STEP_MULTIPLIER = 0.2  # should be below 1.0
 
 function _get_ray_distance(env::BasicCarEnvironment, angle::Float64) :: Float64

@@ -1,4 +1,4 @@
-export DistanceBasedClassificator, membership, encoded_membership, get_states_number
+export ExemplarBasedNN, membership, encoded_membership, get_states_number
 
 const MVAL_GENERATOR_CACHE = Dict{Symbol, Function}()
 

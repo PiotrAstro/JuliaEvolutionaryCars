@@ -97,7 +97,7 @@ end
 
 # other neural networks
 include("_MLP.jl")
-include("_DistanceBasedClassificator.jl")
+# include("_DistanceBasedClassificator.jl")  # it is depracated
 include("_Autoencoder.jl")
 include("_Random.jl")
 include("_ExemplarBasedNN.jl")

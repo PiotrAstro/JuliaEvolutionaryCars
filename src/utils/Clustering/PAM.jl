@@ -1,5 +1,7 @@
 module PAM
 
+import Random
+
 # actually it is fasterpam
 # https://arxiv.org/pdf/1810.05691  -> fastpam1 and fastpam2, I do not use it here
 # https://arxiv.org/pdf/2008.05171  -> it is actually faster version, I use it here
@@ -27,7 +29,7 @@ function lab_initialization(
     sample_size = subsample_size(number_of_points)
 
     @inbounds for current_medoid_index in 1:number_of_medoids
-        candidate_indices = rand(1:number_of_points, sample_size)
+        candidate_indices = Random.randperm(number_of_points)[1:sample_size]
 
         best_change_in_total_deviation = typemax(F)
         best_candidate = 0
@@ -115,30 +117,19 @@ function eager_swap_pam(distance_matrix::Matrix{F}, medoids_initial::Vector{Int}
     end
 
     # The snippet uses xlast to detect no improvements
-    xlast = 0  # "invalid"
+    # xlast = 0  # "invalid"
     deltaTD = Vector{F}(undef, medoids_n)
-    should_break_outer_loop = false
-    swaps = 0
-    prew_swaps = -1
+    previous_medoids = zeros(Int, medoids_n)
 
-    @inbounds for _ in 1:max_iter
-        if should_break_outer_loop
-            # We have completed scanning all non-medoids without improvement
-            break
-        end
-
-        if swaps == prew_swaps
+    @inbounds for iter in 1:max_iter
+        if previous_medoids == medoids
             break
         else
-            prew_swaps = swaps
+            previous_medoids .= medoids
         end
 
         for point_candidate in 1:points_n
             if !is_medoid[point_candidate]
-                if point_candidate == xlast
-                    should_break_outer_loop = true
-                    break
-                end
 
                 @inbounds @simd for medoid_id in 1:medoids_n
                     deltaTD[medoid_id] = removal_loss[medoid_id]
@@ -166,10 +157,8 @@ function eager_swap_pam(distance_matrix::Matrix{F}, medoids_initial::Vector{Int}
                 best_cost = accumulator_for_point_candidate + deltaTD[medoid_id_min]
 
                 if best_cost < zero(F)
-                    swaps += 1
                     old_medoid_point = medoids[medoid_id_min]
                     new_medoid_point = point_candidate
-                    xlast = point_candidate
 
                     is_medoid[old_medoid_point] = false
                     is_medoid[new_medoid_point] = true
