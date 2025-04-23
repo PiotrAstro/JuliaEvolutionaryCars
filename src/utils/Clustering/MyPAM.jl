@@ -2,6 +2,7 @@ module MyPAM
 
 import Distances
 import Random
+import StatsBase
 
 # actually it is fasterpam
 # https://arxiv.org/pdf/1810.05691  -> fastpam1 and fastpam2, I do not use it here
@@ -11,10 +12,10 @@ import Random
 # https://github.com/elki-project/elki/tree/master/elki-clustering/src/main/java/elki/clustering/kmedoids
 export my_pam
 
-struct Cache{F<:AbstractFloat, D<:Distances.PreMetric}
+struct Cache{F<:AbstractFloat,D<:Distances.PreMetric}
     data::Matrix{F}
     distance::D
-    cache::Dict{Int, Vector{F}}
+    cache::Dict{Int,Vector{F}}
 end
 
 function get_distance_vector!(cache::Cache{F}, point_id::Int)::Vector{F} where {F<:AbstractFloat}
@@ -35,10 +36,10 @@ end
 
 subsamble_basic_size(n::Int, k::Int) = min(10 + ceil(Int, sqrt(n)) * ceil(Int, sqrt(k)), n)
 function lab_initialization(
-        cache::Cache{F},
-        number_of_medoids::Int;
-        subsample_size=subsamble_basic_size
-    )::Vector{Int} where {F<:AbstractFloat}
+    cache::Cache{F},
+    number_of_medoids::Int;
+    subsample_size=subsamble_basic_size
+)::Vector{Int} where {F<:AbstractFloat}
     number_of_points = size(cache.data, 2)
     medoids = Vector{Int}(undef, number_of_medoids)  # stores the chosen medoid indices
 
@@ -107,58 +108,108 @@ function get_point_nearest_second(medoid_distances::Vector{Vector{F}}, medoids::
     return best_id, second_best_id, best_dist, second_best_dist
 end
 
-function random_candidates!(candidates::Vector{Int}, cache::Cache{F}, medoids::Vector{Int}) where {F<:AbstractFloat}
+function random_candidates!(;candidates::Vector{Int}, cache::Cache{F},
+        dnearest::Vector{F}, nearest_medoid_id::Vector{Int},
+        medoids::Vector{Int}, medoid_distances::Vector{Vector{F}}
+    )::Vector{Int} where {F<:AbstractFloat}
     number_of_points = size(cache.data, 2)
     candidates .= Random.randperm(number_of_points)[1:length(candidates)]
+    return candidates
 end
 
-function closest_candidates!(candidates::Vector{Int}, cache::Cache{F}, medoids::Vector{Int}) where {F<:AbstractFloat}
+function random_increasing!(;candidates::Vector{Int}, cache::Cache{F},
+        dnearest::Vector{F}, nearest_medoid_id::Vector{Int},
+        medoids::Vector{Int}, medoid_distances::Vector{Vector{F}}
+    )::Vector{Int} where {F<:AbstractFloat}
     number_of_points = size(cache.data, 2)
-    per_each_medoid = ceil(Int, length(candidates) / length(medoids))
-    start = 1
-    finish = per_each_medoid
-    candidates .= 0
-
-    @inbounds @fastmath for medoid in eachindex(medoids)
-        candidate_distances = get_distance_vector!(cache, medoid)
-
-        if start > length(candidates)
-            start = length(candidates)
-        end
-        if finish > length(candidates)
-            finish = length(candidates)
-        end
-        
-        max_dist = safe_max(F)
-
-        for point_id in 1:number_of_points
-            dist = candidate_distances[point_id]
-
-            if dist < max_dist && dist > zero(F)
-                max_dist = zero(F)
-                second_max = zero(F)
-                max_idx = start
-                for id in start:finish
-                    dist_tmp = candidates[id] == 0 ? safe_max(F) : candidate_distances[candidates[id]]
-                    if dist_tmp > max_dist
-                        second_max = max_dist
-                        max_dist = dist_tmp
-                        max_idx = id
-                    elseif dist_tmp > second_max
-                        second_max = dist_tmp
-                    end
-                end
-
-                candidates[max_idx] = point_id
-                max_dist = max(dist, second_max)
-            end
-        end
-        start += per_each_medoid
-        finish += per_each_medoid
+    increse_number = ceil(Int, sqrt(number_of_points))
+    if increse_number > number_of_points - length(candidates)
+        increse_number = number_of_points - length(candidates)
     end
+    if increse_number <= 0
+        return candidates
+    end
+    new_candidates = zeros(Int, increse_number+length(candidates))
+    new_candidates[1:length(candidates)] .= candidates
+    allowed = trues(number_of_points)
+    allowed[candidates] .= false
+    new_candidates[(length(candidates)+1):end] .= Random.shuffle!(collect(filter(x -> allowed[x], 1:number_of_points)))[1:increse_number]
+    return new_candidates
 end
 
-function eager_swap_pam(cache::Cache{F}, medoids_initial::Vector{Int}, candidates_number::Int, candidate_function!::Function, max_iter::Int)::Vector{Int} where {F<:AbstractFloat}
+# It is very weak, so I comment it out
+# function closest_candidates!(;candidates::Vector{Int}, cache::Cache{F},
+#         dnearest::Vector{F}, nearest_medoid_id::Vector{Int},
+#         medoids::Vector{Int}, medoid_distances::Vector{Vector{F}}
+#     )::Vector{Int} where {F<:AbstractFloat}
+#     number_of_points = size(cache.data, 2)
+#     per_each_medoid = ceil(Int, length(candidates) / length(medoids))
+#     start = 1
+#     finish = per_each_medoid
+#     candidates .= 0
+
+#     @inbounds @fastmath for medoid_id in eachindex(medoids)
+#         if start > length(candidates)
+#             start = length(candidates)
+#         end
+#         if finish > length(candidates)
+#             finish = length(candidates)
+#         end
+
+#         max_dist = safe_max(F)
+
+#         for point_id in 1:number_of_points
+#             dist = medoid_distances[medoid_id][point_id]
+
+#             if dist < max_dist && dist > zero(F)
+#                 max_dist = zero(F)
+#                 second_max = zero(F)
+#                 max_idx = start
+#                 for id in start:finish
+#                     dist_tmp = candidates[id] == 0 ? safe_max(F) : medoid_distances[medoid_id][candidates[id]]
+#                     if dist_tmp > max_dist
+#                         second_max = max_dist
+#                         max_dist = dist_tmp
+#                         max_idx = id
+#                     elseif dist_tmp > second_max
+#                         second_max = dist_tmp
+#                     end
+#                 end
+
+#                 candidates[max_idx] = point_id
+#                 max_dist = max(dist, second_max)
+#             end
+#         end
+#         start += per_each_medoid
+#         finish += per_each_medoid
+#     end
+
+#     return candidates
+# end
+
+function weighted_random_candidates!(;candidates::Vector{Int}, cache::Cache{F},
+        dnearest::Vector{F}, nearest_medoid_id::Vector{Int},
+        medoids::Vector{Int}, medoid_distances::Vector{Vector{F}}
+    )::Vector{Int} where {F<:AbstractFloat}
+    number_of_points = size(cache.data, 2)
+
+    # Use dnearest directly as weights (already contains distances to nearest medoid)
+    weights = copy(dnearest)
+    weights[medoids] .= zero(F)  # Exclude current medoids from candidates
+
+    # If all weights are zero, fall back to random selection of non-medoids
+    if sum(weights) <= eps(F)
+        return random_candidates!(candidates=candidates, cache=cache, dnearest=dnearest, nearest_medoid_id=nearest_medoid_id, medoids=medoids, medoid_distances=medoid_distances)
+    end
+
+    # Normalize weights to create a probability distribution
+    statsbase_weights = StatsBase.ProbabilityWeights(weights)
+    candidates .= StatsBase.sample(1:number_of_points, statsbase_weights, length(candidates), replace=false)
+
+    return candidates
+end
+
+function eager_swap_pam(cache::Cache{F}, medoids_initial::Vector{Int}, initial_candidates::Vector{Int}, candidate_function!::Function, max_iter::Int)::Vector{Int} where {F<:AbstractFloat}
     medoids = [medoid for medoid in medoids_initial]
     medoids_n = length(medoids)
     points_n = size(cache.data, 2)
@@ -171,7 +222,7 @@ function eager_swap_pam(cache::Cache{F}, medoids_initial::Vector{Int}, candidate
     dnearest = fill(safe_max(F), points_n)        # distance to nearest medoid
     dsecond = fill(safe_max(F), points_n)        # distance to second-nearest medoid
     removal_loss = zeros(F, medoids_n)
-    candidates = zeros(Int, candidates_number)
+    candidates = copy(initial_candidates)
 
     @inbounds for point in 1:points_n
         best_index, second_best_index, best_dist, second_best_dist = get_point_nearest_second(medoid_distances, medoids, point)
@@ -187,7 +238,7 @@ function eager_swap_pam(cache::Cache{F}, medoids_initial::Vector{Int}, candidate
 
     deltaTD = Vector{F}(undef, medoids_n)
     previous_medoids = zeros(Int, medoids_n)
-
+    
     for iter in 1:max_iter
         if previous_medoids == medoids
             break
@@ -195,7 +246,7 @@ function eager_swap_pam(cache::Cache{F}, medoids_initial::Vector{Int}, candidate
             previous_medoids .= medoids
         end
 
-        candidate_function!(candidates, cache, medoids)
+        candidates = candidate_function!(candidates=candidates, cache=cache, dnearest=dnearest, nearest_medoid_id=nearest_medoid_id, medoids=medoids, medoid_distances=medoid_distances)
 
         for point_candidate in candidates
             if !is_medoid[point_candidate]
@@ -279,8 +330,8 @@ end
 
 
 function my_pam(data::Matrix{F}, distance::Distances.PreMetric, number_of_medoids::Int; max_iter::Int=100, build_method::Symbol=:lab, candidates_method=:random)::Vector{Int} where {F<:AbstractFloat}
-    cache = Cache(data, distance, Dict{Int, Vector{F}}())
-    
+    cache = Cache(data, distance, Dict{Int,Vector{F}}())
+
     if build_method == :random
         initial_medoids = random_initialization(cache, number_of_medoids)
     elseif build_method == :lab
@@ -293,13 +344,24 @@ function my_pam(data::Matrix{F}, distance::Distances.PreMetric, number_of_medoid
 
     if candidates_method == :random
         candidates_function = random_candidates!
-    elseif candidates_method == :best
-        candidates_function = closest_candidates!
+    elseif candidates_method == :random_increasing
+        candidates_function = random_increasing!
+    elseif candidates_method == :weighted_random
+        candidates_function = weighted_random_candidates!
+    # elseif candidates_method == :best  # THis one doesnt work!
+    #     candidates_function = closest_candidates!
     else
         throw(ArgumentError("Unknown candidates method: $candidates_method"))
     end
 
-    final_medoids = eager_swap_pam(cache, initial_medoids, candidates_number, candidates_function, max_iter)
+    initial_candidates = Random.randperm(size(data, 2))[1:candidates_number]
+    for (i, candidate) in enumerate(keys(cache.cache))
+        if i > length(initial_candidates)
+            break
+        end
+        initial_candidates[i] = candidate
+    end
+    final_medoids = eager_swap_pam(cache, initial_medoids, initial_candidates, candidates_function, max_iter)
     return final_medoids
 end
 

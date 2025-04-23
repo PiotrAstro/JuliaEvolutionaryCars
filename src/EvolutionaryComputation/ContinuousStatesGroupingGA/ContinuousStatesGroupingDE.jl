@@ -148,7 +148,7 @@ function _get_levels(individual::Individual)
             :mine,
             individual.config.levels_construct_mode,
             individual.config.levels_hclust;
-            individual.trajectories
+            trajectories=individual._trajectories
         )
     else
         throw(ArgumentError("Unknown mode: $mode"))
@@ -192,20 +192,20 @@ end
 
 function get_genes_mask(ind::Individual, cross_prob::Float64, genes_changed::Vector{Int}, mask_mode::Symbol)::Matrix{Float32}
     genes_changed_copy = zeros(Float32, size(ind.genes))
-    for gene_id in eachindex(genes_changed)
-        genes_changed_copy[:, gene_id] .= 1.0f0
+    for gene in genes_changed
+        genes_changed_copy[:, gene] .= 1.0f0
     end
 
     if mask_mode == :per_value
         for gene_id in eachindex(genes_changed_copy)
             if rand() > cross_prob
-                genes_changed_copy[gene_id] = 0.0
+                genes_changed_copy[gene_id] = 0.0f0
             end
         end
     elseif mask_mode == :per_gene
         for gene_col in eachcol(genes_changed_copy)
             if rand() > cross_prob
-                gene_col .= 0.0
+                gene_col .= 0.0f0
             end
         end
     else
@@ -215,21 +215,12 @@ function get_genes_mask(ind::Individual, cross_prob::Float64, genes_changed::Vec
 end
 
 function get_inidividuals_DE(ind::Individual, others::Vector{Individual}, mode::Symbol)::Tuple{Individual, Individual, Individual}
-    other_1 = others[rand(1:length(others))]
-    while other_1 === ind
-        other_1 = others[rand(1:length(others))]
-    end
-
-    other_2 = others[rand(1:length(others))]
-    while other_2 === ind || other_2 === other_1
-        other_2 = others[rand(1:length(others))]
-    end
+    perm = Random.randperm(length(others))
+    other_1 = others[perm[1]]
+    other_2 = others[perm[2]]
 
     if mode == :rand
-        other_base = others[rand(1:length(others))]
-        while other_base === ind || other_base === other_1 || other_base === other_2
-            other_base = others[rand(1:length(others))]
-        end
+        other_base = others[perm[3]]
     elseif mode == :best
         other_base = others[argmax(get_fitness!(other) for other in others)]
     elseif mode == :self
@@ -300,8 +291,8 @@ function ContinuousStatesGroupingDE_Algorithm(;
 
     individuals = [Individual(env_wrapper_struct, individual_config) for _ in 1:individuals_n]
     # best_individual = individuals[1]
-    # Threads.@threads for ind in individuals
-    for ind in individuals
+    Threads.@threads for ind in individuals
+    # for ind in individuals
         ind.env_wrapper = EnvironmentWrapper.copy(env_wrapper_struct)
         EnvironmentWrapper.random_reinitialize_exemplars!(ind.env_wrapper)
         get_trajectories!(ind)
@@ -409,7 +400,7 @@ function create_new_env_wrap_and_individual(csgs::ContinuousStatesGroupingDE_Alg
     new_env_wrapper, _ = EnvironmentWrapper.create_new_based_on(
         csgs.current_env_wrapper,
         [
-            (1.0, get_flattened_trajectories(csgs.population)),
+            (1.0, get_flattened_trajectories(individuals_copy_for_crossover)),
         ]
     )
     new_individual = Individual(new_env_wrapper, csgs.individual_config, csgs.verbose)

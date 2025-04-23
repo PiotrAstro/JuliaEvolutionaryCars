@@ -3,9 +3,10 @@
 # getting exemplars
 # ------------------------------------------------------------------------------------------
 # import Plots
-# import InteractiveUtils
-# import Profile
-# import PProf
+import InteractiveUtils
+import BenchmarkTools
+import Profile
+import PProf
 function get_exemplars(
     encoded_states::Matrix{Float32},
     n_clusters::Int;
@@ -34,8 +35,10 @@ function get_exemplars(
         return exemplars_pam(encoded_states, n_clusters, distance_premetric)
     elseif exemplars_clustering == :my_pam_random
         return exemplars_my_pam(encoded_states, n_clusters, distance_premetric, :random)
-    elseif exemplars_clustering == :my_pam_best
-        return exemplars_my_pam(encoded_states, n_clusters, distance_premetric, :best)
+    elseif exemplars_clustering == :my_pam_random_increasing
+        return exemplars_my_pam(encoded_states, n_clusters, distance_premetric, :random_increasing)
+    elseif exemplars_clustering == :my_pam_weighted_random
+        return exemplars_my_pam(encoded_states, n_clusters, distance_premetric, :weighted_random)
     elseif exemplars_clustering == :kmedoids
         return exemplars_kmedoids(encoded_states, n_clusters, distance_premetric)
     elseif exemplars_clustering == :k_means_medoids
@@ -58,18 +61,14 @@ function get_exemplars(
     #     exp_python = Vector{Int}(kmedoids.fasterpam(distances, n_clusters, max_iter=100, init="random", n_cpu=1).medoids)
     # end
 
-    # Profile.clear()
-    # Profile.@profile exemplars_fcm(encoded_states, n_clusters, distance_premetric, hclust_distance, mval, :rand)
-    # PProf.pprof(;webport=2137)
-    # throw("I guess I would like to end here after profile")
-
-    # smaller_encoded_states_for_compilation = encoded_states[:, 1:(2*n_clusters)]
+    # smaller_encoded_states_for_compilation = encoded_states[:, 1:(5*n_clusters)]
     # exemplars_genie(smaller_encoded_states_for_compilation, n_clusters, distance_premetric)
     # exemplars_pam(smaller_encoded_states_for_compilation, n_clusters, distance_premetric)
     # exemplars_kmedoids(smaller_encoded_states_for_compilation, n_clusters, distance_premetric)
     # exemplars_k_means_medoids(smaller_encoded_states_for_compilation, n_clusters, distance_premetric)
-    # exemplars_my_pam(smaller_encoded_states_for_compilation, n_clusters, distance_premetric)
-    # InteractiveUtils.@code_warntype exemplars_bandit_pam(smaller_encoded_states_for_compilation, n_clusters, distance_premetric)
+    # exemplars_my_pam(smaller_encoded_states_for_compilation, n_clusters, distance_premetric, :random)
+    # exemplars_my_pam(smaller_encoded_states_for_compilation, n_clusters, distance_premetric, :random_increasing)
+    # exemplars_my_pam(smaller_encoded_states_for_compilation, n_clusters, distance_premetric, :weighted_random)
 
 
     # exemplars_fcm(smaller_encoded_states_for_compilation, n_clusters, distance_premetric, hclust_distance, mval, :rand)
@@ -79,29 +78,52 @@ function get_exemplars(
 
     # println("\n\nGenie:")
     # @time exp_genie = exemplars_genie(encoded_states, n_clusters, distance_premetric)
+    # # display(BenchmarkTools.@benchmark exemplars_genie($encoded_states, $n_clusters, $distance_premetric))
     # println("\n\nLoss:", _loss(encoded_states, exp_genie, distance_premetric))
 
     # println("\n\nPAM:")
     # @time exp_pam = exemplars_pam(encoded_states, n_clusters, distance_premetric)
+    # # display(BenchmarkTools.@benchmark exemplars_pam($encoded_states, $n_clusters, $distance_premetric))
     # println("\n\nLoss:", _loss(encoded_states, exp_pam, distance_premetric))
 
     # println("\n\nKmedoids:")
     # @time exp_kmedoids = exemplars_kmedoids(encoded_states, n_clusters, distance_premetric)
+    # # display(BenchmarkTools.@benchmark exemplars_kmedoids($encoded_states, $n_clusters, $distance_premetric))
     # println("\n\nLoss:", _loss(encoded_states, exp_kmedoids, distance_premetric))
 
     # println("\n\nK_means_medoids:")
     # @time exp_k_means_medoids = exemplars_k_means_medoids(encoded_states, n_clusters, distance_premetric)
+    # # display(BenchmarkTools.@benchmark exemplars_k_means_medoids($encoded_states, $n_clusters, $distance_premetric))
     # println("\n\nLoss:", _loss(encoded_states, exp_k_means_medoids, distance_premetric))
 
-    # println("\n\nMy PAM:")
-    # @time exp_my_pam = exemplars_my_pam(encoded_states, n_clusters, distance_premetric)
-    # println("\n\nLoss:", _loss(encoded_states, exp_my_pam, distance_premetric))
+    # println("\n\nMy PAM random:")
+    # @time exp_my_pam_ran = exemplars_my_pam(encoded_states, n_clusters, distance_premetric, :random)
+    # # display(BenchmarkTools.@benchmark exemplars_my_pam($encoded_states, $n_clusters, $distance_premetric, :random))
+    # println("\n\nLoss:", _loss(encoded_states, exp_my_pam_ran, distance_premetric))
+
+    # println("\n\nMy PAM random increasing:")
+    # @time exp_my_pam_ran_inc = exemplars_my_pam(encoded_states, n_clusters, distance_premetric, :random_increasing)
+    # # display(BenchmarkTools.@benchmark exemplars_my_pam($encoded_states, $n_clusters, $distance_premetric, :random_increasing))
+    # println("\n\nLoss:", _loss(encoded_states, exp_my_pam_ran_inc, distance_premetric))
+
+    # println("\n\nMy PAM weighted random:")
+    # @time exp_my_pam_weighted_random = exemplars_my_pam(encoded_states, n_clusters, distance_premetric, :weighted_random)
+    # # display(BenchmarkTools.@benchmark exemplars_my_pam($encoded_states, $n_clusters, $distance_premetric, :weighted_random))
+    # println("\n\nLoss:", _loss(encoded_states, exp_my_pam_weighted_random, distance_premetric))
 
     # Profile.clear()
-    # Profile.@profile begin
-    #     @time exp_my_pam = exemplars_my_pam(encoded_states, n_clusters, distance_premetric)
+    # Profile.@profile for _ in 1:10
+    #     exp_my_pam = exemplars_my_pam(encoded_states, n_clusters, distance_premetric, :random_increasing)
     # end
     # PProf.pprof(;webport=2137)
+
+    # Profile.clear()
+    # Profile.@profile for _ in 1:10
+    #     exp_my_pam = exemplars_my_pam(encoded_states, n_clusters, distance_premetric, :best)
+    # end
+    # PProf.pprof(;webport=1111)
+
+    # throw("I guess I would like to end here")
 
 
     # println("\n\nFCM rand:")
@@ -229,8 +251,8 @@ end
 # other functions
 
 function _loss(encoded_states::Matrix{Float32}, exemplars::Vector{Int}, distance_premetric::Distances.SemiMetric)::Float32
-    distances = Distances.pairwise(distance_premetric, encoded_states[:, exemplars])
-    loss = sum(distances)
+    distances = Distances.pairwise(distance_premetric, encoded_states[:, exemplars], encoded_states)
+    loss = sum(minimum(col) for col in eachcol(distances))
     return loss
 end
 

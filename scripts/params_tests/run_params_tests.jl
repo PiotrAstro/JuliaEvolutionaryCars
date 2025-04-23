@@ -113,7 +113,7 @@ TESTED_VALUES = [
         Dict(
             :ContinuousStatesGroupingDE => Dict(
                 :env_wrapper => Dict(
-                    :exemplars_clustering => [:genie, :pam, :my_pam_random, :my_pam_best, :kmedoids, :k_means_medoids],
+                    :exemplars_clustering => [:genie, :pam, :my_pam_random, :my_pam_random_increasing, :my_pam_weighted_random, :kmedoids, :k_means_medoids],
                     :n_clusters => [20, 40],
                 ),
                 :individuals_n => [50, 150],
