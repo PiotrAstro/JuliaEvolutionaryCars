@@ -291,7 +291,7 @@ function ContinuousStatesGroupingDE_Algorithm(;
 
     individuals = [Individual(env_wrapper_struct, individual_config) for _ in 1:individuals_n]
     # best_individual = individuals[1]
-    Threads.@threads for ind in individuals
+    Threads.@threads :dynamic for ind in individuals
     # for ind in individuals
         ind.env_wrapper = EnvironmentWrapper.copy(env_wrapper_struct)
         EnvironmentWrapper.random_reinitialize_exemplars!(ind.env_wrapper)
@@ -345,6 +345,8 @@ function AbstractOptimizerModule.run!(csgs::ContinuousStatesGroupingDE_Algorithm
 
         should_add_individual = generation % csgs.new_individual_each_n_epochs == 0
         start_from_n = ifelse(should_add_individual, 0, 1)
+
+        # for i in start_from_n:length(csgs.population)
         Threads.@threads :dynamic for i in start_from_n:length(csgs.population)
             if i == 0
                 new_env_wrap, new_individual = create_new_env_wrap_and_individual(csgs, individuals_copy_for_crossover)
@@ -352,6 +354,7 @@ function AbstractOptimizerModule.run!(csgs::ContinuousStatesGroupingDE_Algorithm
                 run_one_individual_generation!(csgs.population[i], individuals_copy_for_crossover)
             end
         end
+
         best_ind_arg = argmax(get_fitness!.(csgs.population))
         csgs.best_individual = individual_copy(csgs.population[best_ind_arg])
 

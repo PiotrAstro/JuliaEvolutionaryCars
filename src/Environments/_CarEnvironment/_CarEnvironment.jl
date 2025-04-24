@@ -245,12 +245,12 @@ end
 const INITIAL_RAY_STEP = 5.0
 const STEP_MULTIPLIER = 0.2  # should be below 1.0
 
-function _get_ray_distance(env::BasicCarEnvironment, angle::Float64) :: Float64
+function _get_ray_distance(env::BasicCarEnvironment, angle_f::Float64) :: Float64
     x = env.x + 0.5
     y = env.y + 0.5
     distance = 0.0
-    cos_angle = cos(angle)
-    sin_angle = sin(angle)
+    cos_angle = cos(angle_f)
+    sin_angle = sin(angle_f)
     max_distance = env.ray_input_clip * env.rays_distances_scale_factor
 
     x_prev = x

@@ -50,16 +50,17 @@ struct ExemplarBasedNN{N <: Union{AbstractAgentNeuralNetwork, AbstractTrainableA
             membership_normalization! = MVAL_GENERATOR_CACHE[membership_normalization]
         elseif occursin("mval", String(membership_normalization))
             mval = split(String(membership_normalization), "_")[2:end]
-            mval_first = parse(Int, mval[1])
-            mval_final = mval_first
+            mval_first::Int = parse(Int, mval[1])
             if length(mval) > 1
                 mval_second = parse(Int, mval[2])
                 if mval_second > 9
                     throw(ArgumentError("MVAL second value is too high: $mval_second"))
                 end
                 mval_final = Float32(mval_first) + Float32(mval_second) / 10.0f0
+                membership_normalization! = membership_mval_generator(mval_final)
+            else
+                membership_normalization! = membership_mval_generator(mval_first)
             end
-            membership_normalization! = membership_mval_generator(mval_final)
             MVAL_GENERATOR_CACHE[membership_normalization] = membership_normalization!
         else
             throw(ArgumentError("Unknown membership normalization: $membership_normalization"))
@@ -131,10 +132,11 @@ function membership_softmax!(interaction::AbstractVector{Float32})
 end
 
 function membership_mval_generator(m_value::Union{Int, Float32})
+    m_value_Val = Val(m_value)
     return (interaction::AbstractVector{Float32}) -> begin
         @fastmath @inbounds @simd for i in eachindex(interaction)
             distance = abs(1.0f0 - interaction[i]) + EPSILON_F32
-            interaction[i] = (1.0f0 / distance) ^ m_value
+            interaction[i] = (1.0f0 / distance) ^ m_value_Val
         end
         interaction .*= 1.0f0 / sum(interaction)
     end

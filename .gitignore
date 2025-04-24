@@ -3,6 +3,7 @@
 log/*
 *.code-workspace
 .vscode
+.VSCodeCounter
 !log/.gitkeep
 scripts/params_tests/cluster/cluster_config.jl
 profile.pb.gz
