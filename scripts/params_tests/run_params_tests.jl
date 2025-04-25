@@ -133,6 +133,7 @@ TESTED_VALUES = [
                 :individuals_n => [50, 150],
                 :individual_config => Dict(
                     :levels_mode => [:flat],  # all, flat, time_markov, time_mine, latent
+                    :cross_n_times => [2],
                 ),
             ),
         ),
@@ -148,7 +149,7 @@ TESTED_VALUES = [
                 :individual_config => Dict(
                     :levels_mode => [:all],  # all, flat, time_markov, time_mine, latent
                     :mask_mode => [:per_gene, :per_value],  # :per_gene or :per_value
-                    :cross_n_times => 20,  # how many times to cross genes per one generation
+                    :cross_n_times => [40],  # how many times to cross genes per one generation
                     :cross_prob => [0.2, 0.4, 0.8]
                 ),
             ),

@@ -114,18 +114,14 @@ function get_trajectories!(individual::Individual)::Float64
     return individual._fitness
 end
 
-function _get_levels(individual::Individual)
+function _get_levels(individual::Individual)::Vector{Vector{Vector{Int}}}
     mode = individual.config.levels_mode
     exemplars_n = size(individual.genes, 2)
 
     if mode == :all
-        return [[ones(Int, exemplars_n)]]
+        return [[collect(1:exemplars_n)]]
     elseif mode == :flat
-        arr = [[zeros(Int, exemplars_n) for _ in 1:exemplars_n]]
-        for i in 1:exemplars_n
-            arr[1][i][i] = 1
-        end
-        return arr
+        return [[[i] for i in 1:exemplars_n]]
     elseif mode == :latent
         return EnvironmentWrapper.get_levels_latent(
             individual.env_wrapper,

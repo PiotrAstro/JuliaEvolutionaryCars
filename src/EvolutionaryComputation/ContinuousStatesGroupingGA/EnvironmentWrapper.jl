@@ -9,7 +9,7 @@ import Dates
 import Logging
 import Printf
 
-export EnvironmentWrapperStruct, get_action_size, get_groups_number, get_fitness, copy, is_verbose, set_verbose!, translate, create_new_based_on, create_time_distance_tree, normalize_genes_min_0!, clean!
+export EnvironmentWrapperStruct, get_action_size, get_groups_number, get_fitness, copy, is_verbose, set_verbose!, translate, create_new_based_on, get_levels_time, get_levels_latent, clean!
 
 # --------------------------------------------------------------------------------------------------
 # Structs

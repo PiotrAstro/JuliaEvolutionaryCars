@@ -122,7 +122,7 @@ function _get_priority_levels(tree::TreeNode, mode::Symbol=:up) :: Vector{Vector
 
     sort!(all_nodes)
 
-    levels = [Vector{Vector{Int}}(node) for node in all_nodes]
+    levels = [[Vector{Int}(node.elements)] for node in all_nodes]
     if mode == :up
         # nothing
     elseif mode == :down
