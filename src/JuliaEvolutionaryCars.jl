@@ -164,3 +164,18 @@ end # module EvolutionaryCarsJulia
 # ------------------------------------------------------------------------------------------------------
 # Zaimplementować DE!
 # dodatkowo jakiś lepszy lokal search, może VNS? Możel MLB czy coś takiego
+
+
+
+# ------------------------------------------------------------------------------------------------------
+# idealnie to czego potrzebuję do reprezentowania stanów:
+# https://arxiv.org/pdf/2004.04136
+# CURL: Contrastive Unsupervised Representations for Reinforcement Learning
+
+
+# ------------------------------------------------------------------------------------------------------
+# jak porównywać metody:
+# https://arxiv.org/pdf/2108.13264
+# Deep Reinforcement Learning at the Edge of the Statistical Precipice
+# inne miejsca do porównywania wyników:
+# https://paperswithcode.com/

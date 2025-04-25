@@ -92,7 +92,7 @@ CONSTANTS_DICT[:run_config] = Dict(
 )
 
 # Number of run tests per each combination of tested values
-CASES_PER_TEST = 20
+CASES_PER_TEST = 10
 
 LOGS_DIR = joinpath(pwd(), "log", "parTest_" * timestamp)  # running test from scratch
 # LOGS_DIR = joinpath(pwd(), "log", "parTest_2024-12-27_12-31-13")  # running test from some start_position - it will recognize already done cases
@@ -113,10 +113,44 @@ TESTED_VALUES = [
         Dict(
             :ContinuousStatesGroupingDE => Dict(
                 :env_wrapper => Dict(
-                    :exemplars_clustering => [:genie, :pam, :my_pam_random, :my_pam_random_increasing, :my_pam_weighted_random, :kmedoids, :k_means_medoids],
                     :n_clusters => [20, 40],
                 ),
                 :individuals_n => [50, 150],
+                :individual_config => Dict(
+                    :levels_mode => [:time_markov, :latent],  # all, flat, time_markov, time_mine, latent
+                    :levels_construct_mode => [:equal_up, :equal_down, :priority_up, :priority_down],  # equal_up, equal_down, priority_up, priority_down
+                ),
+            ),
+        ),
+    ),
+    (
+        :ContinuousStatesGroupingDE,
+        Dict(
+            :ContinuousStatesGroupingDE => Dict(
+                :env_wrapper => Dict(
+                    :n_clusters => [20, 40],
+                ),
+                :individuals_n => [50, 150],
+                :individual_config => Dict(
+                    :levels_mode => [:flat],  # all, flat, time_markov, time_mine, latent
+                ),
+            ),
+        ),
+    ),
+    (
+        :ContinuousStatesGroupingDE,
+        Dict(
+            :ContinuousStatesGroupingDE => Dict(
+                :env_wrapper => Dict(
+                    :n_clusters => [20, 40],
+                ),
+                :individuals_n => [50, 150],
+                :individual_config => Dict(
+                    :levels_mode => [:all],  # all, flat, time_markov, time_mine, latent
+                    :mask_mode => [:per_gene, :per_value],  # :per_gene or :per_value
+                    :cross_n_times => 20,  # how many times to cross genes per one generation
+                    :cross_prob => [0.2, 0.4, 0.8]
+                ),
             ),
         ),
     ),

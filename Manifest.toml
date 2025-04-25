@@ -2,7 +2,7 @@
 
 julia_version = "1.11.2"
 manifest_format = "2.0"
-project_hash = "f3a3ecd6959b81031d40c6e1df84976c9d04af77"
+project_hash = "9306398dd8d8de20f95d78eada062a020fd271eb"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "e2478490447631aedba0823d4d7a80b2cc8cdb32"
@@ -1578,6 +1578,31 @@ version = "0.3.4"
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
 version = "2023.12.12"
 
+[[deps.MuJoCo]]
+deps = ["CEnum", "LinearAlgebra", "MuJoCo_jll", "UnsafeArrays"]
+git-tree-sha1 = "803832f30fa245bacf6d24ee0d542a87b1b36813"
+uuid = "1c101251-5e0f-4746-b44c-0728d433b68a"
+version = "0.2.1"
+
+    [deps.MuJoCo.extensions]
+    VisualiserExt = ["BangBang", "FFMPEG", "GLFW", "Observables", "PrettyTables", "Printf", "StaticArrays"]
+
+    [deps.MuJoCo.weakdeps]
+    BangBang = "198e06fe-97b7-11e9-32a5-e1d131e6ad66"
+    FFMPEG = "c87230d0-a227-11e9-1b43-d7ebe4e7570a"
+    GLFW = "f7f18e0c-5ee9-5ccd-a5bf-e8befd85ed98"
+    Observables = "510215fc-4207-5dde-b226-833fc4488ee2"
+    PrettyTables = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
+    Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+    Requires = "ae029012-a4dd-5104-9daa-d747884805df"
+    StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+
+[[deps.MuJoCo_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "042c7704123539f9786ad3e4c2c57b1dfaf122fd"
+uuid = "32af7c3b-80ec-5621-8194-2f6cb2280831"
+version = "3.1.6+0"
+
 [[deps.MultivariateStats]]
 deps = ["Arpack", "Distributions", "LinearAlgebra", "SparseArrays", "Statistics", "StatsAPI", "StatsBase"]
 git-tree-sha1 = "816620e3aac93e5b5359e4fdaf23ca4525b00ddf"
@@ -2486,6 +2511,11 @@ deps = ["LaTeXStrings", "Latexify", "Unitful"]
 git-tree-sha1 = "975c354fcd5f7e1ddcc1f1a23e6e091d99e99bc8"
 uuid = "45397f5d-5981-4c77-b2b3-fc36d6e9b728"
 version = "1.6.4"
+
+[[deps.UnsafeArrays]]
+git-tree-sha1 = "d32529bcc1dcef5ff8cf5b6df9c5862c224fa264"
+uuid = "c4a57d5a-5b31-53a6-b365-19f8c011fbd6"
+version = "1.0.7"
 
 [[deps.UnsafeAtomics]]
 git-tree-sha1 = "6331ac3440856ea1988316b46045303bef658278"
