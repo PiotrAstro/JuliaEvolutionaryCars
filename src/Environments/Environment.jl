@@ -1,7 +1,18 @@
 
 module Environment
 
+using TestItems
+
+import Pkg
+import MuJoCo
+import Random
+import LinearAlgebra
+import SimpleDirectMediaLayer as SDL
+import SimpleDirectMediaLayer.LibSDL2 as LSDL2
+
 import ..NeuralNetwork
+
+DATA_DIR = joinpath(dirname(@__FILE__), "..", "..", "data")
 
 export AbstractEnvironment, get_safe_data, load_safe_data!, copy, reset!, react!, get_state, get_action_size, is_alive, get_trajectory_data!, get_trajectory_rewards!, get_environment, prepare_environments_kwargs, visualize!
 # ------------------------------------------------------------------------------------------------
@@ -43,13 +54,13 @@ function get_action_size(env::AbstractEnvironment)::Int
     throw("unimplemented")
 end
 
-function get_safe_data(env::AbstractEnvironment)::Dict{Symbol}
-    throw("unimplemented")
-end
+# function get_safe_data(env::AbstractEnvironment)::Dict{Symbol}
+#     throw("unimplemented")
+# end
 
-function load_safe_data!(env::AbstractEnvironment, data::Dict{Symbol}) 
-    throw("unimplemented")
-end
+# function load_safe_data!(env::AbstractEnvironment, data::Dict{Symbol}) 
+#     throw("unimplemented")
+# end
 
 function reset!(env::AbstractEnvironment)
     throw("unimplemented")
@@ -254,7 +265,8 @@ end
 
 # includes
 include("_CarEnvironment/_CarEnvironment.jl")
-
+include("_Humanoid/_Humanoid.jl")
+include("_HalfCheetah/_HalfCheetah.jl")
 
 
 # functions using includes

@@ -1,6 +1,4 @@
-import SimpleDirectMediaLayer as SDL
-import SimpleDirectMediaLayer.LibSDL2 as LSDL2
-import ..NeuralNetwork
+
 
 function visualize!(env::BasicCarEnvironment, model::NeuralNetwork.AbstractAgentNeuralNetwork, reset::Bool = true; car_image_path::String, map_image_path::String, fps::Int = 60, log::Bool = false)
     if reset

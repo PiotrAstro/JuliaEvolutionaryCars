@@ -93,25 +93,25 @@ function copy(env::BasicCarEnvironment) :: BasicCarEnvironment
     )
 end
 
-function get_safe_data(env::BasicCarEnvironment)::Dict{Symbol}
-    return Dict(
-        :x => env.x,
-        :y => env.y,
-        :angle => env.angle,
-        :speed => env.speed,
-        :current_step => env.current_step
-        :is_alive => env._is_alive
-    )
-end
+# function get_safe_data(env::BasicCarEnvironment)::Dict{Symbol}
+#     return Dict(
+#         :x => env.x,
+#         :y => env.y,
+#         :angle => env.angle,
+#         :speed => env.speed,
+#         :current_step => env.current_step
+#         :is_alive => env._is_alive
+#     )
+# end
 
-function load_safe_data!(env::BasicCarEnvironment, data::Dict{Symbol})
-    env.x = data[:x]
-    env.y = data[:y]
-    env.angle = data[:angle]
-    env.speed = data[:speed]
-    env.current_step = data[:current_step]
-    env._is_alive = data[:is_alive]
-end
+# function load_safe_data!(env::BasicCarEnvironment, data::Dict{Symbol})
+#     env.x = data[:x]
+#     env.y = data[:y]
+#     env.angle = data[:angle]
+#     env.speed = data[:speed]
+#     env.current_step = data[:current_step]
+#     env._is_alive = data[:is_alive]
+# end
 
 function reset!(env::BasicCarEnvironment)
     env.x, env.y = env.start_position

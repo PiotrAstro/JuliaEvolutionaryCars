@@ -12,7 +12,7 @@ import Dates
 # My params
 
 
-TEST_DIR = joinpath("log", "parTest_2025-04-23_16-32-24")
+TEST_DIR = joinpath("log", "parTest_2025-04-25_11-28-09")
 RESULTS_DIR = joinpath(TEST_DIR, "results")
 ANALYSIS_DIR = joinpath(TEST_DIR, "analysis")
 POTENTIAL_ERROR_LOG_FILE = joinpath(ANALYSIS_DIR, "error_log.txt")
@@ -22,19 +22,19 @@ TEST_PREFIX = ""  # will be removed from plot entries
 
 Y_LABEL = :best_fitness
 X_LABEL = :total_evaluations
-LINE_METHOD = :p10  # :all, :mean, :median, :max, :min, :p25, :p90 - p is for percentiles 
+LINE_METHOD = :mean  # :all, :mean, :median, :max, :min, :p25, :p90 - p is for percentiles 
 SHOW_STD = false  # whether to show std ribbon, doesnt matter for :all
 
 # By default [], so no GROUPS
 # could be e.g. ["NClu", "MmdWei"] it will create groups for each combination of these, if entry doesnt have any of these, it will be a group on its own
-GROUPS = ["ExeClu", ] # "DisMemLevMet"
-GROUPS_IN_LEGEND = :col1  # :all - different colours in groups, :col1 - one colour in groups, :col1_ent1 - one colour in groups and one entry in legend
+GROUPS = ["LevConMod"] # "DisMemLevMet"
+GROUPS_IN_LEGEND = :col1_ent1  # :all - different colours in groups, :col1 - one colour in groups, :col1_ent1 - one colour in groups and one entry in legend
 
 # will stay in the plot entries, used for filtering
 # TEST_INFIX_LIST = ["40", ("30", "!50")]  ->  contains("40") && (contains("30") || !contains("50"))
 # usually you should use it like this TEST_INFIX_LIST = ["(MmdWei=0.0)"] 
 # if you add ! as the first string index, it means not this one, e.g. TEST_INFIX_LIST = ["!40", "!50"] -> !contains("40") && !contains("50")
-TEST_INFIX_LIST = ["!NClu=40"]
+TEST_INFIX_LIST = ["!NClu=40", "!All"]
 
 
 # ------------------------------------------------------------------------------------------------

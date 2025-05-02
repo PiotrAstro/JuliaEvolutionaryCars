@@ -7,3 +7,4 @@ log/*
 !log/.gitkeep
 scripts/params_tests/cluster/cluster_config.jl
 profile.pb.gz
+.CondaPkg
