@@ -96,7 +96,7 @@ function _get_activation_function(name::Symbol)::Tuple{Function, Bool}
     if name == :relu
         return Lux.relu, true  # element-wise, can be in layer
     elseif name == :sigmoid
-        return Lux.sigmoid, true  # element-wise, can be in layer
+        return Lux.sigmoid_fast, true  # element-wise, can be in layer
     elseif name == :tanh
         return Lux.tanh_fast, true  # element-wise, can be in layer
     elseif name == :none

@@ -1,6 +1,7 @@
 export ExemplarBasedNN, membership, encoded_membership, get_states_number
 
 const MVAL_GENERATOR_CACHE = Dict{Symbol, Function}()
+const GENERATOR_CACHE_LOCK = ReentrantLock()
 
 """
 DistanceBasedClassificator
@@ -46,35 +47,30 @@ struct ExemplarBasedNN{N <: Union{AbstractAgentNeuralNetwork, AbstractTrainableA
             membership_normalization! = membership_norm!
         elseif membership_normalization == :softmax
             membership_normalization! = membership_softmax!
-        elseif haskey(MVAL_GENERATOR_CACHE, membership_normalization)
-            membership_normalization! = MVAL_GENERATOR_CACHE[membership_normalization]
+        elseif lock(() -> haskey(MVAL_GENERATOR_CACHE, membership_normalization), GENERATOR_CACHE_LOCK)
+            membership_normalization! = lock(() -> MVAL_GENERATOR_CACHE[membership_normalization], GENERATOR_CACHE_LOCK)
         elseif occursin("mval", String(membership_normalization))
-            mval = split(String(membership_normalization), "_")[2:end]
-            mval_first::Int = parse(Int, mval[1])
-            if length(mval) > 1
-                mval_second = parse(Int, mval[2])
-                if mval_second > 9
-                    throw(ArgumentError("MVAL second value is too high: $mval_second"))
+            membership_normalization! = lock(GENERATOR_CACHE_LOCK) do
+                mval = split(String(membership_normalization), "_")[2:end]
+                mval_first::Int = parse(Int, mval[1])
+                if length(mval) > 1
+                    mval_second = parse(Int, mval[2])
+                    if mval_second > 9
+                        throw(ArgumentError("MVAL second value is too high: $mval_second"))
+                    end
+                    mval_final = Float32(mval_first) + Float32(mval_second) / 10.0f0
+                    membership_normalization! = membership_mval_generator(mval_final)
+                else
+                    membership_normalization! = membership_mval_generator(mval_first)
                 end
-                mval_final = Float32(mval_first) + Float32(mval_second) / 10.0f0
-                membership_normalization! = membership_mval_generator(mval_final)
-            else
-                membership_normalization! = membership_mval_generator(mval_first)
-            end
-            MVAL_GENERATOR_CACHE[membership_normalization] = membership_normalization!
+                MVAL_GENERATOR_CACHE[membership_normalization] = membership_normalization!
+                membership_normalization!
+            end 
         else
             throw(ArgumentError("Unknown membership normalization: $membership_normalization"))
         end
 
-        if activation_function == :none
-            activation_function! = activation_none
-        elseif activation_function == :softmax
-            activation_function! = activation_softmax!
-        elseif activation_function == :d_sum
-            activation_function! = activation_dsum!
-        else
-            throw(ArgumentError("Unknown activation function: $activation_function"))
-        end
+        activation_function! = get_activation_function(activation_function)
 
         interaction_fun_type = typeof(interaction_function!)
         membership_fun_type = typeof(membership_normalization!)
@@ -146,8 +142,33 @@ end
 # activation functions
 # They do not change anything for simple max choosing
 # There will be difference for crossover, I should check how to do it properly
+function get_activation_function(activation_function::Symbol)
+    if activation_function == :none
+        activation_function! = activation_none
+    elseif activation_function == :softmax
+        activation_function! = activation_softmax!
+    elseif activation_function == :d_sum
+        activation_function! = activation_dsum!
+    elseif activation_function == :tanh
+        activation_function! = activation_tanh!
+    elseif activation_function == :sigmoid
+        activation_function! = activation_sigmoid!
+    else
+        throw(ArgumentError("Unknown activation function: $activation_function"))
+    end
+    return activation_function!
+end
+
 function activation_softmax!(interaction::AbstractVector{Float32})
     softmax!(interaction)
+end
+
+function activation_tanh!(interaction::AbstractVector{Float32})
+    broadcast!(Lux.tanh_fast, interaction, interaction)
+end
+
+function activation_sigmoid!(interaction::AbstractVector{Float32})
+    broadcast!(Lux.sigmoid_fast, interaction, interaction)
 end
 
 function activation_none(interaction::AbstractVector{Float32})

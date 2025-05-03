@@ -1,8 +1,8 @@
 
 
-function visualize!(env::BasicCarEnvironment, model::NeuralNetwork.AbstractAgentNeuralNetwork, reset::Bool = true; car_image_path::String, map_image_path::String, fps::Int = 60, log::Bool = false)
+function visualize!(env::BasicCarEnvironment, model::NeuralNetwork.AbstractAgentNeuralNetwork, parent_env=env, reset::Bool = true; car_image_path::String, map_image_path::String, fps::Int = 60, log::Bool = false)
     if reset
-        reset!(env)
+        reset!(parent_env)
     end
 
     SDL.SDL_GL_SetAttribute(SDL.SDL_GL_MULTISAMPLEBUFFERS, 1)
@@ -10,7 +10,7 @@ function visualize!(env::BasicCarEnvironment, model::NeuralNetwork.AbstractAgent
 
     @assert SDL.SDL_Init(SDL.SDL_INIT_EVERYTHING) == 0 "error initializing SDL: $(unsafe_string(SDL.SDL_GetError()))"
 
-    win = SDL.SDL_CreateWindow("Car Simulation", SDL.SDL_WINDOWPOS_CENTERED, SDL.SDL_WINDOWPOS_CENTERED, size(env.map, 2), size(env.map, 1), SDL.SDL_WINDOW_OPENGL)
+    win = SDL.SDL_CreateWindow("Car Simulation", SDL.SDL_WINDOWPOS_CENTERED, SDL.SDL_WINDOWPOS_CENTERED, size(env.map, 2), size(parent_env.map, 1), SDL.SDL_WINDOW_OPENGL)
     SDL.SDL_SetWindowResizable(win, SDL.SDL_TRUE)
 
     renderer = SDL.SDL_CreateRenderer(win, -1, SDL.SDL_RENDERER_ACCELERATED | SDL.SDL_RENDERER_PRESENTVSYNC)
@@ -35,7 +35,7 @@ function visualize!(env::BasicCarEnvironment, model::NeuralNetwork.AbstractAgent
         close = false
         counter = 0
         time_start = time()
-        action = zeros(Float32, get_action_size(env))
+        action = zeros(Float32, get_action_size(parent_env))
         while !close
             event_ref = Ref{SDL.SDL_Event}()
             while Bool(SDL.SDL_PollEvent(event_ref))
@@ -83,10 +83,10 @@ function visualize!(env::BasicCarEnvironment, model::NeuralNetwork.AbstractAgent
                 end
             end
 
-            if is_alive(env)
-                state = reshape(get_state(env), :, 1)
+            if is_alive(parent_env)
+                state = reshape(get_state(parent_env), :, 1)
                 action = isa(model, NeuralNetwork.DummyNN) ? action : NeuralNetwork.predict(model, state)[:, 1]
-                react!(env, action)
+                react!(parent_env, action)
             else
                 close = true
             end

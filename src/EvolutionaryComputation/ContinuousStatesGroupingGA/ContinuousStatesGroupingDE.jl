@@ -11,6 +11,7 @@ import ..NeuralNetwork
 import ..Environment
 import ..StatesGrouping
 import ..AbstractOptimizerModule
+import ..fitnesses_reduction
 
 include("EnvironmentWrapper.jl")
 import .EnvironmentWrapper
@@ -29,6 +30,7 @@ import .EnvironmentWrapper
     cross_n_times::Int=1
     cross_f::Float64 = 0.8
     cross_prob::Float64 = 1.0
+    fitnesses_reduction::Symbol = :sum
 end
 
 mutable struct Individual
@@ -95,7 +97,8 @@ end
 
 function get_fitness!(individual::Individual)::Float64
     if !individual._fitness_actual
-        individual._fitness = EnvironmentWrapper.get_fitness(individual.env_wrapper, individual.genes)
+        reduction_mehod = individual.config.fitnesses_reduction
+        individual._fitness = fitnesses_reduction(reduction_mehod, EnvironmentWrapper.get_fitnesses(individual.env_wrapper, individual.genes))
         individual._fitness_actual = true
     end
 
@@ -108,7 +111,8 @@ function get_trajectories!(individual::Individual)::Float64
         individual._levels = _get_levels(individual)
         individual._trajectories_actual = true
         individual._fitness_actual = true
-        individual._fitness = sum([tra.rewards_sum for tra in individual._trajectories])
+        reduction_mehod = individual.config.fitnesses_reduction
+        individual._fitness = fitnesses_reduction(reduction_mehod, [tra.rewards_sum for tra in individual._trajectories])
     end
 
     return individual._fitness
@@ -278,8 +282,9 @@ function ContinuousStatesGroupingDE_Algorithm(;
     visualization_env = (environment_type)(;environment_visualization_kwargs...)
     
 
-    env_wrapper_struct, _ = EnvironmentWrapper.EnvironmentWrapperStruct(
+    env_wrapper_struct, visualization_env = EnvironmentWrapper.EnvironmentWrapperStruct(
         environments,
+        visualization_env,
         run_statistics
         ;
         env_wrapper...
@@ -396,7 +401,7 @@ function AbstractOptimizerModule.run!(csgs::ContinuousStatesGroupingDE_Algorithm
 end
 
 function create_new_env_wrap_and_individual(csgs::ContinuousStatesGroupingDE_Algorithm, individuals_copy_for_crossover::Vector{Individual})::Tuple{EnvironmentWrapper.EnvironmentWrapperStruct, Individual}
-    new_env_wrapper, _ = EnvironmentWrapper.create_new_based_on(
+    new_env_wrapper = EnvironmentWrapper.create_new_based_on(
         csgs.current_env_wrapper,
         [
             (1.0, get_flattened_trajectories(individuals_copy_for_crossover)),

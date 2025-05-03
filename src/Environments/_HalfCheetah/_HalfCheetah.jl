@@ -124,7 +124,7 @@ function HalfCheetah(;
     return half_cheetah
 end
 
-function visualize!(env::HalfCheetah, model::NeuralNetwork.AbstractAgentNeuralNetwork, reset::Bool = true;)
+function visualize!(env::HalfCheetah, model::NeuralNetwork.AbstractAgentNeuralNetwork, parent_env=env, reset::Bool = true;)
     throw("unimplemented")
 end
 

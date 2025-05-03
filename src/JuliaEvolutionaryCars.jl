@@ -28,7 +28,7 @@ function run(optimizer::Symbol, CONSTANTS_DICT::Dict{Symbol}) :: DataFrames.Data
         :visualization_kwargs => Dict{Symbol, Any}(CONSTANTS_DICT[:environment][:visualization]),
         :environment_visualization_kwargs => Environment.prepare_environments_kwargs(
             CONSTANTS_DICT[:environment][:universal_kwargs],
-            CONSTANTS_DICT[:environment][:changeable_validation_kwargs_list]
+            [CONSTANTS_DICT[:environment][:changeable_validation_kwargs]]
         )[1],
         :environment => CONSTANTS_DICT[:environment][:name]
     )

@@ -54,6 +54,25 @@ const HUMANOID_V5 = Dict{Symbol, Any}(
     :exclude_first_cfrc_in_observation => 1
 )
 
+# I guess 376 values
+const HUMANOID_V4 = Dict{Symbol, Any}(
+    :frame_skip => 5,
+    :forward_reward_weight => 1.25,
+    :ctrl_cost_weight => 0.1,
+    :contact_cost_weight => 0.0,
+    :contact_cost_range => (nextfloat(typemin(Float64)), 10.0),
+    :healthy_reward => 5.0,
+    :terminate_when_unhealthy => true,
+    :healthy_z_range => (1.0, 2.0),
+    :reset_noise_scale => 1e-2,
+    :exclude_current_positions_from_observation => true,
+    :exclude_first_cinert_in_observation => 0,  # -1 means it will be ommited althoughether
+    :exclude_first_cvel_in_observation => 0,
+    :exclude_first_qfrc_in_observation => 0,
+    :exclude_first_cfrc_in_observation => 0
+)
+
+# I guess 376 values
 const HUMANOID_V1 = Dict{Symbol, Any}(
     :frame_skip => 5,
     :forward_reward_weight => 1.25,
@@ -76,6 +95,7 @@ mutable struct Humanoid{M, D, R} <: AbstractEnvironment{NeuralNetwork.MatrixASSE
     const max_steps::Int
     const seed::Int
     const reset_random_generator::Bool
+    const additional_normalization::Bool
     
     # general mutable params
     const model::M
@@ -101,19 +121,24 @@ mutable struct Humanoid{M, D, R} <: AbstractEnvironment{NeuralNetwork.MatrixASSE
     const exclude_first_cfrc_in_observation::Int
 end
 
-function get_environment(::Val{Humanoid})::Type{Humanoid}
+function get_environment(::Val{:Humanoid})::Type{Humanoid}
     return Humanoid
 end
 
+const HUMANOID_MODEL_CACHE = Dict{String, Any}()
+const HUMANOID_MODEL_LOCK = ReentrantLock()
 
 # xml file difference? look here: https://gymnasium.farama.org/environments/mujoco/humanoid/
 function Humanoid(;
         base_version::Symbol=:humanoid_v5,
+        additional_normalization::Bool=false,  # if false, then ser should provide actions in range (-0.4, 0.4), if true then (-1, 1) and we will normalize it internally
         xml_path=joinpath(DATA_DIR, "humanoid-post0.21.xml"),  # dont like it, maybe my main module should export data path?
         kwargs...
     )::Humanoid
     if base_version == :humanoid_v5
         base_dict = deepcopy(HUMANOID_V5)
+    elseif base_version == :humanoid_v4
+        base_dict = deepcopy(HUMANOID_V4)
     elseif base_version == :humanoid_v1
         base_dict = deepcopy(HUMANOID_V1)
     else
@@ -124,7 +149,15 @@ function Humanoid(;
         base_dict[key] = value
     end
 
-    model = MuJoCo.load_model(xml_path)
+    model = lock(HUMANOID_MODEL_LOCK) do
+        if haskey(HUMANOID_MODEL_CACHE, xml_path)
+            m = HUMANOID_MODEL_CACHE[xml_path]
+        else
+            m = MuJoCo.load_model(xml_path)
+            HUMANOID_MODEL_CACHE[xml_path] = m
+        end
+        m
+    end
     data = MuJoCo.init_data(model)
     seed = get(base_dict, :seed, rand(Int))
     reset_random_generator = get(base_dict, :reset_random_generator, true)
@@ -134,6 +167,7 @@ function Humanoid(;
         max_steps,
         seed,
         reset_random_generator,
+        additional_normalization,
 
         model,
         data,
@@ -160,7 +194,7 @@ function Humanoid(;
     return humanoid
 end
 
-function visualize!(env::Humanoid, model::NeuralNetwork.AbstractAgentNeuralNetwork, reset::Bool = true;)
+function visualize!(env::Humanoid, model::NeuralNetwork.AbstractAgentNeuralNetwork, parent_env=env, reset::Bool = true;)
     throw("unimplemented")
 end
 
@@ -190,7 +224,7 @@ end
 
 function react!(env::Humanoid, actions::AbstractVector{Float32}) :: Float64
     for i in eachindex(actions)
-        env.data.ctrl[i] = Float64(actions[i])
+        env.data.ctrl[i] = Float64(ifelse(env.additional_normalization, actions[i] * 0.4f0, actions[i]))
     end
 
     xy_before = _mass_center(env)
@@ -283,6 +317,7 @@ function copy(env::Humanoid)
         env.max_steps,
         env.seed,
         env.reset_random_generator,
+        env.additional_normalization,
 
         env.model,
         new_data,

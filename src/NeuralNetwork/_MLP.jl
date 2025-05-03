@@ -186,7 +186,7 @@ function predict(nn::MLP_NN, X::Matrix{Float32}) :: Matrix{Float32}
     # Test.@test isapprox(y, y_lux; atol=1e-5, rtol=1e-5)
     # display(y_lux)
     # display(y)
-    return y
+    # return y
 end
 
 function copy(nn::MLP_NN) :: MLP_NN

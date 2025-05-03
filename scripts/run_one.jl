@@ -17,15 +17,18 @@ include("../src/JuliaEvolutionaryCars.jl")
 import .JuliaEvolutionaryCars
 
 
-# global profiling
+# # global profiling
 # dict_copy = deepcopy(CONSTANTS_DICT)
 # dict_copy[:run_config][:max_generations] = 1
-# # precompiling
-# JuliaEvolutionaryCars.run(:ContinuousStatesGroupingSimpleGA, dict_copy)
+# dict_copy[:ContinuousStatesGroupingDE][:individuals_n] = 5
+# JuliaEvolutionaryCars.run(:ContinuousStatesGroupingDE, dict_copy) # precompilation
+
+# dict_copy2 = deepcopy(CONSTANTS_DICT)
+# dict_copy2[:run_config][:max_generations] = 4
 # import Profile
 # import PProf
 # Profile.clear()
-# Profile.@profile JuliaEvolutionaryCars.run(:ContinuousStatesGroupingSimpleGA, CONSTANTS_DICT)
+# Profile.@profile JuliaEvolutionaryCars.run(:ContinuousStatesGroupingDE, dict_copy2)
 # PProf.pprof(;webport=2137)
 
 # Run the algorithm
@@ -34,5 +37,5 @@ import .JuliaEvolutionaryCars
 # JuliaEvolutionaryCars.run(:ContinuousStatesGroupingP3, CONSTANTS_DICT)
 
 
-# JuliaEvolutionaryCars.run(:Evolutionary_Mutate_Population, CONSTANTS_DICT)
-JuliaEvolutionaryCars.run(:ContinuousStatesGroupingDE, CONSTANTS_DICT)
+JuliaEvolutionaryCars.run(:Evolutionary_Mutate_Population, CONSTANTS_DICT)
+# JuliaEvolutionaryCars.run(:ContinuousStatesGroupingDE, CONSTANTS_DICT)

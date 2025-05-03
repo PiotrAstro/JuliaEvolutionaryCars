@@ -86,13 +86,13 @@ How to set TESTED_VALUES:
 # we will change these values globally for all tests
 CONSTANTS_DICT[:run_config] = Dict(
     :max_generations => 10_000_000,  # 200
-    :max_evaluations => 1_000_000,  # 1_000_000
+    :max_evaluations => 500_000,  # 1_000_000
     :log => false,
     :visualize_each_n_epochs => 0,
 )
 
 # Number of run tests per each combination of tested values
-CASES_PER_TEST = 10
+CASES_PER_TEST = 3
 
 LOGS_DIR = joinpath(pwd(), "log", "parTest_" * timestamp)  # running test from scratch
 # LOGS_DIR = joinpath(pwd(), "log", "parTest_2024-12-27_12-31-13")  # running test from some start_position - it will recognize already done cases
@@ -104,7 +104,7 @@ TESTED_VALUES = [
         Dict(
             :Evolutionary_Mutate_Population => Dict(
                 :population_size => [100, 400],
-                :mutation_rate => [0.1, 0.05],
+                :mutation_rate => [0.01, 0.05],
             ),
         ),
     ),
@@ -117,40 +117,8 @@ TESTED_VALUES = [
                 ),
                 :individuals_n => [50, 150],
                 :individual_config => Dict(
-                    :levels_mode => [:time_markov, :latent],  # all, flat, time_markov, time_mine, latent
-                    :levels_construct_mode => [:equal_up, :equal_down, :priority_up, :priority_down],  # equal_up, equal_down, priority_up, priority_down
-                ),
-            ),
-        ),
-    ),
-    (
-        :ContinuousStatesGroupingDE,
-        Dict(
-            :ContinuousStatesGroupingDE => Dict(
-                :env_wrapper => Dict(
-                    :n_clusters => [20, 40],
-                ),
-                :individuals_n => [50, 150],
-                :individual_config => Dict(
-                    :levels_mode => [:flat],  # all, flat, time_markov, time_mine, latent
-                    :cross_n_times => [2],
-                ),
-            ),
-        ),
-    ),
-    (
-        :ContinuousStatesGroupingDE,
-        Dict(
-            :ContinuousStatesGroupingDE => Dict(
-                :env_wrapper => Dict(
-                    :n_clusters => [20, 40],
-                ),
-                :individuals_n => [50, 150],
-                :individual_config => Dict(
-                    :levels_mode => [:all],  # all, flat, time_markov, time_mine, latent
-                    :mask_mode => [:per_gene, :per_value],  # :per_gene or :per_value
-                    :cross_n_times => [40],  # how many times to cross genes per one generation
-                    :cross_prob => [0.2, 0.4, 0.8]
+                    :norm_genes => [:std, :none],
+                    :cross_f => [0.3, 0.8],
                 ),
             ),
         ),

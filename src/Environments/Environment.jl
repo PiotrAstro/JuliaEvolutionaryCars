@@ -9,15 +9,20 @@ import Random
 import LinearAlgebra
 import SimpleDirectMediaLayer as SDL
 import SimpleDirectMediaLayer.LibSDL2 as LSDL2
+import Statistics
 
 import ..NeuralNetwork
 
 DATA_DIR = joinpath(dirname(@__FILE__), "..", "..", "data")
 
-export AbstractEnvironment, get_safe_data, load_safe_data!, copy, reset!, react!, get_state, get_action_size, is_alive, get_trajectory_data!, get_trajectory_rewards!, get_environment, prepare_environments_kwargs, visualize!
+export AbstractEnvironment, copy, reset!, react!, get_state, get_action_size, is_alive, get_trajectory_data!, get_trajectory_rewards!, get_environment, prepare_environments_kwargs, visualize!, get_ASSEQ, get_norm_data, norm_ASSEQ, AbstractNormEnvironmentWrapper, RunStatistics, get_statistics
 # ------------------------------------------------------------------------------------------------
 
 abstract type AbstractEnvironment{ASSEQ <: NeuralNetwork.AbstractStateSequence} end
+
+function get_ASSEQ(env::AbstractEnvironment{ASSEQ}) where {ASSEQ<:NeuralNetwork.AbstractStateSequence}
+    return ASSEQ
+end
 
 struct Trajectory{ASSEQ<:NeuralNetwork.AbstractStateSequence}
     states::ASSEQ
@@ -46,7 +51,7 @@ function get_environment(environment::Val{T}) where T
 end
 
 "Doesnt reset environment afterwards, real implementation will have some kwargs"
-function visualize!(env::AbstractEnvironment, model::NeuralNetwork.AbstractAgentNeuralNetwork, reset::Bool = true;)
+function visualize!(env::AbstractEnvironment, model::NeuralNetwork.AbstractAgentNeuralNetwork, parent_env=env, reset::Bool = true;)
     throw("unimplemented")
 end
 
@@ -81,6 +86,25 @@ end
 function copy(env::AbstractEnvironment)
     throw("unimplemented")
 end
+
+
+# ------------------------------------------------------------------------------------------------
+# Normalization wrapper for environments
+abstract type AbstractNormEnvironmentWrapper{ASSEQ} <: AbstractEnvironment{ASSEQ} end
+
+# calculates normalization parameters and should be used in constructor of the wraper itself
+function get_norm_data(::Type{ANEW}, data::ASSEQ; kwargs...) where {ASSEQ, ANEW<:AbstractNormEnvironmentWrapper{ASSEQ}}
+    throw("unimplemented")
+end
+
+function (::Type{ANEW})(env::AbstractEnvironment, norm_data) where {ANEW<:AbstractNormEnvironmentWrapper}
+    throw("unimplemented")
+end
+
+function norm_ASSEQ(::Type{ANEW}, norm_data, asseq::ASSEQ)::ASSEQ where {ASSEQ<:NeuralNetwork.AbstractStateSequence, ANEW<:AbstractNormEnvironmentWrapper{ASSEQ}}
+    throw("unimplemented")
+end
+
 
 """
 A thread safe structure to store run statistics.
@@ -268,13 +292,16 @@ include("_CarEnvironment/_CarEnvironment.jl")
 include("_Humanoid/_Humanoid.jl")
 include("_HalfCheetah/_HalfCheetah.jl")
 
+# normalization wrapper for environments
+include("_NormMatrixASSEQ/_NormMatrixASSEQ.jl")
+
 
 # functions using includes
 function get_environment(name::Symbol)
     return get_environment(Val(name))
 end
 
-function prepare_environments_kwargs(dict_universal::Dict{Symbol, Any}, dict_changeable::Vector{Dict{Symbol, Any}}) :: Vector{Dict{Symbol, Any}}
+function prepare_environments_kwargs(dict_universal::Dict, dict_changeable::Vector{D}) where D<:Dict
     dicts_copy = [deepcopy(dict_universal) for _ in 1:length(dict_changeable)]
     for i in 1:length(dict_changeable)
         for (key, value) in dict_changeable[i]

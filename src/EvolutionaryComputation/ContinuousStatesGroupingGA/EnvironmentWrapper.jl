@@ -42,6 +42,7 @@ end
 
 function EnvironmentWrapperStruct(
         envs::Vector{<:Environment.AbstractEnvironment},
+        visualization_env::Environment.AbstractEnvironment,
         run_statistics::Environment.RunStatistics=Environment.RunStatistics(),
 
         ;
@@ -59,7 +60,9 @@ function EnvironmentWrapperStruct(
             :activation_function=>:softmax,
         ),
         exemplars_clustering::Symbol=:pam,
-        verbose::Bool=false
+        verbose::Bool=false,
+        environment_norm::Union{Nothing, Symbol}=nothing,
+        environment_norm_kwargs::Union{Nothing, Dict}=nothing,
     )
     encoder = NeuralNetwork.get_neural_network(encoder_dict[:name])(; encoder_dict[:kwargs]...)
     decoder = NeuralNetwork.get_neural_network(decoder_dict[:name])(; decoder_dict[:kwargs]...)
@@ -68,11 +71,48 @@ function EnvironmentWrapperStruct(
     # initial state space exploration
     # random NNs creation
     action_n = Environment.get_action_size(envs[1])
-    NNs = [NeuralNetwork.Random_NN(action_n) for _ in 1:initial_space_explorers_n]
+    NNs = [NeuralNetwork.Random_NN(action_n, exemplar_nn[:activation_function]) for _ in 1:initial_space_explorers_n]
     
     # states collection
     trajectories = _collect_trajectories(envs, NNs, run_statistics)
     states = _combine_states_from_trajectories([(1.0, trajectories)], max_states_considered)
+    
+    # NNs_more = [NeuralNetwork.Random_NN(action_n, exemplar_nn[:activation_function]) for _ in 1:1000]
+    # trajectories_more = _collect_trajectories(envs, NNs_more, run_statistics)
+    # states_more = _combine_states_from_trajectories([(1.0, trajectories_more)], 1000_000)
+    # states_internal_more = states_more.states
+    # stats_mat_more = Matrix{Float32}(undef, size(states_internal_more, 1), 2)
+    # stats_mat_more[:, 1] .= [Statistics.mean(row) for row in eachrow(states_internal_more)]
+    # stats_mat_more[:, 2] .= [Statistics.std(row) for row in eachrow(states_internal_more)]
+    # states_internal = states.states
+    # stats_mat = Matrix{Float32}(undef, size(states_internal, 1), 2)
+    # stats_mat[:, 1] .= [Statistics.mean(row) for row in eachrow(states_internal)]
+    # stats_mat[:, 2] .= [Statistics.std(row) for row in eachrow(states_internal)]
+    # for i in 1:size(stats_mat, 1)
+    #     Printf.@printf("dim %d:   State N: %d,  mean %4.2f, std %4.2f       State N: %d,  mean %4.2f, std %4.2f\n",
+    #         i,
+    #         size(states_internal, 2),
+    #         stats_mat[i, 1],
+    #         stats_mat[i, 2],
+    #         size(states_internal_more, 2),
+    #         stats_mat_more[i, 1],
+    #         stats_mat_more[i, 2]
+    #     )
+    # end
+    # throw("dfrvdv")
+
+    if !isnothing(environment_norm)
+        norm_type = Environment.get_environment(environment_norm)
+        if isnothing(environment_norm_kwargs)
+            norm_data = Environment.get_norm_data(norm_type, states)
+        else
+            norm_data = Environment.get_norm_data(norm_type, states; environment_norm_kwargs...)
+        end
+        states = Environment.norm_ASSEQ(norm_type, norm_data, states)
+        envs = [norm_type(env, norm_data) for env in envs]
+        visualization_env = norm_type(visualization_env, norm_data)
+    end
+    
     NeuralNetwork.learn!(autoencoder, states; verbose=verbose)
 
     if verbose
@@ -143,7 +183,7 @@ function EnvironmentWrapperStruct(
             struct_memory,
             run_statistics
         ),
-        states
+        visualization_env
     )
 end
 
@@ -158,15 +198,14 @@ end
 function random_reinitialize_exemplars!(env_wrap::EnvironmentWrapperStruct, n_clusters::Int=env_wrap._n_clusters)
     action_n = Environment.get_action_size(env_wrap._envs[1])
     NNs = [
-        NeuralNetwork.Random_NN(action_n) for _ in 1:env_wrap._initial_space_explorers_n
+        NeuralNetwork.Random_NN(action_n, env_wrap._exemplar_nn_dict[:activation_function]) for _ in 1:env_wrap._initial_space_explorers_n
     ]
     # states collection
     trajectories = _collect_trajectories(env_wrap._envs, NNs, env_wrap._run_statistics)
     states = _combine_states_from_trajectories([(1.0, trajectories)], env_wrap._max_states_considered)
 
     env_wrap._n_clusters = n_clusters
-    states_nn_input = states
-    encoded_states = NeuralNetwork.predict(env_wrap._encoder, states_nn_input)
+    encoded_states = NeuralNetwork.predict(env_wrap._encoder, states)
     exemplars_ids = StatesGrouping.get_exemplars(
         encoded_states,
         n_clusters;
@@ -256,11 +295,11 @@ function get_groups_number(env_wrap::EnvironmentWrapperStruct)::Int
     return size(env_wrap._encoded_exemplars, 2)
 end
 
-function get_fitness(env_wrap::EnvironmentWrapperStruct, translation::Matrix{Float32}) :: Float64
+function get_fitnesses(env_wrap::EnvironmentWrapperStruct, translation::Matrix{Float32}) :: Vector{Float64}
     full_NN = get_full_NN(env_wrap, translation)
 
     envs_copies = [Environment.copy(env) for env in env_wrap._envs]
-    result = sum(Environment.get_trajectory_rewards!(envs_copies, full_NN; run_statistics=env_wrap._run_statistics, reset=true))
+    result = Environment.get_trajectory_rewards!(envs_copies, full_NN; run_statistics=env_wrap._run_statistics, reset=true)
 
     return result
 end
@@ -312,7 +351,7 @@ function create_new_based_on(
     new_env_wrapper._struct_memory._raw_exemplars = new_raw_exemplars
     new_env_wrapper._n_clusters = new_n_clusters
 
-    return new_env_wrapper, new_states
+    return new_env_wrapper
 end
 
 function translate(
@@ -325,7 +364,7 @@ function translate(
 
     from_full_NN = get_full_NN(from_env_wrap, from_translation)
     to_raw_exemplars = NeuralNetwork.get_sequence_with_ids(to_env_wrap._struct_memory._raw_exemplars, to_genes_indices)
-    return NeuralNetwork.predict(from_full_NN, to_raw_exemplars)
+    return NeuralNetwork.predict_pre_activation(from_full_NN, to_raw_exemplars)
 end
 
 function get_full_NN(env_wrap::EnvironmentWrapperStruct, translation::Matrix{Float32})

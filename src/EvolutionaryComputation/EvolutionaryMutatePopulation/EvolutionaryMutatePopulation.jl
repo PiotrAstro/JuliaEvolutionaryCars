@@ -3,6 +3,7 @@ module EvolutionaryMutatePopulaiton
 import ..NeuralNetwork
 import ..Environment
 import ..AbstractOptimizerModule
+import ..fitnesses_reduction
 
 import Statistics as St
 import Printf as Pf
@@ -24,27 +25,29 @@ mutable struct Individual
     _is_fitness_calculated::Bool
     environments::Vector{<:Environment.AbstractEnvironment}
     run_statistics::Environment.RunStatistics
+    fitnesses_reduction_method::Symbol
 end
 
 function Individual(
         neural_network_type::Type{N},
         neural_network_kwargs::Dict{Symbol, Any},
-        environments_kwargs::Vector{Dict{Symbol, Any}},
-        environment_type::Type{T},
-        run_statistics::Environment.RunStatistics
+        envs::Vector{T},
+        run_statistics::Environment.RunStatistics,
+        fitnesses_reduction_method::Symbol
     ) where {T<:Environment.AbstractEnvironment, N<:NeuralNetwork.AbstractTrainableAgentNeuralNetwork}
     return Individual(
         (neural_network_type)(;neural_network_kwargs...),
         0.0,
         false,
-        [(environment_type)(;environment_kwarg...) for environment_kwarg in environments_kwargs],
-        run_statistics
+        envs,
+        run_statistics,
+        fitnesses_reduction_method
     )
 end
 
 function get_fitness(ind::Individual)::Float64
     if !ind._is_fitness_calculated
-        ind._fitness = sum(Environment.get_trajectory_rewards!(ind.environments, ind.neural_network; run_statistics=ind.run_statistics, reset=true))
+        ind._fitness = fitnesses_reduction(ind.fitnesses_reduction_method, Environment.get_trajectory_rewards!(ind.environments, ind.neural_network; run_statistics=ind.run_statistics, reset=true))
         ind._is_fitness_calculated = true
     end
     return ind._fitness
@@ -84,7 +87,8 @@ function copy(ind::Individual) :: Individual
         ind._fitness,
         ind._is_fitness_calculated,
         [Environment.copy(env) for env in ind.environments],
-        ind.run_statistics
+        ind.run_statistics,
+        ind.fitnesses_reduction_method
     )
     return new_individual
 end
@@ -114,24 +118,45 @@ function EvolutionaryMutatePopulationAlgorithm(;
     visualization_kwargs::Dict{Symbol, Any},
     environment_visualization_kwargs::Dict{Symbol, Any},
     environment::Symbol,
-    neural_network_data::Dict{Symbol, Any}
+    neural_network_data::Dict{Symbol, Any},
+    fitnesses_reduction_method::Symbol=:sum,
+    environment_norm::Union{Nothing, Symbol}=nothing,
+    environment_norm_kwargs::Union{Dict, Nothing}=nothing,
+    environment_norm_individuals::Int=30,
+    environment_norm_activation::Symbol=:none,
 ) :: EvolutionaryMutatePopulationAlgorithm
     nn_type = NeuralNetwork.get_neural_network(neural_network_data[:name])
     env_type = Environment.get_environment(environment)
+    envs = [(env_type)(;environment_kwarg...) for environment_kwarg in environment_kwargs]
     
     visualization_environment = (env_type)(;environment_visualization_kwargs...)
     run_statistics = Environment.RunStatistics()
+
+    if !isnothing(environment_norm)
+        env_norm_type = Environment.get_environment(environment_norm)
+        random_nns = [NeuralNetwork.Random_NN(Environment.get_action_size(envs[1]), environment_norm_activation) for _ in 1:environment_norm_individuals]
+        trajectories = [Environment.get_trajectory_data!(envs, nn; run_statistics=run_statistics, reset=true) for nn in random_nns]
+        flat_trajectories = vcat(trajectories...)
+        states = [trajectory.states for trajectory in flat_trajectories]
+        asseq = Environment.get_ASSEQ(envs[1])(states)
+
+        if isnothing(environment_norm_kwargs)
+            env_norms = Environment.get_norm_data(env_norm_type, asseq)
+        else
+            env_norms = Environment.get_norm_data(env_norm_type, asseq; environment_norm_kwargs...)
+        end
+        envs = [env_norm_type(env, env_norms) for env in envs]
+        visualization_environment = env_norm_type(visualization_environment, env_norms)
+    end
 
     population = Vector([
         Individual(
             nn_type,
             neural_network_data[:kwargs],
-            environment_kwargs,
-            env_type,
-            run_statistics
+            [Environment.copy(env) for env in envs],
+            run_statistics,
+            fitnesses_reduction_method
     ) for _ in 1:population_size])
-
-    visualization_environment = (env_type)(;environment_visualization_kwargs...)
 
     return EvolutionaryMutatePopulationAlgorithm(
         population,

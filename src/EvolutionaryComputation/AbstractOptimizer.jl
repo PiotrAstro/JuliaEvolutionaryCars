@@ -5,6 +5,7 @@ import ..Environment
 using ..Utils
 
 import DataFrames
+import Statistics
 
 function get_optimizer(optimizer::Symbol)
     return get_optimizer(Val(optimizer))
@@ -27,6 +28,20 @@ function run!(
         visualize_each_n_epochs
     ) :: DataFrames.DataFrame
     throw("not implemented")
+end
+
+function fitnesses_reduction(method::Symbol, fitnesses::AbstractVector{Float64}) :: Float64
+    if method == :mean
+        return Statistics.mean(fitnesses)
+    elseif method == :median
+        return Statistics.median(fitnesses)
+    elseif method == :max
+        return maximum(fitnesses)
+    elseif method == :min
+        return minimum(fitnesses)
+    else
+        throw(ArgumentError("Unknown fitness reduction method: $method"))
+    end
 end
 
 include("EvolutionaryMutatePopulation/EvolutionaryMutatePopulation.jl")
