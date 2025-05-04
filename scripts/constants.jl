@@ -317,13 +317,150 @@ HUMANOID_DICT = Dict(
 )
 
 
+HALF_CHEETAH_DICT = Dict(
+    # ------------------------------------------------------------------------------------
+    # Universal staff
+    :run_config => Dict(
+        :max_generations => 1000,
+        :max_evaluations => 1_000_000,
+        :log => true,
+        :visualize_each_n_epochs => 0,
+    ),
+    :environment => Dict(
+        :name => :HalfCheetah,
+        :visualization => Dict(
+        ),
+        :universal_kwargs => Dict(
+            :base_version => :half_cheetah_v5,
+            :max_steps => 1000,
+            :reset_noise_scale => 0.1,
+            :reset_random_generator => true,
+        ),
+        :changeable_training_kwargs_list => [
+            Dict(
+                :seed => 0,
+            ),
+            Dict(
+                :seed => 1,
+            ),
+            Dict(
+                :seed => 2,
+            ),
+            Dict(
+                :seed => 3,
+            ),
+            Dict(
+                :seed => 4,
+            ),
+            Dict(
+                :seed => 5,
+            )
+        ],
+        :changeable_validation_kwargs => Dict()
+        
+    ),
+
+
+    # ------------------------------------------------------------------------------------
+    # method specific staff
+
+
+    :ContinuousStatesGroupingDE => Dict(
+        :env_wrapper => Dict(
+            :encoder_dict => Dict(
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 17,
+                    :output_size => 32,  # 16
+                    :hidden_layers => 2,
+                    :hidden_neurons => 256,  # 32
+                    :dropout => 0.0,  # 0.5
+                    :activation_function => :relu,  # :relu
+                    :input_activation_function => :none,
+                    :last_activation_function => :none
+                )
+            ),
+            :decoder_dict => Dict(
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 32,  # 16
+                    :output_size => 17,  # it should be 10, 9 is for normal learning
+                    :hidden_layers => 2,  # was 1
+                    :hidden_neurons => 256,  # 64
+                    :dropout => 0.0,  # 0.5
+                    :activation_function => :relu,  # :relu
+                    :input_activation_function => :none,  # shouldnt it be :none?
+                    :last_activation_function => :none, # was :none
+                    :loss => :mse
+                )
+            ),
+            :autoencoder_dict => Dict(
+                :mmd_weight => 0.0,  # turns out it might be beneficial to set it to 0.01, so maybe in the future compare e.g. 0.0, 0.01, 0.1
+                :learning_rate => 0.001,  # 0.001
+                :weight_decay => 0.0
+            ),
+            :initial_space_explorers_n => 30,
+            :max_states_considered => 10_000,
+            :environment_norm => :NormMatrixASSEQ,
+            :n_clusters => 20,  # 40 and 200 works very well, should try different values
+            :verbose => false,
+            :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock, after some initial tests it should definatelly be cosine!
+            :exemplars_clustering => :my_pam_random_increasing,  # :genie or :kmedoids or :pam
+            :exemplar_nn=>Dict(
+                :interaction_method=>:cosine,
+                :membership_normalization=>:mval_2,  # can be either mval_2 for 2 Int type or mval_1_5 for 1.5 Float32
+                :activation_function=>:tanh,  # for car racing should be :none, for humanoid should be :tanh
+            ),
+        ),
+        :individuals_n => 50,
+        :new_individual_each_n_epochs => 1,
+        :new_individual_genes => :rand,  # :rand or :best
+        :individual_config => Dict(
+            :initial_genes_mode => :std,
+            :norm_genes => :none,  # for car racing should be std, for humanoid should be :none
+            :levels_mode => :time_markov,  # all, flat, time_markov, time_mine, latent
+            :levels_hclust => :complete,  # :ward or :single or :complete or :average
+            :levels_construct_mode => :equal_up,  # equal_up, equal_down, priority_up, priority_down
+            :base_mode => :best, # :best or :rand or :self
+            :mask_mode => :per_gene,  # :per_gene or :per_value
+            :cross_n_times => 1,  # how many times to cross genes per one generation
+            :cross_f => 0.8,
+            :cross_prob => 1.0,
+            :fitnesses_reduction => :median,
+        ),
+    ),
+
+    :Evolutionary_Mutate_Population => Dict(
+        :population_size => 100, # 400
+        :mutation_rate => 0.05,
+        :environment_norm => :NormMatrixASSEQ,
+        :environment_norm_individuals => 30,
+        :environment_norm_activation => :tanh,
+        :fitnesses_reduction_method => :median,
+        :neural_network_data => Dict(
+            :name => :MLP_NN,
+            :kwargs => Dict(
+                :input_size => 17,
+                :output_size => 6,  # 6 # 3 # 9
+                :hidden_layers => 2,
+                :hidden_neurons => 256,  # was 64
+                :dropout => 0.0,
+                :activation_function => :relu,  # :relu
+                :last_activation_function => :tanh,  # (x) -> vcat(Flux.softmax(@view x[1:3, :]), Flux.softmax(@view x[4:6, :])) # [(:softmax, 3), (:softmax, 3)] # [(:softmax, 3), (:tanh, 1)],
+                :loss => :kldivergence
+            )
+        ),
+    ),
+)
 
 
 
 
 
 
-CONSTANTS_DICT = HUMANOID_DICT
+
+
+CONSTANTS_DICT = HALF_CHEETAH_DICT
 
 
 

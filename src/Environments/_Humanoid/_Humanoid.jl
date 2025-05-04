@@ -226,8 +226,11 @@ end
 # xml file difference? look here: https://gymnasium.farama.org/environments/mujoco/humanoid/
 function Humanoid(;
         base_version::Symbol=:humanoid_v5,
-        additional_normalization::Bool=false,  # if false, then ser should provide actions in range (-0.4, 0.4), if true then (-1, 1) and we will normalize it internally
-        xml_path=joinpath(DATA_DIR, "humanoid-post0.21.xml"),  # dont like it, maybe my main module should export data path?
+        additional_normalization::Bool=false,  # if false, then nn should provide actions in range (-0.4, 0.4), if true then (-1, 1) and we will normalize it internally
+        xml_path=joinpath(DATA_DIR, "humanoid-post0.21.xml"),
+        seed::Int=rand(Int),
+        reset_random_generator::Bool=true,
+        max_steps::Int=1000,
         kwargs...
     )::Humanoid
     if base_version == :humanoid_v5
@@ -246,9 +249,6 @@ function Humanoid(;
 
     model, data_pool = get_model_data_pool(MUJOCO_MODEL_CACHE, xml_path)
     data = nothing
-    seed = get(base_dict, :seed, rand(Int))
-    reset_random_generator = get(base_dict, :reset_random_generator, true)
-    max_steps = get(base_dict, :max_steps, 1000)
     current_step = max_steps
     
     humanoid = Humanoid(

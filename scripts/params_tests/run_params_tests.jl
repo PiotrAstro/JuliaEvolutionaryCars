@@ -86,7 +86,7 @@ How to set TESTED_VALUES:
 # we will change these values globally for all tests
 CONSTANTS_DICT[:run_config] = Dict(
     :max_generations => 10_000_000,  # 200
-    :max_evaluations => 1_000_000,  # 1_000_000
+    :max_evaluations => 500_000,  # 1_000_000
     :log => false,
     :visualize_each_n_epochs => 0,
 )
@@ -103,6 +103,7 @@ TESTED_VALUES = [
         :Evolutionary_Mutate_Population,
         Dict(
             :Evolutionary_Mutate_Population => Dict(
+                # :environment_norm => [:NormMatrixASSEQ, nothing],
                 :population_size => [100, 400],
                 :mutation_rate => [0.01, 0.05],
             ),
@@ -114,6 +115,7 @@ TESTED_VALUES = [
             :ContinuousStatesGroupingDE => Dict(
                 :env_wrapper => Dict(
                     :n_clusters => [20, 40],
+                    # :environment_norm => [:NormMatrixASSEQ, nothing],
                 ),
                 :individuals_n => [50, 150],
                 :individual_config => Dict(

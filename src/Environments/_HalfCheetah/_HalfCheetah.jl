@@ -77,7 +77,7 @@ mutable struct HalfCheetah{R} <: AbstractEnvironment{NeuralNetwork.MatrixASSEQ}
     const exclude_current_positions_from_observation::Bool
 end
 
-function get_environment(::Val{HalfCheetah})::Type{HalfCheetah}
+function get_environment(::Val{:HalfCheetah})::Type{HalfCheetah}
     return HalfCheetah
 end
 
@@ -85,7 +85,10 @@ end
 # xml file difference? look here: https://gymnasium.farama.org/environments/mujoco/humanoid/
 function HalfCheetah(;
         base_version::Symbol=:half_cheetah_v5,
-        xml_path=joinpath(DATA_DIR, "half_cheetah.xml"),  # dont like it, maybe my main module should export data path?
+        xml_path=joinpath(DATA_DIR, "half_cheetah.xml"),
+        seed::Int=rand(Int),
+        reset_random_generator::Bool=true,
+        max_steps::Int=1000,
         kwargs...
     )::HalfCheetah
     if base_version == :half_cheetah_v5
@@ -102,9 +105,6 @@ function HalfCheetah(;
 
     model, data_pool = get_model_data_pool(MUJOCO_MODEL_CACHE, xml_path)
     data = nothing
-    seed = get(base_dict, :seed, rand(Int))
-    reset_random_generator = get(base_dict, :reset_random_generator, true)
-    max_steps = get(base_dict, :max_steps, 1000)
     current_steps = max_steps
     
     half_cheetah = HalfCheetah(
@@ -187,7 +187,7 @@ end
 
 function get_state(env::HalfCheetah) :: Vector{Float32}
     @assert !isnothing(env.data) "Data is not initialized, call reset!() first"
-    
+
     observation_length = (
         ifelse(env.exclude_current_positions_from_observation, length(env.data.qpos) - 1, length(env.data.qpos)) +
         length(env.data.qvel)
