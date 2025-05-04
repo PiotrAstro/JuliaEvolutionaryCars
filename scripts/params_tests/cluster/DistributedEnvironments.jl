@@ -258,7 +258,7 @@ Currently, it will not work at all, unfortunatelly pmap doesnt handle workers te
 
 It will take some time, I do not want to do it now, so currently this feature is not used.
 """
-function hosts_manager(cluster::Cluster, should_exit::Ref{Bool}, sleep_seconds=300)
+function hosts_manager(cluster::Cluster, should_exit::Ref{Bool}, sleep_seconds=3000)
     sleep_start_time = time()
     while !should_exit[]
         if time() - sleep_start_time < sleep_seconds
