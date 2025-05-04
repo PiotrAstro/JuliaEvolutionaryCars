@@ -86,7 +86,7 @@ How to set TESTED_VALUES:
 # we will change these values globally for all tests
 CONSTANTS_DICT[:run_config] = Dict(
     :max_generations => 10_000_000,  # 200
-    :max_evaluations => 500_000,  # 1_000_000
+    :max_evaluations => 1_000_000,  # 1_000_000
     :log => false,
     :visualize_each_n_epochs => 0,
 )

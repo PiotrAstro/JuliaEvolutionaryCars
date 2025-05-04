@@ -177,6 +177,9 @@ function AbstractOptimizerModule.run!(algo::EvolutionaryMutatePopulationAlgorith
     list_with_results = Vector{Tuple}()
 
     for generation in 1:max_generations
+        if generation % 10 == 0
+            Base.GC.gc(true)
+        end
         statistics = Environment.get_statistics(algo.run_statistics)
 
         if statistics.total_evaluations - statistics.collected_evaluations >= max_evaluations

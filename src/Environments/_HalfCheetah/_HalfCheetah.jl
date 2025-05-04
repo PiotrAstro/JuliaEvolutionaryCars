@@ -14,6 +14,7 @@
     py_cheetah = gym.make("HalfCheetah-v5", reset_noise_scale=0.0)
     py_cheetah.reset()
     my_cheetah = Environment.HalfCheetah(base_version=:half_cheetah_v5, reset_noise_scale=0.0, max_steps=70)
+    my_cheetah.reset!()
 
     random_nn = Environment.NeuralNetwork.Random_NN(Environment.get_action_size(my_cheetah))
     while Environment.is_alive(my_cheetah) && my_cheetah.current_step < my_cheetah.max_steps -1
@@ -55,15 +56,16 @@ const HALF_CHEETAH_V1 = Dict{Symbol, Any}(
     :exclude_current_positions_from_observation => true,
 )
 
-mutable struct HalfCheetah{M, D, R} <: AbstractEnvironment{NeuralNetwork.MatrixASSEQ} 
+mutable struct HalfCheetah{R} <: AbstractEnvironment{NeuralNetwork.MatrixASSEQ} 
     # my params
     const max_steps::Int
     const seed::Int
     const reset_random_generator::Bool
     
     # general mutable params
-    const model::M
-    data::D
+    const model::MuJoCo.Model
+    data_pool::MuJoCoDataPool
+    data::Union{MuJoCo.Data, Nothing}
     random_generator::R
     current_step::Int
 
@@ -98,11 +100,12 @@ function HalfCheetah(;
         base_dict[key] = value
     end
 
-    model = MuJoCo.load_model(xml_path)
-    data = MuJoCo.init_data(model)
+    model, data_pool = get_model_data_pool(MUJOCO_MODEL_CACHE, xml_path)
+    data = nothing
     seed = get(base_dict, :seed, rand(Int))
     reset_random_generator = get(base_dict, :reset_random_generator, true)
     max_steps = get(base_dict, :max_steps, 1000)
+    current_steps = max_steps
     
     half_cheetah = HalfCheetah(
         max_steps,
@@ -110,9 +113,10 @@ function HalfCheetah(;
         reset_random_generator,
 
         model,
+        data_pool,
         data,
         Random.Xoshiro(seed),
-        0,
+        current_steps,
 
         base_dict[:frame_skip],
         base_dict[:forward_reward_weight],
@@ -120,7 +124,7 @@ function HalfCheetah(;
         base_dict[:reset_noise_scale],
         base_dict[:exclude_current_positions_from_observation]
     )
-    reset!(half_cheetah)
+    # I do not reset it for purpose - to reduce data footprint when I dont really use it!
     return half_cheetah
 end
 
@@ -145,7 +149,11 @@ function reset!(env::HalfCheetah)
         env.random_generator = Random.Xoshiro(env.seed)
     end
 
-    MuJoCo.reset!(env.model, env.data)
+    if isnothing(env.data)
+        env.data = aquire!(env.data_pool)
+    else
+        MuJoCo.reset!(env.model, env.data)
+    end
     _add_noise!(env)
     MuJoCo.forward!(env.model, env.data)
     env.current_step = 0   
@@ -169,10 +177,17 @@ function react!(env::HalfCheetah, actions::AbstractVector{Float32}) :: Float64
     x_vel = (x_after - x_before) / dt
 
     reward = _get_reward(env, x_vel)
+
+    if !is_alive(env)
+        release!(env.data_pool, env.data)
+        env.data = nothing
+    end
     return reward
 end
 
 function get_state(env::HalfCheetah) :: Vector{Float32}
+    @assert !isnothing(env.data) "Data is not initialized, call reset!() first"
+    
     observation_length = (
         ifelse(env.exclude_current_positions_from_observation, length(env.data.qpos) - 1, length(env.data.qpos)) +
         length(env.data.qvel)
@@ -198,14 +213,19 @@ function is_alive(env::HalfCheetah)::Bool
 end
 
 function copy(env::HalfCheetah)
-    new_data = MuJoCo.init_data(env.model)
-    MuJoCo.LibMuJoCo.mj_copyData(new_data, env.model, env.data)
+    if isnothing(env.data)
+        new_data = nothing
+    else
+        new_data = aquire!(env.data_pool)
+        MuJoCo.LibMuJoCo.mj_copyData(new_data, env.model, env.data)
+    end
     return HalfCheetah(
         env.max_steps,
         env.seed,
         env.reset_random_generator,
 
         env.model,
+        env.data_pool,
         new_data,
         Random.Xoshiro(env.seed),
         env.current_step,

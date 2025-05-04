@@ -1,6 +1,102 @@
 # this is a translation of Farama-Foundation Gymnasium Humanoid implementation to pure Julia environment
 # their implementation: https://github.com/Farama-Foundation/Gymnasium/blob/main/gymnasium/envs/mujoco/humanoid_v5.py
 
+
+# ---------------------------------------------------------------------------------------------
+# MuJoCo data pools - it reduces memory problems
+# it is universal for all mujoco models
+
+# should set it correctly, it is just a guess, for very powerfull machine I should set it higher
+const MAX_DATA_POOL_SIZE = min(1000, Threads.nthreads() * 10)
+
+struct MuJoCoDataPool
+    locker::ReentrantLock
+    model::MuJoCo.Model
+    data::Vector{Union{MuJoCo.Data, Nothing}}
+    free::BitVector
+end
+
+function MuJoCoDataPool(model::MuJoCo.Model, max_size::Int=MAX_DATA_POOL_SIZE)::MuJoCoDataPool
+    return MuJoCoDataPool(
+        ReentrantLock(),
+        model,
+        Vector{Union{MuJoCo.Data, Nothing}}(nothing, max_size),
+        trues(max_size)
+    )
+end
+
+"""
+No matter the cache size, it will return already reset data object.
+It is thread safe.
+Returned objects are reseted.
+"""
+function aquire!(data_pool::MuJoCoDataPool)::MuJoCo.Data
+    data_object::Union{MuJoCo.Data, Nothing} = lock(data_pool.locker) do
+        index = findfirst(data_pool.free)
+        if isnothing(index)
+            return nothing
+        else
+            data_pool.free[index] = false
+            return data_pool.data[index]
+        end
+    end
+    if isnothing(data_object)
+        data_object = MuJoCo.init_data(data_pool.model)
+    else
+        MuJoCo.reset!(data_pool.model, data_object)
+    end
+    return data_object
+end
+
+"""
+It will put data object back to the pool.
+It is thread safe.
+"""
+function release!(data_pool::MuJoCoDataPool, data_object::MuJoCo.Data)
+    lock(data_pool.locker) do
+        index = findfirst(!, data_pool.free)
+        if !isnothing(index)
+            data_pool.data[index] = data_object
+            data_pool.free[index] = true
+        end
+    end
+end
+
+struct MuJoCoModelCache
+    locker::ReentrantLock
+    cache::Dict{String, Tuple{MuJoCo.Model, MuJoCoDataPool}}
+end
+
+"""
+It is thread safe.
+"""
+function get_model_data_pool(model_cache::MuJoCoModelCache, xml_path::String)::Tuple{MuJoCo.Model, MuJoCoDataPool}
+    return lock(model_cache.locker) do
+        if haskey(model_cache.cache, xml_path)
+            return model_cache.cache[xml_path]
+        else
+            model = MuJoCo.load_model(xml_path)
+            data_pool = MuJoCoDataPool(model)
+            model_cache.cache[xml_path] = (model, data_pool)
+            return (model, data_pool)
+        end
+    end
+end
+
+const MUJOCO_MODEL_CACHE = MuJoCoModelCache(ReentrantLock(), Dict{String, Tuple{MuJoCo.Model, MuJoCoDataPool}}())
+
+
+
+
+
+
+
+# ---------------------------------------------------------------------------------------------------------------------------------------
+# Humanoid environment
+
+
+
+
 @testitem "Humanoid-v5" begin
     import PythonCall
     import JuliaEvolutionaryCars.Environment as Environment
@@ -15,6 +111,7 @@
         terminate_when_unhealthy=false,
         max_steps=400
     )
+    my_humanoid.reset()
 
     random_nn = Environment.NeuralNetwork.Random_NN(Environment.get_action_size(my_humanoid))
     while Environment.is_alive(my_humanoid) && my_humanoid.current_step < my_humanoid.max_steps -1
@@ -90,7 +187,7 @@ const HUMANOID_V1 = Dict{Symbol, Any}(
     :exclude_first_cfrc_in_observation => 0
 )
 
-mutable struct Humanoid{M, D, R} <: AbstractEnvironment{NeuralNetwork.MatrixASSEQ} 
+mutable struct Humanoid{R} <: AbstractEnvironment{NeuralNetwork.MatrixASSEQ} 
     # my params
     const max_steps::Int
     const seed::Int
@@ -98,8 +195,9 @@ mutable struct Humanoid{M, D, R} <: AbstractEnvironment{NeuralNetwork.MatrixASSE
     const additional_normalization::Bool
     
     # general mutable params
-    const model::M
-    data::D
+    const model::MuJoCo.Model
+    const data_pool::MuJoCoDataPool
+    data::Union{MuJoCo.Data, Nothing}
     random_generator::R
     is_healthy::Bool
     current_step::Int
@@ -125,9 +223,6 @@ function get_environment(::Val{:Humanoid})::Type{Humanoid}
     return Humanoid
 end
 
-const HUMANOID_MODEL_CACHE = Dict{String, Any}()
-const HUMANOID_MODEL_LOCK = ReentrantLock()
-
 # xml file difference? look here: https://gymnasium.farama.org/environments/mujoco/humanoid/
 function Humanoid(;
         base_version::Symbol=:humanoid_v5,
@@ -149,19 +244,12 @@ function Humanoid(;
         base_dict[key] = value
     end
 
-    model = lock(HUMANOID_MODEL_LOCK) do
-        if haskey(HUMANOID_MODEL_CACHE, xml_path)
-            m = HUMANOID_MODEL_CACHE[xml_path]
-        else
-            m = MuJoCo.load_model(xml_path)
-            HUMANOID_MODEL_CACHE[xml_path] = m
-        end
-        m
-    end
-    data = MuJoCo.init_data(model)
+    model, data_pool = get_model_data_pool(MUJOCO_MODEL_CACHE, xml_path)
+    data = nothing
     seed = get(base_dict, :seed, rand(Int))
     reset_random_generator = get(base_dict, :reset_random_generator, true)
     max_steps = get(base_dict, :max_steps, 1000)
+    current_step = max_steps
     
     humanoid = Humanoid(
         max_steps,
@@ -170,10 +258,11 @@ function Humanoid(;
         additional_normalization,
 
         model,
+        data_pool,
         data,
         Random.Xoshiro(seed),
         true,
-        0,
+        current_step,
 
         base_dict[:frame_skip],
         base_dict[:forward_reward_weight],
@@ -190,7 +279,7 @@ function Humanoid(;
         base_dict[:exclude_first_qfrc_in_observation],
         base_dict[:exclude_first_cfrc_in_observation]
     )
-    reset!(humanoid)
+    # I do not reset it on purpose - to not allocate data object!
     return humanoid
 end
 
@@ -215,14 +304,21 @@ function reset!(env::Humanoid)
         env.random_generator = Random.Xoshiro(env.seed)
     end
 
-    MuJoCo.reset!(env.model, env.data)
+    if isnothing(env.data)
+        env.data = aquire!(env.data_pool)
+    else
+        MuJoCo.reset!(env.model, env.data)
+    end
     _add_noise!(env)
     MuJoCo.forward!(env.model, env.data)
     env.is_healthy = true
-    env.current_step = 0   
+    env.current_step = 0
 end
 
 function react!(env::Humanoid, actions::AbstractVector{Float32}) :: Float64
+    @assert length(actions) == length(env.data.ctrl)
+    @assert is_alive(env) "You have to reset the environment first!"
+
     for i in eachindex(actions)
         env.data.ctrl[i] = Float64(ifelse(env.additional_normalization, actions[i] * 0.4f0, actions[i]))
     end
@@ -242,10 +338,17 @@ function react!(env::Humanoid, actions::AbstractVector{Float32}) :: Float64
 
     env.is_healthy = _is_healthy(env)
     reward = _get_reward(env, x_vel)
+
+    if !is_alive(env)
+        release!(env.data_pool, env.data)
+        env.data = nothing
+    end
+    
     return reward
 end
 
 function get_state(env::Humanoid) :: Vector{Float32}
+    @assert !isnothing(env.data) "You have to reset the environment first!"
     observation_length = (
         ifelse(env.exclude_current_positions_from_observation, length(env.data.qpos) - 2, length(env.data.qpos)) +
         length(env.data.qvel) +
@@ -311,8 +414,12 @@ function is_alive(env::Humanoid)::Bool
 end
 
 function copy(env::Humanoid)
-    new_data = MuJoCo.init_data(env.model)
-    MuJoCo.LibMuJoCo.mj_copyData(new_data, env.model, env.data)
+    if isnothing(env.data)
+        new_data = nothing
+    else
+        new_data = aquire!(env.data_pool)
+        MuJoCo.LibMuJoCo.mj_copyData(new_data, env.model, env.data)
+    end
     return Humanoid(
         env.max_steps,
         env.seed,
@@ -320,6 +427,7 @@ function copy(env::Humanoid)
         env.additional_normalization,
 
         env.model,
+        env.data_pool,
         new_data,
         Random.Xoshiro(env.seed),
         env.is_healthy,
@@ -357,11 +465,11 @@ function _add_noise!(env::Humanoid)
     rng = env.random_generator
     data = env.data
     if scale > 0.0
-        for i in 1:length(data.qpos)
+        for i in eachindex(data.qpos)
             data.qpos[i] += scale * 2 * (rand(rng, Float64) - 0.5)
         end
 
-        for i in 1:length(data.qvel)
+        for i in eachindex(data.qvel)
             data.qvel[i] += scale * 2 * (randn(rng, Float64) - 0.5)
         end
     end
@@ -395,3 +503,4 @@ function _get_reward(env::Humanoid, x_velocity::Float64)::Float64
     reward = forward_reward + healthy_reward - ctrl_cost - contact_cost
     return reward
 end
+
