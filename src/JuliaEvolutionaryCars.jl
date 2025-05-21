@@ -179,3 +179,26 @@ end # module EvolutionaryCarsJulia
 # Deep Reinforcement Learning at the Edge of the Statistical Precipice
 # inne miejsca do porównywania wyników:
 # https://paperswithcode.com/
+
+
+
+
+
+# ------------------------------------------------------------------------------------------------------
+# normalizacja - sprawdzić metodę Komara z doktoratu czy jakoś tak - to może być bardzo fajne!:
+# https://ieeexplore.ieee.org/ielx7/4235/10269088/9929256/supp1-3216968.pdf?arnumber=9929256
+# sekcja S-IV-C. Normalizacja
+
+# dodatkowe ostatnie pomysły:
+# 1. Zrobić normalizacje tanh /2 a potem razy 2
+# 2. Zrobić miarę novelty search (suma cosine distance) oraz łączoną - jeśli reward sum yo reward sum * cosine sum, jeśli reward ujemne to reward sum * (2-cosine sum)
+# 3. Zrobić fihc ale w stylu cmaes lub coś takiego - może to być po prostu na przestrzeni akcji (wtedy to ma sens), można po prostu po iluś iteracjach przeuczyć sieć, wybrać nowych reprezentantów, przetłumaczyć starą sieć i lecieć dalej, fajny artykuł na ten temat: https://arxiv.org/abs/1803.07055
+# 4. Potencjalnie można rozszerzyć cmaes na wiele osobników? Jest jeden osobnik który jest tym właściwym (może mieć często aktualizowane stany czy coś takiego), utrzymujemy populacje jak w de, tłumaczymy z tego głównego na pozostałe i bierzemy od nich fitness?
+
+# L-BFGS-B   ->  https://direct.mit.edu/evco/article-abstract/25/1/143/1041/LM-CMA-An-Alternative-to-L-BFGS-for-Large-Scale?redirectedFrom=fulltext
+# MAES, LM-CMA czy coś takiego
+
+# PSO? - nie zatrzymuje się! W sensie caly czas leci, a nie że akceptuje tylko lepsze rozwiązania
+# DE- current to best, ale będzie tylko lepsze akceptowane
+# A może jeśli nie będę miał dynamicznego problemu to będzie zwykłe DE dobrze działało?
+

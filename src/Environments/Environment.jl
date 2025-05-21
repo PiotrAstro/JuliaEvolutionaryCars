@@ -5,6 +5,7 @@ using TestItems
 
 import Pkg
 import MuJoCo
+MuJoCo.init_visualiser()
 import Random
 import LinearAlgebra
 import SimpleDirectMediaLayer as SDL

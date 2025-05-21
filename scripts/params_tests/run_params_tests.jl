@@ -100,31 +100,46 @@ LOGS_DIR = joinpath(pwd(), "log", "parTest_" * timestamp)  # running test from s
 # Values that will be tested
 TESTED_VALUES = [
     (
-        :Evolutionary_Mutate_Population,
-        Dict(
-            :Evolutionary_Mutate_Population => Dict(
-                # :environment_norm => [:NormMatrixASSEQ, nothing],
-                :population_size => [100, 400],
-                :mutation_rate => [0.01, 0.05],
-            ),
-        ),
-    ),
-    (
         :ContinuousStatesGroupingDE,
         Dict(
-            :ContinuousStatesGroupingDE => Dict(
+            :ContinuousStatesGroupingES => Dict(
                 :env_wrapper => Dict(
-                    :n_clusters => [20, 40],
-                    # :environment_norm => [:NormMatrixASSEQ, nothing],
+                    :n_clusters => [10, 40],
                 ),
-                :individuals_n => [50, 150],
-                :individual_config => Dict(
-                    :norm_genes => [:std, :none],
-                    :cross_f => [0.3, 0.8],
+                :new_es_after_n_iterations => [10, 40],
+                :es_kwargs => Dict(
+                    :sigma => [0.01f0, 0.4f0],
+                    :lambda_n => [30, 500],  # it might be left empty
                 ),
             ),
         ),
     ),
+    # (
+    #     :Evolutionary_Mutate_Population,
+    #     Dict(
+    #         :Evolutionary_Mutate_Population => Dict(
+    #             # :environment_norm => [:NormMatrixASSEQ, nothing],
+    #             :population_size => [100, 400],
+    #             :mutation_rate => [0.01, 0.05],
+    #         ),
+    #     ),
+    # ),
+    # (
+    #     :ContinuousStatesGroupingDE,
+    #     Dict(
+    #         :ContinuousStatesGroupingDE => Dict(
+    #             :env_wrapper => Dict(
+    #                 :n_clusters => [20, 40],
+    #                 # :environment_norm => [:NormMatrixASSEQ, nothing],
+    #             ),
+    #             :individuals_n => [50, 150],
+    #             :individual_config => Dict(
+    #                 :norm_genes => [:std, :none],
+    #                 :cross_f => [0.3, 0.8],
+    #             ),
+    #         ),
+    #     ),
+    # ),
 ]
 
 

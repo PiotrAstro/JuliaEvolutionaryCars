@@ -5,19 +5,19 @@ import LinearAlgebra
 LinearAlgebra.BLAS.set_num_threads(1)
 
 import Lux
-import Flux
+# import Flux
 import Random
 import BenchmarkTools
 using SimpleChains
 
 function mlp_test()
     batch_size = 5
-    size_n = 64
-    layers_n = 3
+    size_n = 256
+    layers_n = 2
 
-    flux_model = Flux.Chain(
-        [Flux.Dense(size_n => size_n, relu) for _ in 1:layers_n]...,
-    )
+    # flux_model = Flux.Chain(
+    #     [Flux.Dense(size_n => size_n, relu) for _ in 1:layers_n]...,
+    # )
 
     lux_model = Lux.Chain(
         [Lux.Dense(size_n => size_n, relu) for _ in 1:layers_n]...,
@@ -32,14 +32,26 @@ function mlp_test()
 
     println("\n\n\n\nMLP test: features: $(size_n), layers: $(layers_n) batch_size: $(batch_size)")
 
-    println("\nFlux model:")
-    display(BenchmarkTools.@benchmark ($flux_model)($random_input))
+    # println("\nFlux model:")
+    # display(BenchmarkTools.@benchmark ($flux_model)($random_input))
 
     println("\nLux model:")
     display(BenchmarkTools.@benchmark Lux.apply($lux_model, $random_input, $lx_ps, $lx_st))
 
     println("\nSimpleChains model:")
     display(BenchmarkTools.@benchmark Lux.apply($simple_model, $random_input, $lxsc_ps, $lxsc_st))
+end
+
+function count_params(params)
+    total_params = 0
+    for param in params
+        if isa(param, Array)
+            total_params += length(param)
+        else
+            total_params += count_params(param)
+        end
+    end
+    return total_params
 end
 
 function conv_test()
@@ -59,14 +71,14 @@ function conv_test()
     random_input = randn(Float32, img_size, img_size, 1, batch_size)
     
     # Flux model
-    flux_model = Flux.Chain(
-        [Flux.Chain(
-            Flux.Conv((kernel_size, kernel_size), (i == 1 ? 1 : channels) => channels, relu),
-            Flux.MaxPool((2, 2))
-        ) for i in 1:conv_layers]...,
-        Flux.flatten,
-        Flux.Dense(final_feats => 10)
-    )
+    # flux_model = Flux.Chain(
+    #     [Flux.Chain(
+    #         Flux.Conv((kernel_size, kernel_size), (i == 1 ? 1 : channels) => channels, relu),
+    #         Flux.MaxPool((2, 2))
+    #     ) for i in 1:conv_layers]...,
+    #     Flux.flatten,
+    #     Flux.Dense(final_feats => 10)
+    # )
     
     # Lux model
     lux_model = Lux.Chain(
@@ -87,7 +99,7 @@ function conv_test()
     # display(Lux.trainmode(lxsc_st))
 
     # Calculate parameters
-    total_params = sum(length, Flux.params(flux_model))
+    total_params = length(lxsc_ps.params)
     
     println("\n\n\n\nCNN test: img_size: $(img_size), channels: $(channels), " *
             "kernel: $(kernel_size), conv_layers: $(conv_layers), batch_size: $(batch_size)")
@@ -96,8 +108,8 @@ function conv_test()
     println("\nSimpleChains model:")
     display(BenchmarkTools.@benchmark Lux.apply($simple_model, $random_input, $lxsc_ps, $lxsc_st))
 
-    println("\nFlux model:")
-    display(BenchmarkTools.@benchmark ($flux_model)($random_input))
+    # println("\nFlux model:")
+    # display(BenchmarkTools.@benchmark ($flux_model)($random_input))
     
     println("\nLux model:")
     display(BenchmarkTools.@benchmark Lux.apply($lux_model, $random_input, $lx_ps, $lx_st))

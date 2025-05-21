@@ -62,5 +62,11 @@ import .EvolutionaryMutatePopulaiton
 include("ContinuousStatesGroupingGA/ContinuousStatesGroupingDE.jl")
 import .ContinuousStatesGroupingDE
 
+include("ContinuousStatesGroupingGA/ContinuousStatesGroupingFIHC.jl")
+import .ContinuousStatesGroupingFIHC
+
+include("ContinuousStatesGroupingGA/ContinuousStatesGroupingES.jl")
+import .ContinuousStatesGroupingES
+
 end # module AbstractOptimizerModule
  

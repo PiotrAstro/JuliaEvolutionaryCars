@@ -23,7 +23,7 @@ CARS_DICT = Dict(
         :max_generations => 1000,
         :max_evaluations => 1_000_000,
         :log => true,
-        :visualize_each_n_epochs => 0,
+        :visualize_each_n_epochs => 10,
     ),
     :environment => Dict(
         :name => :BasicCarEnvironment,
@@ -89,6 +89,70 @@ CARS_DICT = Dict(
 
     # ------------------------------------------------------------------------------------
     # method specific staff
+
+    :ContinuousStatesGroupingFIHC => Dict(
+        :env_wrapper => Dict(
+            # for car racing:
+            :encoder_dict => Dict(
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 10,
+                    :output_size => 16,  # 16
+                    :hidden_layers => 2,
+                    :hidden_neurons => 32,  # 32
+                    :dropout => 0.0,  # 0.5
+                    :activation_function => :relu,  # :relu
+                    :input_activation_function => :none,
+                    :last_activation_function => :none
+                )
+            ),
+            :decoder_dict => Dict(
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 16,  # 16
+                    :output_size => 10,  # it should be 10, 9 is for normal learning
+                    :hidden_layers => 2,  # was 1
+                    :hidden_neurons => 32,  # 64
+                    :dropout => 0.0,  # 0.5
+                    :activation_function => :relu,  # :relu
+                    :input_activation_function => :none,  # shouldnt it be :none?
+                    :last_activation_function => :none, # was :none
+                    :loss => :mse
+                )
+            ),
+            :autoencoder_dict => Dict(
+                :mmd_weight => 0.0,  # turns out it might be beneficial to set it to 0.01, so maybe in the future compare e.g. 0.0, 0.01, 0.1
+                :learning_rate => 0.001,  # 0.001
+                :weight_decay => 0.0
+            ),
+            :initial_space_explorers_n => 30,
+            :max_states_considered => 10_000,
+            :n_clusters => 20,  # 40 and 200 works very well, should try different values
+            :verbose => false,
+            :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock, after some initial tests it should definatelly be cosine!
+            :exemplars_clustering => :my_pam_random_increasing,  # :genie or :kmedoids or :pam
+            :environment_norm => nothing,
+            :exemplar_nn=>Dict(
+                :interaction_method=>:cosine,
+                :membership_normalization=>:mval_2,  # can be either mval_2 for 2 Int type or mval_1_5 for 1.5 Float32
+                :activation_function=>:none,  # for car racing should be :none, for humanoid should be :tanh
+            ),
+        ),
+        :new_individual_after_n_no_improvements => 10,
+        :new_individual_genes => :best,  # :rand or :best
+        :individual_config => Dict(
+            :initial_genes_mode => :std,
+            :norm_genes => :none,  # for car racing should be std, for humanoid should be :none
+            :levels_mode => :time_markov,  # all, flat, time_markov, time_mine, latent
+            :levels_hclust => :complete,  # :ward or :single or :complete or :average
+            :levels_construct_mode => :equal_up,  # equal_up, equal_down, priority_up, priority_down
+            :fitnesses_reduction => :median,
+            # fihc things
+            :fihc_f => 0.1,
+            :fihc_n_times => 5,
+            :fihc_same_per_gene => true,
+        ),
+    ),
 
 
     :ContinuousStatesGroupingDE => Dict(
@@ -227,6 +291,132 @@ HUMANOID_DICT = Dict(
     # ------------------------------------------------------------------------------------
     # method specific staff
 
+    :ContinuousStatesGroupingES => Dict(
+        :env_wrapper => Dict(
+            :encoder_dict => Dict(
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 376,
+                    :output_size => 16,  # 16
+                    :hidden_layers => 2,
+                    :hidden_neurons => 256,  # 32
+                    :dropout => 0.0,  # 0.5
+                    :activation_function => :relu,  # :relu
+                    :input_activation_function => :none,
+                    :last_activation_function => :none
+                )
+            ),
+            :decoder_dict => Dict(
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 16,  # 16
+                    :output_size => 376,  # it should be 10, 9 is for normal learning
+                    :hidden_layers => 2,  # was 1
+                    :hidden_neurons => 256,  # 64
+                    :dropout => 0.0,  # 0.5
+                    :activation_function => :relu,  # :relu
+                    :input_activation_function => :none,  # shouldnt it be :none?
+                    :last_activation_function => :none, # was :none
+                    :loss => :mse
+                )
+            ),
+            :autoencoder_dict => Dict(
+                :mmd_weight => 0.0,  # turns out it might be beneficial to set it to 0.01, so maybe in the future compare e.g. 0.0, 0.01, 0.1
+                :learning_rate => 0.001,  # 0.001
+                :weight_decay => 0.0
+            ),
+            :initial_space_explorers_n => 30,
+            :max_states_considered => 20_000,
+            :environment_norm => :NormMatrixASSEQ,
+            :n_clusters => 40,  # 40 and 200 works very well, should try different values
+            :verbose => false,
+            :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock, after some initial tests it should definatelly be cosine!
+            :exemplars_clustering => :my_pam_random_increasing,  # :genie or :kmedoids or :pam
+            :exemplar_nn=>Dict(
+                :interaction_method=>:cosine,
+                :membership_normalization=>:mval_2,  # can be either mval_2 for 2 Int type or mval_1_5 for 1.5 Float32
+                :activation_function=>:tanh,  # for car racing should be :none, for humanoid should be :tanh
+            ),
+        ),
+        :new_es_after_n_iterations => 10,
+        :es_type => :CMAES,
+        :es_kwargs => Dict(
+            :sigma => 0.01f0,
+            :lambda_n => 100,  # it might be left empty
+        ),
+        :individual_config => Dict(
+            :norm_genes => :none,  # make sure initial settings will not destroy anything, it is not used 
+            :levels_mode => :flat,  # make sure initial settings will not destroy anything, it is not used, make sure I do not doo additional calculations
+            :fitnesses_reduction => :mean,
+        ),
+    ),
+
+    :ContinuousStatesGroupingFIHC => Dict(
+        :env_wrapper => Dict(
+            :encoder_dict => Dict(
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 376,
+                    :output_size => 32,  # 16
+                    :hidden_layers => 2,
+                    :hidden_neurons => 256,  # 32
+                    :dropout => 0.0,  # 0.5
+                    :activation_function => :relu,  # :relu
+                    :input_activation_function => :none,
+                    :last_activation_function => :none
+                )
+            ),
+            :decoder_dict => Dict(
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 32,  # 16
+                    :output_size => 376,  # it should be 10, 9 is for normal learning
+                    :hidden_layers => 2,  # was 1
+                    :hidden_neurons => 256,  # 64
+                    :dropout => 0.0,  # 0.5
+                    :activation_function => :relu,  # :relu
+                    :input_activation_function => :none,  # shouldnt it be :none?
+                    :last_activation_function => :none, # was :none
+                    :loss => :mse
+                )
+            ),
+            :autoencoder_dict => Dict(
+                :mmd_weight => 0.0,  # turns out it might be beneficial to set it to 0.01, so maybe in the future compare e.g. 0.0, 0.01, 0.1
+                :learning_rate => 0.001,  # 0.001
+                :weight_decay => 0.0
+            ),
+            :initial_space_explorers_n => 30,
+            :max_states_considered => 10_000,
+            :environment_norm => :NormMatrixASSEQ,
+            :n_clusters => 15,  # 40 and 200 works very well, should try different values
+            :verbose => false,
+            :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock, after some initial tests it should definatelly be cosine!
+            :exemplars_clustering => :my_pam_random_increasing,  # :genie or :kmedoids or :pam
+            :exemplar_nn=>Dict(
+                :interaction_method=>:cosine,
+                :membership_normalization=>:mval_2,  # can be either mval_2 for 2 Int type or mval_1_5 for 1.5 Float32
+                :activation_function=>:tanh,  # for car racing should be :none, for humanoid should be :tanh
+            ),
+        ),
+        :new_individual_after_n_no_improvements => 3,
+        :new_individual_genes => :rand,  # :rand or :best
+        :individual_config => Dict(
+            :initial_genes_mode => :std,
+            :norm_genes => :tanh,  # for car racing should be std, for humanoid should be :none
+            :levels_mode => :time_markov,  # all, flat, time_markov, time_mine, latent
+            :levels_hclust => :complete,  # :ward or :single or :complete or :average
+            :levels_construct_mode => :priority_up,  # equal_up, equal_down, priority_up, priority_down
+            :fitnesses_reduction => :median,
+
+            :per_column_norm => false,
+
+            # fihc things
+            :fihc_f => 0.5,
+            :fihc_n_times => 5,
+            :fihc_same_per_gene => true,
+        ),
+    ),
+
 
     :ContinuousStatesGroupingDE => Dict(
         :env_wrapper => Dict(
@@ -283,9 +473,12 @@ HUMANOID_DICT = Dict(
             :norm_genes => :none,  # for car racing should be std, for humanoid should be :none
             :levels_mode => :time_markov,  # all, flat, time_markov, time_mine, latent
             :levels_hclust => :complete,  # :ward or :single or :complete or :average
-            :levels_construct_mode => :equal_up,  # equal_up, equal_down, priority_up, priority_down
-            :base_mode => :best, # :best or :rand or :self
+            :levels_construct_mode => :priority_up,  # equal_up, equal_down, priority_up, priority_down
+            :base_mode => :rand, # :best or :rand or :self
             :mask_mode => :per_gene,  # :per_gene or :per_value
+
+            :per_column_norm => true,
+
             :cross_n_times => 1,  # how many times to cross genes per one generation
             :cross_f => 0.8,
             :cross_prob => 1.0,
@@ -363,6 +556,69 @@ HALF_CHEETAH_DICT = Dict(
 
     # ------------------------------------------------------------------------------------
     # method specific staff
+
+        :ContinuousStatesGroupingFIHC => Dict(
+        :env_wrapper => Dict(
+            :encoder_dict => Dict(
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 376,
+                    :output_size => 32,  # 16
+                    :hidden_layers => 2,
+                    :hidden_neurons => 256,  # 32
+                    :dropout => 0.0,  # 0.5
+                    :activation_function => :relu,  # :relu
+                    :input_activation_function => :none,
+                    :last_activation_function => :none
+                )
+            ),
+            :decoder_dict => Dict(
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 32,  # 16
+                    :output_size => 376,  # it should be 10, 9 is for normal learning
+                    :hidden_layers => 2,  # was 1
+                    :hidden_neurons => 256,  # 64
+                    :dropout => 0.0,  # 0.5
+                    :activation_function => :relu,  # :relu
+                    :input_activation_function => :none,  # shouldnt it be :none?
+                    :last_activation_function => :none, # was :none
+                    :loss => :mse
+                )
+            ),
+            :autoencoder_dict => Dict(
+                :mmd_weight => 0.0,  # turns out it might be beneficial to set it to 0.01, so maybe in the future compare e.g. 0.0, 0.01, 0.1
+                :learning_rate => 0.001,  # 0.001
+                :weight_decay => 0.0
+            ),
+            :initial_space_explorers_n => 30,
+            :max_states_considered => 10_000,
+            :environment_norm => :NormMatrixASSEQ,
+            :n_clusters => 20,  # 40 and 200 works very well, should try different values
+            :verbose => false,
+            :distance_metric => :cosine,  # :euclidean or :cosine or :cityblock, after some initial tests it should definatelly be cosine!
+            :exemplars_clustering => :my_pam_random_increasing,  # :genie or :kmedoids or :pam
+            :exemplar_nn=>Dict(
+                :interaction_method=>:cosine,
+                :membership_normalization=>:mval_2,  # can be either mval_2 for 2 Int type or mval_1_5 for 1.5 Float32
+                :activation_function=>:tanh,  # for car racing should be :none, for humanoid should be :tanh
+            ),
+        ),
+        :new_individual_after_n_no_improvements => 10,
+        :new_individual_genes => :best,  # :rand or :best
+        :individual_config => Dict(
+            :initial_genes_mode => :std,
+            :norm_genes => :none,  # for car racing should be std, for humanoid should be :none
+            :levels_mode => :time_markov,  # all, flat, time_markov, time_mine, latent
+            :levels_hclust => :complete,  # :ward or :single or :complete or :average
+            :levels_construct_mode => :equal_up,  # equal_up, equal_down, priority_up, priority_down
+            :fitnesses_reduction => :median,
+            # fihc things
+            :fihc_f => 0.1,
+            :fihc_n_times => 5,
+            :fihc_same_per_gene => true,
+        ),
+    ),
 
 
     :ContinuousStatesGroupingDE => Dict(
@@ -459,8 +715,9 @@ HALF_CHEETAH_DICT = Dict(
 
 
 
-
-CONSTANTS_DICT = HALF_CHEETAH_DICT
+# CONSTANTS_DICT = CARS_DICT
+# CONSTANTS_DICT = HALF_CHEETAH_DICT
+CONSTANTS_DICT = HUMANOID_DICT
 
 
 

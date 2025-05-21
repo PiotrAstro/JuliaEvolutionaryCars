@@ -283,8 +283,50 @@ function Humanoid(;
     return humanoid
 end
 
+"""
+One should use 
+`MuJoCo.install_visualiser()`
+To use visualizers!
+"""
 function visualize!(env::Humanoid, model::NeuralNetwork.AbstractAgentNeuralNetwork, parent_env=env, reset::Bool = true;)
-    throw("unimplemented")
+    if reset
+        reset!(parent_env)
+    end
+
+    trajectory = Vector{Vector{Float32}}(undef, 0)
+    while is_alive(parent_env)
+        ctrl = NeuralNetwork.predict(model, NeuralNetwork.MatrixASSEQ([get_state(parent_env)]))[:, 1]
+        _set_ctrl(env, ctrl)
+        for _ in 1:env.frame_skip
+            MuJoCo.step!(env.model, env.data)
+            traj = Vector{Float64}(undef, env.model.nq + env.model.nv + env.model.na)
+            for i in 1:env.model.nq
+                traj[i] = env.data.qpos[i]
+            end
+            start_index = env.model.nq
+            for i in 1:length(env.data.qvel)
+                traj[i + start_index] = env.data.qvel[i]
+            end
+            start_index += length(env.data.qvel)
+            if !isnothing(env.data.act)
+                for i in 1:length(env.data.act)
+                    traj[i + start_index] = env.data.act[i]
+                end
+            end
+
+            push!(trajectory, traj)
+        end
+        MuJoCo.LibMuJoCo.mj_rnePostConstraint(env.model, env.data)
+        env.current_step += 1
+        env.is_healthy = _is_healthy(env)
+    end
+
+    trajectory_matrix = Matrix{Float64}(undef, length(trajectory[1]), length(trajectory))
+    for i in 1:length(trajectory)
+        trajectory_matrix[:, i] .= trajectory[i]
+    end
+
+    MuJoCo.visualise!(env.model, env.data, trajectories=trajectory_matrix)
 end
 
 function get_action_size(env::Humanoid)::Int
@@ -316,13 +358,9 @@ function reset!(env::Humanoid)
 end
 
 function react!(env::Humanoid, actions::AbstractVector{Float32}) :: Float64
-    @assert length(actions) == length(env.data.ctrl)
     @assert is_alive(env) "You have to reset the environment first!"
 
-    for i in eachindex(actions)
-        env.data.ctrl[i] = Float64(ifelse(env.additional_normalization, actions[i] * 0.4f0, actions[i]))
-    end
-
+    _set_ctrl(env, actions)
     xy_before = _mass_center(env)
 
     for _ in 1:env.frame_skip
@@ -452,6 +490,13 @@ end
 
 # --------------------------------------------------------------------------------------------------------------------------------------
 # INTERNAL
+
+function _set_ctrl(env::Humanoid, actions::AbstractVector{Float32})
+    @assert length(actions) == length(env.data.ctrl)
+    for i in eachindex(actions)
+        env.data.ctrl[i] = Float64(ifelse(env.additional_normalization, actions[i] * 0.4f0, actions[i]))
+    end
+end
 
 function _mass_center(env::Humanoid)::Tuple{Float64, Float64}
     mass_sum = sum(env.model.body_mass)
