@@ -39,5 +39,8 @@ import .JuliaEvolutionaryCars
 
 # JuliaEvolutionaryCars.run(:Evolutionary_Mutate_Population, CONSTANTS_DICT)
 # JuliaEvolutionaryCars.run(:ContinuousStatesGroupingDE, CONSTANTS_DICT)
-JuliaEvolutionaryCars.run(:ContinuousStatesGroupingES, CONSTANTS_DICT)
+# JuliaEvolutionaryCars.run(:ContinuousStatesGroupingES, CONSTANTS_DICT)
 # JuliaEvolutionaryCars.run(:ContinuousStatesGroupingFIHC, CONSTANTS_DICT)
+
+JuliaEvolutionaryCars.run(:EncoderOutputES, CONSTANTS_DICT)
+

@@ -1,6 +1,6 @@
 
 
-function visualize!(env::BasicCarEnvironment, model::NeuralNetwork.AbstractAgentNeuralNetwork, parent_env=env, reset::Bool = true; car_image_path::String, map_image_path::String, fps::Int = 60, log::Bool = false)
+function visualize!(env::BasicCarEnvironment, model::NeuralNetwork.AbstractAgentNeuralNetwork, parent_env=env, reset::Bool = true; car_image_path::String="data/car.png", map_image_path::String, fps::Int = 60, log::Bool = false)
     if reset
         reset!(parent_env)
     end

@@ -202,3 +202,12 @@ end # module EvolutionaryCarsJulia
 # DE- current to best, ale będzie tylko lepsze akceptowane
 # A może jeśli nie będę miał dynamicznego problemu to będzie zwykłe DE dobrze działało?
 
+#-------------------------------------------------------------------------------------------------------
+# może będziemy też ewoluować exemplarów w latent space? - czyli jednocześnie ewolucja exemplarów i ewolucja akcji
+
+# nowisie świeżucie inne pomysły:
+# - nie mamy żadnych exemplarów - po prostu ewoluujemy jedną warstwę z wyjścia z encodera do akcji.
+# - wtedy naturalny jest es i ten sam encoder.
+# - tłumaczenie dla de i przy zmianie encodera w es można robić na zasadzie uczenia tej warstwy (może się da jakoś sprytnie?)
+# - potencjalnie można badać jak się przesuwa centrum np. dla konkretnego wymiaru latent space czy coś i przy każdej iteracji lekko to przesuwać
+#   wtedy nie musimy cyklicznie zmieiać encoder, tylko wszystko by nam się automatycznie robiło

@@ -39,6 +39,8 @@ function fitnesses_reduction(method::Symbol, fitnesses::AbstractVector{Float64})
         return maximum(fitnesses)
     elseif method == :min
         return minimum(fitnesses)
+    elseif method == :sum
+        return sum(fitnesses)
     else
         throw(ArgumentError("Unknown fitness reduction method: $method"))
     end
@@ -67,6 +69,9 @@ import .ContinuousStatesGroupingFIHC
 
 include("ContinuousStatesGroupingGA/ContinuousStatesGroupingES.jl")
 import .ContinuousStatesGroupingES
+
+include("EncoderOutput/EncoderOutputES.jl")
+import .EncoderOutputES
 
 end # module AbstractOptimizerModule
  

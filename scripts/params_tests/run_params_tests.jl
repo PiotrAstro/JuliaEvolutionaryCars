@@ -100,13 +100,10 @@ LOGS_DIR = joinpath(pwd(), "log", "parTest_" * timestamp)  # running test from s
 # Values that will be tested
 TESTED_VALUES = [
     (
-        :ContinuousStatesGroupingDE,
+        :EncoderBasedNN,
         Dict(
-            :ContinuousStatesGroupingES => Dict(
-                :env_wrapper => Dict(
-                    :n_clusters => [10, 40],
-                ),
-                :new_es_after_n_iterations => [10, 40],
+            :EncoderBasedNN => Dict(
+                # :new_es_after_n_iterations => [10, 40],
                 :es_kwargs => Dict(
                     :sigma => [0.01f0, 0.4f0],
                     :lambda_n => [30, 500],  # it might be left empty

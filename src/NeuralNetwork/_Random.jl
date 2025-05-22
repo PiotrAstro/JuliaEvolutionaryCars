@@ -6,7 +6,7 @@ struct Random_NN{F} <: AbstractAgentNeuralNetwork
     activation!::F
 
     function Random_NN(actions_n::Int, activation_function::Symbol=:none)
-        activation_function! = get_activation_function(activation_function)
+        activation_function! = get_activation_layer_function(activation_function)
 
         return new{typeof(activation_function!)}(actions_n, activation_function!)
     end

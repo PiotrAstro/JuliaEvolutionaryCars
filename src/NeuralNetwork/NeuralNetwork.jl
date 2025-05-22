@@ -101,6 +101,7 @@ include("_MLP.jl")
 include("_Autoencoder.jl")
 include("_Random.jl")
 include("_ExemplarBasedNN.jl")
+include("_EncoderBasedNN.jl")
 
 # -------------------------------------------------------
 # module functions:

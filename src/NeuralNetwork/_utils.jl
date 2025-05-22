@@ -130,3 +130,47 @@ function _get_loss_function(name::Symbol)
         throw("Loss function not implemented")
     end
 end
+
+
+
+# ------------------------------------------------------------------------------------------
+# activation functions
+# They do not change anything for simple max choosing
+# There will be difference for crossover, I should check how to do it properly
+function get_activation_layer_function(activation_function::Symbol)
+    if activation_function == :none
+        activation_function! = activation_none
+    elseif activation_function == :softmax
+        activation_function! = activation_softmax!
+    elseif activation_function == :d_sum
+        activation_function! = activation_dsum!
+    elseif activation_function == :tanh
+        activation_function! = activation_tanh!
+    elseif activation_function == :sigmoid
+        activation_function! = activation_sigmoid!
+    else
+        throw(ArgumentError("Unknown activation function: $activation_function"))
+    end
+    return activation_function!
+end
+
+function activation_softmax!(interaction::AbstractVector{Float32})
+    softmax!(interaction)
+end
+
+function activation_tanh!(interaction::AbstractVector{Float32})
+    broadcast!(Lux.tanh_fast, interaction, interaction)
+end
+
+function activation_sigmoid!(interaction::AbstractVector{Float32})
+    broadcast!(Lux.sigmoid_fast, interaction, interaction)
+end
+
+function activation_none(interaction::AbstractVector{Float32})
+    return nothing
+end
+
+function activation_dsum!(interaction::AbstractVector{Float32})
+    sum_val = sum(interaction)
+    interaction .*= 1.0f0 / sum_val
+end
