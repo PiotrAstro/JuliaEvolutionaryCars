@@ -313,7 +313,7 @@ HUMANOID_DICT = Dict(
         :max_generations => 1000,
         :max_evaluations => 1_000_000,
         :log => true,
-        :visualize_each_n_epochs => 10,
+        :visualize_each_n_epochs => 0,
     ),
     :environment => Dict(
         :name => :Humanoid,
