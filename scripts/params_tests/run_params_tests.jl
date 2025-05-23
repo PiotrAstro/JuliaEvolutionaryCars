@@ -92,7 +92,7 @@ CONSTANTS_DICT[:run_config] = Dict(
 )
 
 # Number of run tests per each combination of tested values
-CASES_PER_TEST = 3
+CASES_PER_TEST = 4
 
 LOGS_DIR = joinpath(pwd(), "log", "parTest_" * timestamp)  # running test from scratch
 # LOGS_DIR = joinpath(pwd(), "log", "parTest_2024-12-27_12-31-13")  # running test from some start_position - it will recognize already done cases
@@ -100,43 +100,17 @@ LOGS_DIR = joinpath(pwd(), "log", "parTest_" * timestamp)  # running test from s
 # Values that will be tested
 TESTED_VALUES = [
     (
-        :EncoderBasedNN,
+        :EncoderOutputES,
         Dict(
-            :EncoderBasedNN => Dict(
+            :EncoderOutputES => Dict(
                 # :new_es_after_n_iterations => [10, 40],
                 :es_kwargs => Dict(
-                    :sigma => [0.01f0, 0.4f0],
-                    :lambda_n => [30, 500],  # it might be left empty
+                    :sigma => [0.007f0, 0.07f0], # here it doesnt really matter
+                    :step_size => [0.02f0, 0.2f0],
                 ),
             ),
         ),
     ),
-    # (
-    #     :Evolutionary_Mutate_Population,
-    #     Dict(
-    #         :Evolutionary_Mutate_Population => Dict(
-    #             # :environment_norm => [:NormMatrixASSEQ, nothing],
-    #             :population_size => [100, 400],
-    #             :mutation_rate => [0.01, 0.05],
-    #         ),
-    #     ),
-    # ),
-    # (
-    #     :ContinuousStatesGroupingDE,
-    #     Dict(
-    #         :ContinuousStatesGroupingDE => Dict(
-    #             :env_wrapper => Dict(
-    #                 :n_clusters => [20, 40],
-    #                 # :environment_norm => [:NormMatrixASSEQ, nothing],
-    #             ),
-    #             :individuals_n => [50, 150],
-    #             :individual_config => Dict(
-    #                 :norm_genes => [:std, :none],
-    #                 :cross_f => [0.3, 0.8],
-    #             ),
-    #         ),
-    #     ),
-    # ),
 ]
 
 

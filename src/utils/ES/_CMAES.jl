@@ -167,6 +167,7 @@ function update!(cmaes::CMAESState{F, ARR}, solutions::Vector{ARR}, fitness::Vec
 
     # Update step size
     cmaes.sigma = cmaes.sigma * exp((cmaes.c_sigma / cmaes.damping) * (norm_p_sigma / cmaes.expected_N - 1))
+    # println("Sigma: ", cmaes.sigma)
 end
 
 function get_mean(cmaes::CMAESState{F, ARR})::ARR where {F<:AbstractFloat, ARR<:Array{F}}

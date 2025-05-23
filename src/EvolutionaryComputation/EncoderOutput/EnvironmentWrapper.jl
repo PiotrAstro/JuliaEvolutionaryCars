@@ -186,8 +186,12 @@ end
 # end
 
 function get_full_NN(env_wrap::EnvironmentWrapperStruct, translation::Matrix{Float32})
-    return NeuralNetwork.EncoderBasedNN(
-        env_wrap._autoencoder.encoder,
+    # return NeuralNetwork.EncoderBasedNN(
+    #     env_wrap._autoencoder.encoder,
+    #     translation,
+    #     env_wrap._activation_function
+    # )
+    return NeuralNetwork.SimpleMul_NN(
         translation,
         env_wrap._activation_function
     )

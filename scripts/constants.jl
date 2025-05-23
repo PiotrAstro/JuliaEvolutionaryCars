@@ -89,7 +89,75 @@ CARS_DICT = Dict(
 
     # ------------------------------------------------------------------------------------
     # method specific staff
-        :ContinuousStatesGroupingES => Dict(
+    :EncoderOutputES => Dict(
+        :env_wrapper => Dict(
+            :encoder_dict => Dict(
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 10,
+                    :output_size => 16,  # 16
+                    :hidden_layers => 2,
+                    :hidden_neurons => 32,  # 32
+                    :dropout => 0.0,  # 0.5
+                    :activation_function => :relu,  # :relu
+                    :input_activation_function => :none,
+                    :last_activation_function => :none
+                )
+            ),
+            :decoder_dict => Dict(
+                :name => :MLP_NN,
+                :kwargs => Dict(
+                    :input_size => 16,  # 16
+                    :output_size => 10,  # it should be 10, 9 is for normal learning
+                    :hidden_layers => 2,  # was 1
+                    :hidden_neurons => 32,  # 64
+                    :dropout => 0.0,  # 0.5
+                    :activation_function => :relu,  # :relu
+                    :input_activation_function => :none,  # shouldnt it be :none?
+                    :last_activation_function => :none, # was :none
+                    :loss => :mse
+                )
+            ),
+            :autoencoder_dict => Dict(
+                :mmd_weight => 0.0,  # turns out it might be beneficial to set it to 0.01, so maybe in the future compare e.g. 0.0, 0.01, 0.1
+                :learning_rate => 0.001,  # 0.001
+                :weight_decay => 0.0
+            ),
+            :initial_space_explorers_n => 30,
+            :max_states_considered => 20_000,
+            :environment_norm => nothing,
+            :activation_function => :none,
+            :verbose => false,
+        ),
+        # :new_es_after_n_iterations => 10,
+        # :es_type => :CMAES,
+        # :es_kwargs => Dict(
+        #     :sigma => 0.3f0,
+        #     :lambda_n => 500,  # it might be left empty
+        # ),
+        # :es_type => :DE,
+        # :es_kwargs => Dict(
+        #     :base_mode => :best, # :best or :rand
+        #     # :sigma => 0.3f0, # here it doesnt really matter
+        #     :cross_per_symbol => :all, # :row or :col or :all
+        #     :parents_n => 1000,
+        #     :f_param => 0.7f0,
+        #     :cross_param => 0.5f0,
+        #     :norm_std => false,
+        # ),
+        :es_type => :ARS,
+        :es_kwargs => Dict(
+            :sigma => 0.03f0, # here it doesnt really matter
+            :step_size => 0.03f0,
+            :child_n => 1000,
+            :best_n => 500,
+        ),
+        :individual_config => Dict(
+            :fitnesses_reduction => :sum,
+        ),
+    ),
+
+    :ContinuousStatesGroupingES => Dict(
         :env_wrapper => Dict(
             :encoder_dict => Dict(
                 :name => :MLP_NN,
@@ -320,7 +388,7 @@ HUMANOID_DICT = Dict(
         :visualization => Dict(
         ),
         :universal_kwargs => Dict(
-            :base_version => :humanoid_v4,
+            :base_version => :humanoid_v5,
             :max_steps => 1000,
             :reset_noise_scale => 0.01,
             :reset_random_generator => true,
@@ -359,9 +427,9 @@ HUMANOID_DICT = Dict(
             :encoder_dict => Dict(
                 :name => :MLP_NN,
                 :kwargs => Dict(
-                    :input_size => 376,
-                    :output_size => 16,  # 16
-                    :hidden_layers => 2,
+                    :input_size => 348,
+                    :output_size => 348,  # 16
+                    :hidden_layers => 0,
                     :hidden_neurons => 256,  # 32
                     :dropout => 0.0,  # 0.5
                     :activation_function => :relu,  # :relu
@@ -372,9 +440,9 @@ HUMANOID_DICT = Dict(
             :decoder_dict => Dict(
                 :name => :MLP_NN,
                 :kwargs => Dict(
-                    :input_size => 16,  # 16
-                    :output_size => 376,  # it should be 10, 9 is for normal learning
-                    :hidden_layers => 2,  # was 1
+                    :input_size => 348,  # 16
+                    :output_size => 348,  # it should be 10, 9 is for normal learning
+                    :hidden_layers => 0,  # was 1
                     :hidden_neurons => 256,  # 64
                     :dropout => 0.0,  # 0.5
                     :activation_function => :relu,  # :relu
@@ -383,6 +451,33 @@ HUMANOID_DICT = Dict(
                     :loss => :mse
                 )
             ),
+            # :encoder_dict => Dict(
+            #     :name => :MLP_NN,
+            #     :kwargs => Dict(
+            #         :input_size => 348,
+            #         :output_size => 16,  # 16
+            #         :hidden_layers => 2,
+            #         :hidden_neurons => 256,  # 32
+            #         :dropout => 0.0,  # 0.5
+            #         :activation_function => :relu,  # :relu
+            #         :input_activation_function => :none,
+            #         :last_activation_function => :none
+            #     )
+            # ),
+            # :decoder_dict => Dict(
+            #     :name => :MLP_NN,
+            #     :kwargs => Dict(
+            #         :input_size => 16,  # 16
+            #         :output_size => 348,  # it should be 10, 9 is for normal learning
+            #         :hidden_layers => 2,  # was 1
+            #         :hidden_neurons => 256,  # 64
+            #         :dropout => 0.0,  # 0.5
+            #         :activation_function => :relu,  # :relu
+            #         :input_activation_function => :none,  # shouldnt it be :none?
+            #         :last_activation_function => :none, # was :none
+            #         :loss => :mse
+            #     )
+            # ),
             :autoencoder_dict => Dict(
                 :mmd_weight => 0.0,  # turns out it might be beneficial to set it to 0.01, so maybe in the future compare e.g. 0.0, 0.01, 0.1
                 :learning_rate => 0.001,  # 0.001
@@ -391,14 +486,31 @@ HUMANOID_DICT = Dict(
             :initial_space_explorers_n => 30,
             :max_states_considered => 20_000,
             :environment_norm => :NormMatrixASSEQ,
-            :activation_function => :tanh,
+            :activation_function => :none,
             :verbose => false,
         ),
         # :new_es_after_n_iterations => 10,
-        :es_type => :CMAES,
+        # :es_type => :CMAES,
+        # :es_kwargs => Dict(
+        #     :sigma => 0.3f0,
+        #     :lambda_n => 500,  # it might be left empty
+        # ),
+        # :es_type => :DE,
+        # :es_kwargs => Dict(
+        #     :base_mode => :best, # :best or :rand
+        #     # :sigma => 0.3f0, # here it doesnt really matter
+        #     :cross_per_symbol => :all, # :row or :col or :all
+        #     :parents_n => 1000,
+        #     :f_param => 0.7f0,
+        #     :cross_param => 0.5f0,
+        #     :norm_std => false,
+        # ),
+        :es_type => :ARS,
         :es_kwargs => Dict(
-            :sigma => 0.01f0,
-            :lambda_n => 100,  # it might be left empty
+            :sigma => 0.007f0, # here it doesnt really matter
+            :step_size => 0.02f0,
+            :child_n => 230,
+            # :best_n => 230,
         ),
         :individual_config => Dict(
             :fitnesses_reduction => :mean,
